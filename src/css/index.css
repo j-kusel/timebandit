@@ -1,0 +1,6 @@
+.measure {
+  display: inline-block; }
+
+.workspace {
+  overflow-x: scroll;
+  white-space: nowrap; }
