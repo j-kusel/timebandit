@@ -78,7 +78,7 @@ class App extends Component {
       console.log(newMeasure);
 
       this.setState((oldState) => {
-          oldState.insts[this.inputs.inst.value].push(newMeasure);
+          oldState.insts[this.inputs.inst.value].push(calc);
           return oldState;
       });
   }
@@ -89,7 +89,7 @@ class App extends Component {
         let measures = inst.map((measure, index2) => {
             return (
                 <div className="measure">
-                    <Measure className="measure" key={index2} start={parseInt(measure.start)} end={parseInt(measure.end)} beats={parseInt(measure.beats)} PPQ={this.state.PPQ} sizing={5000.0}/>
+                    <Measure className="measure" key={index2} beats={measure.beats} len={measure.ms} sizing={5000.0}/>
                 </div>)
         });
         return (

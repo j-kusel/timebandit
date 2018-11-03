@@ -1,10 +1,6 @@
 export default function measure(p) {
 
-    let start = 0;
-    let end = 0;
-    let timesig = 0;
-    let PPQ = 24;
-    let ms = 600;
+    var len = 600;
     let beats = [];
 
     p.setup = function () {
@@ -14,35 +10,18 @@ export default function measure(p) {
         console.log(p.height);
     };
 
-    p.myCustomRedrawAccordingToNewPropsHandler = function (props) {
-        start = props.start;
-        end = props.end;
-        timesig = props.beats;
-        PPQ = props.PPQ;
-
+    p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
+        len = props.len;
+        beats = props.beats;
         
-        let ticks = props.PPQ * props.beats;
-        let cumulative = 0.0;
-        let inc = (props.end-props.start)/ticks;
-        for (var i=0; i<ticks; i++) {
-            let elapsed = (60000.0/(props.start + inc*i))/props.PPQ;
-            if (!(i%props.PPQ)) beats.push(cumulative);
-            cumulative += elapsed;
-        }
-        ms = cumulative;
-        console.log({
-            canvasSize: ms*props.scope/props.sizing,
-            beats: beats
-        });
-
-        p.resizeCanvas(ms*props.scope/props.sizing, 100);
-
+        console.log({canvasBeats: props.beats});
+        p.resizeCanvas(props.len*props.scope/props.sizing, 100);
     }
 
     p.draw = function () {
         p.stroke(255, 0, 0);
         beats.forEach((beat) => {
-            let loc = p.width/ms*beat;
+            let loc = p.width/len*beat;
             p.line(loc, 0, loc, p.height);
         });
         p.noFill();

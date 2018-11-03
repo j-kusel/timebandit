@@ -31,7 +31,7 @@ class Measure extends Component {
             sizing: this.props.sizing
         });
         return (
-            <P5Wrapper sketch={measure} start={this.state.start} end={this.state.end} beats={this.state.beats} PPQ={this.state.PPQ} sizing={this.props.sizing} scope={window.innerWidth}/>
+            <P5Wrapper sketch={measure} len={this.props.len} beats={this.props.beats} sizing={this.props.sizing} scope={window.innerWidth}/>
         )
     }
 }
