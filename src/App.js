@@ -40,13 +40,17 @@ class App extends Component {
 
       this.state = {
           insts: [[], []],
+          sizing: 5000.0,
+          scroll: 0,
           PPQ: 24,
           time: 0
       }
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
+      this.handleWheel = this.handleWheel.bind(this);
 
       this.inputs = {};
+
   }
 
   handleInst(e) {
@@ -83,13 +87,21 @@ class App extends Component {
       });
   }
 
+  handleWheel(e) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          e.preventDefault();
+          let percent = e.deltaY/200.0;
+          this.setState((oldState) => ({sizing: oldState.sizing*(1.0-percent)}));
+      }
+  }
+
   render() {
     let insts = this.state.insts.map((inst, index) => {
 
         let measures = inst.map((measure, index2) => {
             return (
                 <div className="measure">
-                    <Measure className="measure" key={index2} beats={measure.beats} len={measure.ms} sizing={5000.0}/>
+                    <Measure className="measure" key={index2} beats={measure.beats} len={measure.ms} sizing={this.state.sizing}/>
                 </div>)
         });
         return (
@@ -144,7 +156,8 @@ class App extends Component {
                 <Button type="submit">create</Button>
             </FormGroup>
         </form>
-        <div className="workspace">
+        <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
+        <div id="workspace" onWheel={(e) => this.handleWheel(e)} className="workspace">
             { insts }
         </div>
       </div>

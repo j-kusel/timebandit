@@ -26,10 +26,6 @@ class Measure extends Component {
     }
 
     render() {
-        console.log({
-            scope: window.innerWidth,
-            sizing: this.props.sizing
-        });
         return (
             <P5Wrapper sketch={measure} len={this.props.len} beats={this.props.beats} sizing={this.props.sizing} scope={window.innerWidth}/>
         )
