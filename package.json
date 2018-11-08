@@ -10,7 +10,8 @@
     "react-bootstrap": "^0.32.4",
     "react-dom": "^16.5.2",
     "react-p5-wrapper": "0.0.4",
-    "react-scripts": "1.1.5"
+    "react-scripts": "1.1.5",
+    "styled-components": "^4.0.3"
   },
   "scripts": {
     "build-css": "node-sass-chokidar src/sass/ -o src/css/",

@@ -3,18 +3,20 @@ export default function measure(p) {
     var len = 600;
     let beats = [];
     var rollover = -1;
+    var callback;
     var init = true;
+    var selected = false;
     const ROLLOVER_TOLERANCE = 3;
 
 
     p.setup = function () {
         p.createCanvas(600, 100);
-        console.log(p.width);
-        console.log(p.height);
     };
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         len = props.len;
+        callback = props.callback;
+        selected = props.selected;
         p.resizeCanvas(props.len*props.scope/props.sizing, 100);
         beats = props.beats.map(beat => p.width/len*beat);
         p.background(0);
@@ -22,6 +24,8 @@ export default function measure(p) {
 
     p.draw = function () {
 
+        p.background(0);
+        p.background(0);
         p.stroke(255, 0, 0);
         let cursor = 'default';
         rollover = -1;
@@ -40,7 +44,16 @@ export default function measure(p) {
         p.rect(0, 0, p.width-1, p.height-1);
         p.stroke(0, 255, 0);
         p.line(0, 0, 0, p.height);
+
+        selected ? p.tint(255, 100) : p.tint(255, 0);
+        p.fill(255, 255, 255, selected ? 100 : 0);
+        p.rect(0, 0, p.width-1, p.height-1);
     }
+
+    /*p.mousePressed = function() {
+        callback({x: p.mouseX, y: p.mouseY});
+    }
+    */
 
 }
 
