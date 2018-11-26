@@ -1,6 +1,9 @@
 import React, { Component } from 'react';
 import { Button, ControlLabel, FormControl, FormGroup } from 'react-bootstrap';
-import Measure from "./Components/Measure";
+import measure from './Sketches/measure';
+import P5Wrapper from 'react-p5-wrapper';
+import styled from 'styled-components';
+import uuidv4 from 'uuid/v4';
 
 var MeasureCalc = (start, end, timesig, PPQ) => {
     var ms;
@@ -18,6 +21,7 @@ var MeasureCalc = (start, end, timesig, PPQ) => {
         console.log(cumulative);
     }
     ms = cumulative;
+    beats.push(ms);
     console.log({
         start: start,
         end: end,
@@ -30,7 +34,7 @@ var MeasureCalc = (start, end, timesig, PPQ) => {
 
     
 
-    return {beats: beats, ms: ms};
+    return {id: uuidv4(), beats: beats, ms: ms};
 }
 
 
@@ -40,6 +44,7 @@ class App extends Component {
 
       this.state = {
           insts: [[], []],
+          measures: [],
           sizing: 5000.0,
           scroll: 0,
           PPQ: 24,
@@ -47,7 +52,8 @@ class App extends Component {
           selected: {
               inst: -1,
               measure: -1
-          }
+          },
+          API: this.initAPI()
       }
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
@@ -56,6 +62,13 @@ class App extends Component {
 
       this.inputs = {};
 
+  }
+
+  initAPI() {
+      var self = this;
+      return {
+          select: (inst, meas) => self.setState(oldState => ({selected: {inst: inst, measure: meas}})),
+      };
   }
 
   handleInst(e) {
@@ -83,19 +96,19 @@ class App extends Component {
 
       var calc = MeasureCalc(newMeasure.start, newMeasure.end, newMeasure.beats, this.state.PPQ);
       calc.offset = parseInt(this.inputs.offset.value);
+      console.log(calc);
+      this.setState(oldState => ({measures: oldState.measures.concat(calc)}));
 
-      var inst = this.inputs.inst.value;
+      /*var inst = this.inputs.inst.value;
       var newInst = [];
       if (this.state.selected.inst >= 0) {
           var oldInst = this.state.insts[this.state.selected.inst];
           var oldLen = oldInst.length;
-          console.log({oldLen: oldLen});
           for (var i=0; i<oldLen; i++) {
               console.log(oldInst[i]);
               if (i === this.state.selected.measure) newInst.push(calc);
               newInst.push(oldInst[i]);
           }
-          console.log(newInst);
           this.setState(oldState => {
               oldState.insts[inst] = newInst;
               return oldState;
@@ -105,7 +118,7 @@ class App extends Component {
               oldState.insts[inst].push(calc);
               return oldState;
           });
-      }
+      }*/
 
   }
 
@@ -128,23 +141,17 @@ class App extends Component {
       
 
   render() {
-    let insts = this.state.insts.map((inst, index) => {
 
-        let measures = inst.map((measure, index2) => {
-            var selected = (this.state.selected.inst === index && this.state.selected.measure === index2);
-            return (
-                <div className="measure" key={index2} onClick={e => this.handleClick(index, index2)}>
-                    <Measure className="measure" selected={selected} beats={measure.beats} offset={measure.offset} len={measure.ms} sizing={this.state.sizing}/>
-                </div>)
-        });
-        return (
-            <div className="inst" key={index}>
-                { measures }
-            </div>
-        )
-    })
+    var paddingLeft = 0;
 
-    let instOptions = this.state.insts.map((inst, index) => <option key={index} value={index}>{'inst'+index.toString()}</option>);
+    var P5Container = styled.div`
+        div {
+            padding-left: ${paddingLeft}px;
+        }
+    `;
+
+    
+    //let instOptions = this.state.insts.map((inst, index) => <option key={index} value={index}>{'inst'+index.toString()}</option>);
 
     return (
       <div className="App">
@@ -162,12 +169,13 @@ class App extends Component {
         <form onSubmit={this.handleMeasure} className="measure-form">
             <FormGroup>
                 <ControlLabel>start tempo</ControlLabel>
-                <FormControl
+        {/*<FormControl
                     componentClass="select"
                     inputRef={(ref) => {this.inputs.inst = ref}}
                 >
                     { instOptions }
                 </FormControl>
+                */}
                 <FormControl
                     type="text"
                     placeholder="start"
@@ -197,7 +205,10 @@ class App extends Component {
         </form>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <div id="workspace" onWheel={(e) => this.handleWheel(e)} className="workspace">
-            { insts }
+            <P5Container>
+                <P5Wrapper className="p5" sketch={measure} API={this.state.API} measures={this.state.measures} score={this.state.insts} selected={this.state.selected} sizing={this.state.sizing} />
+            </P5Container>
+
         </div>
       </div>
     );
