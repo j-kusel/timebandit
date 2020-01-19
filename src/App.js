@@ -8,20 +8,22 @@ import uuidv4 from 'uuid/v4';
 var MeasureCalc = (start, end, timesig, PPQ) => {
     var ms;
     var beats = [];
-    let ticks = PPQ * timesig;
+    var ticks = [];
+    let tick_num = PPQ * timesig;
     let cumulative = 0.0;
-    let inc = (end-start)/ticks;
+    let inc = (end-start)/tick_num;
     console.log({inc: inc, ticks: ticks});
-    for (var i=0; i<ticks; i++) {
+    for (var i=0; i<tick_num; i++) {
         let elapsed = (60000.0/(start + inc*i))/PPQ;
         if (!(i%PPQ)) {
             beats.push(cumulative);
-        }
+        };
+        ticks.push(cumulative);
         cumulative += elapsed;
-        console.log(cumulative);
     }
     ms = cumulative;
     beats.push(ms);
+    ticks.push(cumulative);
     console.log({
         start: start,
         end: end,
@@ -32,9 +34,7 @@ var MeasureCalc = (start, end, timesig, PPQ) => {
         ms: ms
     });
 
-    
-
-    return {id: uuidv4(), beats: beats, ms: ms};
+    return {id: uuidv4(), beats, ms, ticks};
 }
 
 
@@ -55,11 +55,15 @@ class App extends Component {
           },
           API: this.initAPI()
       }
+
+      this.sizing = 5000.0;
+
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
-      this.handleWheel = this.handleWheel.bind(this);
       this.handleClick = this.handleClick.bind(this);
+      this.handleRecalc = this.handleRecalc.bind(this);
 
+      this.scopeDisplay = this.scopeDisplay.bind(this);
       this.inputs = {};
 
   }
@@ -94,6 +98,7 @@ class App extends Component {
           beats: parseInt(this.inputs.beats.value),
       }
 
+      console.log(newMeasure);
       var calc = MeasureCalc(newMeasure.start, newMeasure.end, newMeasure.beats, this.state.PPQ);
       calc.offset = parseInt(this.inputs.offset.value);
       console.log(calc);
@@ -122,13 +127,6 @@ class App extends Component {
 
   }
 
-  handleWheel(e) {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-          e.preventDefault();
-          let percent = e.deltaY/200.0;
-          this.setState((oldState) => ({sizing: oldState.sizing*(1.0-percent)}));
-      }
-  }
 
   handleClick(inst, measure) {
       if (inst === this.state.selected.inst && measure === this.state.selected.measure) {
@@ -138,6 +136,23 @@ class App extends Component {
       this.setState(oldState => ({ selected: { inst: inst, measure: measure }}));
       console.log('which hits first?');
   }
+
+  handleRecalc(index, measure, change) {
+      this.setState(oldState => {
+          let measures = oldState.measures;
+          let tick = measure.ticks.pop() - measure.ticks.pop();
+          let BPM = 60000.0/(tick * oldState.PPQ);
+          console.log(BPM);
+          measures[index] = MeasureCalc(60, BPM, 5, 24);
+          return ({ measures })
+      });
+  }
+
+  scopeDisplay(scale) {
+      this.sizing = 5000.0 * scale;
+  };
+
+
       
 
   render() {
@@ -204,9 +219,9 @@ class App extends Component {
             </FormGroup>
         </form>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
-        <div id="workspace" onWheel={(e) => this.handleWheel(e)} className="workspace">
+        <div id="workspace" className="workspace">
             <P5Container>
-                <P5Wrapper className="p5" sketch={measure} API={this.state.API} measures={this.state.measures} score={this.state.insts} selected={this.state.selected} sizing={this.state.sizing} />
+                <P5Wrapper key={1} className="p5" sketch={measure} API={this.state.API} measures={this.state.measures} score={this.state.insts} selected={this.state.selected} callback={this.handleRecalc} wheelCallback={this.scopeDisplay} />
             </P5Container>
 
         </div>
