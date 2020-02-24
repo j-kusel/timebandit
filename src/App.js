@@ -5,14 +5,19 @@ import P5Wrapper from 'react-p5-wrapper';
 import styled from 'styled-components';
 import uuidv4 from 'uuid/v4';
 
-var MeasureCalc = (start, end, timesig, PPQ) => {
+const DEBUG = true;
+
+var MeasureCalc = (features, options) => {
+    let start, end, timesig;
+    let PPQ;
+    ({ start, end, timesig } = features);
+    ({ PPQ } = options);
     var ms;
     var beats = [];
     var ticks = [];
-    let tick_num = PPQ * timesig;
+    let tick_num = options.PPQ * timesig;
     let cumulative = 0.0;
     let inc = (end-start)/tick_num;
-    console.log({inc: inc, ticks: ticks});
     for (var i=0; i<tick_num; i++) {
         let elapsed = (60000.0/(start + inc*i))/PPQ;
         if (!(i%PPQ)) {
@@ -24,18 +29,58 @@ var MeasureCalc = (start, end, timesig, PPQ) => {
     ms = cumulative;
     beats.push(ms);
     ticks.push(cumulative);
-    console.log({
-        start: start,
-        end: end,
-        timesig: timesig,
-        PPQ: PPQ,
-        beats: beats,
-        ticks: ticks,
-        ms: ms
-    });
 
-    return {id: uuidv4(), beats, ms, ticks};
+    return {start, end, beats, ms, ticks, offset: features.offset};
 }
+
+class UI extends Component {
+    /*constructor(props, context) {
+        super(props, context);
+        /*this.state = {
+            API: props.API,
+            measures: {},
+            CONSTANTS: props.CONSTANTS,
+        };
+    };
+    */
+
+    // NEVER UPDATE
+    shouldComponentUpdate(nextProps, nextState) {
+        let flag = false;
+        
+        Object.keys(nextProps.measures)
+            .forEach((key) => {
+                if (!(key in this.props.measures)) {
+                    flag = true;
+                };
+                ['start', 'end', 'offset'].forEach((attr) => {
+                    if (nextProps.measures[key] !== this.props.measures[key])
+                        flag = true;
+                });
+            });
+        return flag;
+    };
+
+    render() {
+        var paddingLeft = 0;
+
+        var P5Container = styled.div`
+            div {
+                padding-left: ${paddingLeft}px;
+            }
+        `;
+
+
+        return (
+            <div>
+                <P5Container>
+                    <P5Wrapper key={1} className="p5" sketch={measure} measures={this.props.measures} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                </P5Container>
+            </div>
+        );
+        // sketch={measure} API={this.state.API} measures={this.state.measures} score={this.state.insts} selected={this.state.selected} callback={this.handleRecalc} wheelCallback={this.scopeDisplay} 
+    };
+};
 
 
 class App extends Component {
@@ -44,8 +89,7 @@ class App extends Component {
 
       this.state = {
           insts: [[], []],
-          measures: [],
-          sizing: 5000.0,
+          sizing: 600.0,
           scroll: 0,
           PPQ: 24,
           time: 0,
@@ -53,26 +97,55 @@ class App extends Component {
               inst: -1,
               measure: -1
           },
-          API: this.initAPI()
       }
 
-      this.sizing = 5000.0;
+      this.state.measures = DEBUG ?
+          {
+              [uuidv4()]: MeasureCalc({ 
+                  start: 60,
+                  end: 120,
+                  timesig: 5,
+                  offset: 0
+              }, { PPQ: this.state.PPQ })
+          } :
+          {};
+          
+
+      this.CONSTANTS = {
+          PPQ: 24
+      };
+
+      this.sizing = 600.0;
 
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
       this.handleClick = this.handleClick.bind(this);
-      this.handleRecalc = this.handleRecalc.bind(this);
 
-      this.scopeDisplay = this.scopeDisplay.bind(this);
       this.inputs = {};
+
+
+      this.API = this.initAPI()
 
   }
 
   initAPI() {
       var self = this;
-      return {
-          select: (inst, meas) => self.setState(oldState => ({selected: {inst: inst, measure: meas}})),
+    
+      var select = (inst, meas) => self.setState(oldState => ({selected: {inst: inst, measure: meas}}));
+
+      var updateMeasure = (id, start, end, timesig) => {
+          var offset = this.state.measures[id].offset;
+          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ });
+          self.setState(oldState => {
+              let measures = oldState.measures;
+              measures[id] = calc;
+              return { measures };
+          });
       };
+
+      var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
+
+      return { select, updateMeasure, newScaling };
   }
 
   handleInst(e) {
@@ -95,14 +168,20 @@ class App extends Component {
       let newMeasure = {
           start: parseInt(this.inputs.start.value),
           end: parseInt(this.inputs.end.value),
-          beats: parseInt(this.inputs.beats.value),
-      }
+          timesig: parseInt(this.inputs.beats.value),
+          offset: parseInt(this.inputs.offset.value)
+      };
 
-      console.log(newMeasure);
-      var calc = MeasureCalc(newMeasure.start, newMeasure.end, newMeasure.beats, this.state.PPQ);
-      calc.offset = parseInt(this.inputs.offset.value);
+      console.log('PPQ');
+      console.log(this.state.PPQ);
+      var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ });
       console.log(calc);
-      this.setState(oldState => ({measures: oldState.measures.concat(calc)}));
+
+      this.setState(oldState => {
+          let measures = oldState.measures;
+          measures[uuidv4()] = calc;
+          return { measures };
+      });
 
       /*var inst = this.inputs.inst.value;
       var newInst = [];
@@ -137,36 +216,16 @@ class App extends Component {
       console.log('which hits first?');
   }
 
-  handleRecalc(index, measure, change) {
-      this.setState(oldState => {
-          let measures = oldState.measures;
-          let tick = measure.ticks.pop() - measure.ticks.pop();
-          let BPM = 60000.0/(tick * oldState.PPQ);
-          console.log(BPM);
-          measures[index] = MeasureCalc(60, BPM, 5, 24);
-          return ({ measures })
-      });
-  }
-
-  scopeDisplay(scale) {
-      this.sizing = 5000.0 * scale;
-  };
-
 
       
 
   render() {
 
-    var paddingLeft = 0;
-
-    var P5Container = styled.div`
-        div {
-            padding-left: ${paddingLeft}px;
-        }
-    `;
-
     
     //let instOptions = this.state.insts.map((inst, index) => <option key={index} value={index}>{'inst'+index.toString()}</option>);
+
+
+    var newMeasures = Object.assign({}, this.state.measures);
 
     return (
       <div className="App">
@@ -220,10 +279,7 @@ class App extends Component {
         </form>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <div id="workspace" className="workspace">
-            <P5Container>
-                <P5Wrapper key={1} className="p5" sketch={measure} API={this.state.API} measures={this.state.measures} score={this.state.insts} selected={this.state.selected} callback={this.handleRecalc} wheelCallback={this.scopeDisplay} />
-            </P5Container>
-
+            <UI measures={newMeasures} API={this.API} CONSTANTS={this.CONSTANTS}/> 
         </div>
       </div>
     );
