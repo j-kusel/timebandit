@@ -116,6 +116,7 @@ class App extends Component {
       };
 
       this.sizing = 600.0;
+      this.location = 0.0;
 
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);

@@ -1,5 +1,6 @@
 
 var scale = 1.0;
+var offset = 0.0;
 var range = [0, 100];
 var scaleY = () => 50.0;
 
@@ -72,7 +73,7 @@ export default function measure(p) {
                 which = 'temp_';
 
             measure[which + 'ticks'].forEach((tick) => {
-                let loc = (measure.offset + tick)*scale;
+                let loc = (measure.offset + tick + offset)*scale;
                 if (loc > p.width)
                     return
                 p.line(loc, 0, loc, p.height);
@@ -80,12 +81,9 @@ export default function measure(p) {
 
 
             p.stroke(240, 200, 200);
-
-            //p.line(measure.offset, scaleY(measure.start), measure.offset + measure.beats.slice(-1), scaleY(measure.end));
-
             let scaleY = (input) => p.height - (input - range[0])/(range[1] - range[0])*p.height;
 
-            p.line(measure.offset*scale, scaleY(measure.start), (measure.offset + measure.beats.slice(-1)[0])*scale, scaleY(measure.end));
+            p.line((measure.offset + offset)*scale, scaleY(measure.start), (measure.offset + measure.beats.slice(-1)[0] + offset)*scale, scaleY(measure.end));
         });
 
 
@@ -134,7 +132,10 @@ export default function measure(p) {
     }
 
     p.mouseWheel = function(event) {
-        scale = scale*(1.0-event.delta/200.0);
+        let change = 1.0-event.delta/200.0;
+        scale = scale*change;
+        // ??????????????????????????????????
+        offset = (p.mouseX - offset)*change;
         API.newScaling(scale);
     }
 
