@@ -1,9 +1,7 @@
 
 var scale = 1.0;
-var offset = 0.0;
+var start = 500.0;
 var range = [0, 100];
-var scaleY = () => 50.0;
-
 
 const DRAG_THRESHOLD_X = 10;
 
@@ -11,10 +9,8 @@ export default function measure(p) {
 
     var len = 600;
     var rollover;
-    var clicked = 0;
     var dragged = 0;
     var API, CONSTANTS;
-    var init = true;
     var selected = {inst: -1};
     var scope = window.innerWidth;
     var score = [[], []];
@@ -25,7 +21,7 @@ export default function measure(p) {
     var beat_rollover = (beat, index) => {
         if (dragged)
             return
-        if (p.mouseX > beat*scale-ROLLOVER_TOLERANCE && p.mouseX < beat*scale+ROLLOVER_TOLERANCE) {
+        if (p.mouseX > beat-ROLLOVER_TOLERANCE && p.mouseX < beat+ROLLOVER_TOLERANCE) {
             cursor = "pointer";
             rollover = index;
         }             
@@ -34,7 +30,7 @@ export default function measure(p) {
 
 
     p.setup = function () {
-        p.createCanvas(600, 100);
+        p.createCanvas(len, 100);
         p.background(0);
     };
 
@@ -64,80 +60,83 @@ export default function measure(p) {
     }
 
     p.draw = function () {
-        // draw grid, tempo
-        Object.keys(measures).forEach(key => {
-            p.stroke(240);
-            var which = '';
-            let measure = measures[key];
-            if (measure.temp_ticks && measure.temp_ticks.length)
-                which = 'temp_';
 
-            measure[which + 'ticks'].forEach((tick) => {
-                let loc = (measure.offset + tick + offset)*scale;
+        // reset rollover cursor
+        cursor = 'default';
+
+        p.stroke(255, 0, 0);
+        p.fill(255, 255, 255, selected ? 100 : 0);
+        p.rect(0, 0, p.width-1, p.height-1);
+
+
+        Object.keys(measures).forEach(key => {
+
+            let measure = measures[key];
+            let position = (tick) => ((measure.offset + tick)*scale + start);
+
+            var ticks = 'ticks';
+            var beats = 'beats';
+
+            // check for temporary display
+            if (measure.temp_ticks && measure.temp_ticks.length) {
+                ticks = 'temp_ticks';
+                beats = 'temp_beats';
+            }
+
+            // draw ticks
+            p.stroke(240);
+            measure[ticks].forEach((tick) => {
+                let loc = position(tick);
                 if (loc > p.width)
                     return
                 p.line(loc, 0, loc, p.height);
             });
 
+            // draw beats
+            p.stroke(255, 0, 0);
+            measure[beats].forEach((beat, index) => {
+                let coord = position(beat);
+                p.line(coord, 0, coord, p.height);
 
+                // handle rollover
+                if (beats === 'beats')
+                    beat_rollover(position(beat), index);
+            });
+
+            // draw tempo graph
             p.stroke(240, 200, 200);
             let scaleY = (input) => p.height - (input - range[0])/(range[1] - range[0])*p.height;
+            p.line(position(0), scaleY(measure.start), position(measure.beats.slice(-1)[0]), scaleY(measure.end));
 
-            p.line((measure.offset + offset)*scale, scaleY(measure.start), (measure.offset + measure.beats.slice(-1)[0] + offset)*scale, scaleY(measure.end));
-        });
-
-
-
-
-        p.stroke(255, 0, 0);
-        p.fill(255, 255, 255, selected ? 100 : 0);
-        p.rect(0, 0, p.width-1, p.height-1);
-        cursor = 'default';
-      
-        Object.keys(measures).forEach(key => {
-            let measure = measures[key];
-            p.stroke(255, 0, 0);
-            var coord;
-            var which = '';
-            if (measure.temp_ticks && measure.temp_ticks.length)
-                which = 'temp_';
-
-            measure[which + 'beats'].forEach((beat) => {
-                coord = (measure.offset + beat)*scale;
-                p.line(coord, 0, coord, p.height);
-            });
-            measure.beats.forEach((beat, index) => beat_rollover(beat+measure.offset, index));
-            coord = (measure.offset + measure.beats[0])*scale;
+            // draw origin
             p.stroke(0, 255, 0);
-            p.line(coord, 0, coord, p.height);
+            let origin = position(measure.beats[0]);
+            p.line(origin, 0, origin, p.height);
 
+            // handle selection
             if (measure.id === selected) {
                 p.fill(255, 255, 255, 100);
                 p.rect(0, 0, measure.ms, p.height-1);
             }
+
         });
+
         document.body.style.cursor = cursor;
-        // don't forget the end!
+
+
+
+
+      
 
                 
-
-        /*p.noFill();
-        p.stroke(0, 0, 255);
-        p.strokeWeight(4);
-        p.rect(0, 0, p.width-1, p.height-1);
-        p.stroke(0, 255, 0);
-        p.line(0, 0, 0, p.height);
-        */
-
     }
 
     p.mouseWheel = function(event) {
-        let change = 1.0-event.delta/200.0;
+        let change = 1.0-event.delta/100.0;
         scale = scale*change;
-        // ??????????????????????????????????
-        offset = (p.mouseX - offset)*change;
+        start = p.mouseX - change*(p.mouseX - start);
         API.newScaling(scale);
-    }
+    };
 
     p.mousePressed = function(e) {
         if (p.mouseX === Infinity || p.mouseY === Infinity)
@@ -145,7 +144,6 @@ export default function measure(p) {
         if (p.mouseY < 0 || p.mouseY > p.height)
             return;
 
-        clicked = p.mouseX;
         dragged = 0;
         console.log(`clicked: x = ${p.mouseX} y = ${p.mouseY}`);
         var change = 0;
@@ -207,7 +205,6 @@ export default function measure(p) {
             dragged = 0;
             return;
         };
-        var refresh = false;
 
         if (!selected.meas)
             return
