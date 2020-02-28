@@ -38,17 +38,24 @@ class UI extends Component {
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
         let flag = false;
+        if (nextProps.instruments) {
+            console.log(nextProps.instruments[0]);
+            console.log(this.props.instruments[0]);
+        };
         
-        Object.keys(nextProps.measures)
-            .forEach((key) => {
-                if (!(key in this.props.measures)) {
+        nextProps.instruments.forEach((inst, index) =>
+            Object.keys(inst.measures).forEach((key) => {
+                if (!(key in inst.measures)) {
                     flag = true;
                 };
                 ['start', 'end', 'offset'].forEach((attr) => {
-                    if (nextProps.measures[key] !== this.props.measures[key])
+                    console.log(inst.measures[key][attr]);
+                    console.log(this.props.instruments[index].measures[key][attr]);
+                    if (inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr])
                         flag = true;
                 });
-            });
+            })
+        );
         return flag;
     };
 
@@ -65,11 +72,10 @@ class UI extends Component {
         return (
             <div>
                 <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} measures={this.props.measures} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
                 </P5Container>
             </div>
         );
-        // sketch={measure} API={this.state.API} measures={this.state.measures} score={this.state.insts} selected={this.state.selected} callback={this.handleRecalc} wheelCallback={this.scopeDisplay} 
     };
 };
 
@@ -79,7 +85,7 @@ class App extends Component {
       super(props, context);
 
       this.state = {
-          insts: [[], []],
+          instruments: [],
           sizing: 600.0,
           scroll: 0,
           PPQ: 24,
@@ -90,16 +96,18 @@ class App extends Component {
           },
       }
 
-      this.state.measures = DEBUG ?
+      this.state.instruments.push(DEBUG ?
           {
-              [uuidv4()]: MeasureCalc({ 
-                  start: 60,
-                  end: 120,
-                  timesig: 5,
-                  offset: 0
-              }, { PPQ: this.state.PPQ })
+              measures: {
+                  [uuidv4()]: MeasureCalc({ 
+                      start: 60,
+                      end: 120,
+                      timesig: 5,
+                      offset: 0
+                  }, { PPQ: this.state.PPQ })
+              }
           } :
-          {};
+          { measures: {} });
           
 
       this.CONSTANTS = {
@@ -125,15 +133,15 @@ class App extends Component {
     
       var select = (inst, meas) => self.setState(oldState => ({selected: {inst: inst, measure: meas}}));
 
-      var updateMeasure = (id, start, end, timesig) => {
-          var offset = this.state.measures[id].offset;
+      var updateMeasure = (inst, id, start, end, timesig) => {
+          var offset = this.state.instruments[inst].measures[id].offset;
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ });
           self.setState(oldState => {
-              let measures = oldState.measures;
-              if (id in measures)
+              let instruments = oldState.instruments;
+              if (id in instruments[inst].measures)
                   console.log('FOUND');
-              measures[id] = calc;
-              return { measures };
+              instruments[inst].measures[id] = calc;
+              return { instruments };
           });
       };
 
@@ -160,6 +168,7 @@ class App extends Component {
 
   handleMeasure(e) {
       e.preventDefault();
+      let inst = this.state.selected.inst;
       
       let newMeasure = {
           start: parseInt(this.inputs.start.value),
@@ -174,9 +183,9 @@ class App extends Component {
       console.log(calc);
 
       this.setState(oldState => {
-          let measures = oldState.measures;
-          measures[uuidv4()] = calc;
-          return { measures };
+          let instruments = oldState.instruments;
+          instruments[inst][uuidv4()] = calc;
+          return { instruments };
       });
 
       /*var inst = this.inputs.inst.value;
@@ -221,7 +230,8 @@ class App extends Component {
     //let instOptions = this.state.insts.map((inst, index) => <option key={index} value={index}>{'inst'+index.toString()}</option>);
 
 
-    var newMeasures = Object.assign({}, this.state.measures);
+    var newInstruments = this.state.instruments.map((inst) => ({ measures: Object.assign({}, inst.measures ) }));
+    console.log(newInstruments);
 
     return (
       <div className="App">
@@ -275,7 +285,7 @@ class App extends Component {
         </form>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <div id="workspace" className="workspace">
-            <UI measures={newMeasures} API={this.API} CONSTANTS={this.CONSTANTS}/> 
+            <UI instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/> 
         </div>
       </div>
     );

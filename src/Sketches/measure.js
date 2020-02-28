@@ -25,6 +25,8 @@ export default function measure(p) {
     var scope = window.innerWidth;
     var score = [[], []];
     const ROLLOVER_TOLERANCE = 3;
+
+    var instruments = [];
     var measures = [];
     var cursor = 'default';
 
@@ -45,14 +47,21 @@ export default function measure(p) {
     };
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
-        measures = props.measures;
-        Object.keys(measures).forEach((key) => {
-            let measure = measures[key];
-            measure.temp_beats = [];
-            measure.temp_ticks = [];
-        });
-
-        range = calcRange(measures);
+        instruments = props.instruments;
+        //measures = props.measures;
+        console.log(instruments);
+        let all_meas = instruments.reduce((acc, inst) => {
+            Object.keys(inst.measures).forEach((key) => {
+                let measure = inst.measures[key];
+                console.log(measure);
+                measure.temp_beats = [];
+                measure.temp_ticks = [];
+            });
+            return ({ ...acc, ...(inst.measures) });
+        }, {});
+        console.log(all_meas);
+        range = calcRange(all_meas);
+        console.log(range);
         
         //p.resizeCanvas(props.len*props.scope/props.sizing, 100);
         ({ API, CONSTANTS } = props);
@@ -70,64 +79,67 @@ export default function measure(p) {
 
         // draw selection
         if (selected.inst > -1 && selected.meas !== -1) {
-            console.log(selected.inst);
             p.stroke(240, 255, 240);
             p.fill(240, 255, 240); 
-            p.rect(measures[selected.meas].offset * scale + start, selected.inst*100, measures[selected.meas].ms * scale, 100);
+
+            // check this later?
+            p.rect(instruments[selected.inst].measures[selected.meas].offset * scale + start, selected.inst*100, instruments[selected.inst].measures[selected.meas].ms * scale, 100);
         };
 
 
-        Object.keys(measures).forEach(key => {
+        instruments.forEach((inst) =>
+            Object.keys(inst.measures).forEach(key => {
 
-            let measure = measures[key];
-            let position = (tick) => ((measure.offset + tick)*scale + start);
+                let measure = inst.measures[key];
+                let position = (tick) => ((measure.offset + tick)*scale + start);
 
-            var ticks = 'ticks';
-            var beats = 'beats';
+                var ticks = 'ticks';
+                var beats = 'beats';
 
-            // check for temporary display
-            if (measure.temp_ticks && measure.temp_ticks.length) {
-                ticks = 'temp_ticks';
-                beats = 'temp_beats';
-            }
+                // check for temporary display
+                if (measure.temp_ticks && measure.temp_ticks.length) {
+                    ticks = 'temp_ticks';
+                    beats = 'temp_beats';
+                }
 
-            // draw ticks
-            p.stroke(240);
-            measure[ticks].forEach((tick) => {
-                let loc = position(tick);
-                if (loc > p.width)
-                    return
-                p.line(loc, 0, loc, p.height);
-            });
+                // draw ticks
+                p.stroke(240);
+                measure[ticks].forEach((tick) => {
+                    let loc = position(tick);
+                    if (loc > p.width)
+                        return
+                    p.line(loc, 0, loc, p.height);
+                });
 
-            // draw beats
-            p.stroke(255, 0, 0);
-            measure[beats].forEach((beat, index) => {
-                let coord = position(beat);
-                p.line(coord, 0, coord, p.height);
+                // draw beats
+                p.stroke(255, 0, 0);
+                measure[beats].forEach((beat, index) => {
+                    let coord = position(beat);
+                    p.line(coord, 0, coord, p.height);
 
-                // handle rollover
-                if (beats === 'beats')
-                    beat_rollover(position(beat), index);
-            });
+                    // handle rollover
+                    if (beats === 'beats')
+                        beat_rollover(position(beat), index);
+                });
 
-            // draw tempo graph
-            p.stroke(240, 200, 200);
-            let scaleY = (input) => p.height - (input - range[0])/(range[1] - range[0])*p.height;
-            p.line(position(0), scaleY(measure.start), position(measure.beats.slice(-1)[0]), scaleY(measure.end));
+                // draw tempo graph
+                p.stroke(240, 200, 200);
+                let scaleY = (input) => p.height - (input - range[0])/(range[1] - range[0])*p.height;
+                p.line(position(0), scaleY(measure.start), position(measure.beats.slice(-1)[0]), scaleY(measure.end));
 
-            // draw origin
-            p.stroke(0, 255, 0);
-            let origin = position(measure.beats[0]);
-            p.line(origin, 0, origin, p.height);
+                // draw origin
+                p.stroke(0, 255, 0);
+                let origin = position(measure.beats[0]);
+                p.line(origin, 0, origin, p.height);
 
-            // handle selection
-            if (measure.id === selected) {
-                p.fill(255, 255, 255, 100);
-                p.rect(0, 0, measure.ms, p.height-1);
-            }
+                // handle selection
+                if (measure.id === selected) {
+                    p.fill(255, 255, 255, 100);
+                    p.rect(0, 0, measure.ms, p.height-1);
+                }
 
-        });
+            })
+        );
 
         document.body.style.cursor = cursor;
                 
@@ -141,6 +153,7 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
+        // return if outside canvas
         if (p.mouseX === Infinity 
             || p.mouseY === Infinity 
             || p.mouseY < 0
@@ -149,16 +162,19 @@ export default function measure(p) {
 
         dragged = 0;
         var change = 0;
-        Object.keys(measures).forEach((key) => {
-            let measure = measures[key];
+        let inst = Math.floor(p.mouseY*0.01);
+        let meas = instruments[inst].measures;
+
+        Object.keys(meas).forEach((key) => {
+            let measure = meas[key];
             var left = (measure.offset + measure.beats[0])*scale + start;
             var right = (measure.offset + measure.ms)*scale + start;
             change = (p.mouseX > left && p.mouseX < right && p.mouseY > 0 && p.mouseY < p.height) ?
                 key : -1;
         });
+
+        selected = {inst, meas: change};
         
-        selected = {inst: Math.floor(p.mouseY*0.01), meas: change};
-        console.log(selected);
         API.displaySelected(selected);
     }
 
@@ -170,18 +186,17 @@ export default function measure(p) {
             return;
         dragged += event.movementX;
 
-        /*if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
+        if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
             if (selected.meas !== -1) {
-                measures[selected.meas].temp_ticks = [];
+                instruments[selected.inst].measures[selected.meas].temp_ticks = [];
             };
             return;
         };
-        */
 
         if (selected.meas === -1) 
             return;
 
-        let measure = measures[selected.meas];
+        let measure = instruments[selected.inst].measures[selected.meas];
         let grabbed = 60000.0/(measure.ticks[(rollover * CONSTANTS.PPQ)]);
         let origin = p.mouseX - dragged;
         console.log(origin);
@@ -205,7 +220,7 @@ export default function measure(p) {
             return;
         if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
             if (selected.meas !== -1) {
-                measures[selected.meas].temp_ticks = [];
+                instruments[selected.inst].measures[selected.meas].temp_ticks = [];
             };
             dragged = 0;
             return;
@@ -214,15 +229,14 @@ export default function measure(p) {
         if (selected.meas === -1)
             return
 
-        console.log(selected.meas);
-        let measure = measures[selected.meas];
+        let measure = instruments[selected.inst].measures[selected.meas];
         let tick = measure.temp_ticks.pop() - measure.temp_ticks.pop();
         let BPM = 60000.0/(tick * CONSTANTS.PPQ);
         measure.temp_ticks = [];
         if (BPM < 10)
             return;
         
-        API.updateMeasure(selected.meas, measure.start, BPM, measure.beats.length - 1);
+        API.updateMeasure(selected.inst, selected.meas, measure.start, BPM, measure.beats.length - 1);
         dragged = 0;
     }
 
