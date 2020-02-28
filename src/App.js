@@ -34,15 +34,6 @@ var MeasureCalc = (features, options) => {
 }
 
 class UI extends Component {
-    /*constructor(props, context) {
-        super(props, context);
-        /*this.state = {
-            API: props.API,
-            measures: {},
-            CONSTANTS: props.CONSTANTS,
-        };
-    };
-    */
 
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
@@ -95,7 +86,7 @@ class App extends Component {
           time: 0,
           selected: {
               inst: -1,
-              measure: -1
+              meas: -1
           },
       }
 
@@ -120,7 +111,7 @@ class App extends Component {
 
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
-      this.handleClick = this.handleClick.bind(this);
+      //this.handleClick = this.handleClick.bind(this);
 
       this.inputs = {};
 
@@ -139,14 +130,18 @@ class App extends Component {
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ });
           self.setState(oldState => {
               let measures = oldState.measures;
+              if (id in measures)
+                  console.log('FOUND');
               measures[id] = calc;
               return { measures };
           });
       };
 
+      var displaySelected = (selected) => self.setState(oldState => ({ selected }));
+
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
 
-      return { select, updateMeasure, newScaling };
+      return { select, updateMeasure, newScaling, displaySelected };
   }
 
   handleInst(e) {
@@ -208,14 +203,14 @@ class App extends Component {
   }
 
 
-  handleClick(inst, measure) {
+  /*handleClick(inst, measure) {
       if (inst === this.state.selected.inst && measure === this.state.selected.measure) {
           inst = -1;
           measure = -1;
       }
-      this.setState(oldState => ({ selected: { inst: inst, measure: measure }}));
+      this.setState(oldState => ({ selected: { inst: inst, measure: meas }}));
       console.log('which hits first?');
-  }
+  }*/
 
 
       
@@ -230,7 +225,7 @@ class App extends Component {
 
     return (
       <div className="App">
-        { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.measure} </p> }
+        { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
         <form onSubmit={this.handleInst} className="inst-form">
             <FormGroup>
                 <ControlLabel>new instrument</ControlLabel>
