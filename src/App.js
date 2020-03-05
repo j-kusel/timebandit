@@ -38,24 +38,21 @@ class UI extends Component {
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
         let flag = false;
-        if (nextProps.instruments) {
-            console.log(nextProps.instruments[0]);
-            console.log(this.props.instruments[0]);
-        };
-        
-        nextProps.instruments.forEach((inst, index) =>
+        if (nextProps.instruments.length !== this.props.instruments.length)
+            flag = true;
+        nextProps.instruments.forEach((inst, index) => {
             Object.keys(inst.measures).forEach((key) => {
-                if (!(key in inst.measures)) {
+                if (!(key in this.props.instruments[index].measures)) {
                     flag = true;
+                } else {
+                    ['start', 'end', 'offset'].forEach((attr) => {
+                        if (inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr])
+                            flag = true;
+                    });
                 };
-                ['start', 'end', 'offset'].forEach((attr) => {
-                    console.log(inst.measures[key][attr]);
-                    console.log(this.props.instruments[index].measures[key][attr]);
-                    if (inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr])
-                        flag = true;
-                });
             })
-        );
+        });
+        console.log(flag);
         return flag;
     };
 
@@ -98,12 +95,13 @@ class App extends Component {
 
       this.state.instruments.push(DEBUG ?
           {
+              name: 'default',
               measures: {
                   [uuidv4()]: MeasureCalc({ 
                       start: 60,
                       end: 120,
                       timesig: 5,
-                      offset: 0
+                      offset: 500
                   }, { PPQ: this.state.PPQ })
               }
           } :
@@ -156,11 +154,12 @@ class App extends Component {
       e.preventDefault();
 
       let newInst = {
-          name: this.inputs.instName.value
+          name: this.inputs.instName.value,
+          measures: {}
       }
 
       this.setState((oldState) => {
-          oldState.insts.push([]);
+          oldState.instruments.push(newInst);
           return oldState;
       });
   }
@@ -177,61 +176,25 @@ class App extends Component {
           offset: parseInt(this.inputs.offset.value)
       };
 
-      console.log('PPQ');
-      console.log(this.state.PPQ);
       var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ });
-      console.log(calc);
+      console.log(inst);
 
       this.setState(oldState => {
           let instruments = oldState.instruments;
-          instruments[inst][uuidv4()] = calc;
+          instruments[inst].measures[uuidv4()] = calc;
           return { instruments };
       });
-
-      /*var inst = this.inputs.inst.value;
-      var newInst = [];
-      if (this.state.selected.inst >= 0) {
-          var oldInst = this.state.insts[this.state.selected.inst];
-          var oldLen = oldInst.length;
-          for (var i=0; i<oldLen; i++) {
-              console.log(oldInst[i]);
-              if (i === this.state.selected.measure) newInst.push(calc);
-              newInst.push(oldInst[i]);
-          }
-          this.setState(oldState => {
-              oldState.insts[inst] = newInst;
-              return oldState;
-          });
-      } else {
-          this.setState((oldState) => {
-              oldState.insts[inst].push(calc);
-              return oldState;
-          });
-      }*/
-
   }
-
-
-  /*handleClick(inst, measure) {
-      if (inst === this.state.selected.inst && measure === this.state.selected.measure) {
-          inst = -1;
-          measure = -1;
-      }
-      this.setState(oldState => ({ selected: { inst: inst, measure: meas }}));
-      console.log('which hits first?');
-  }*/
-
-
-      
 
   render() {
 
-    
     //let instOptions = this.state.insts.map((inst, index) => <option key={index} value={index}>{'inst'+index.toString()}</option>);
 
 
-    var newInstruments = this.state.instruments.map((inst) => ({ measures: Object.assign({}, inst.measures ) }));
-    console.log(newInstruments);
+    var newInstruments = this.state.instruments.map((inst) => ({ 
+        measures: Object.assign({}, inst.measures), 
+        name: Object.assign({}, inst.name)
+    }));
 
     return (
       <div className="App">
@@ -280,7 +243,7 @@ class App extends Component {
                     inputRef={(ref) => {this.inputs.offset = ref}}
                 >
                 </FormControl>
-                <Button type="submit">create</Button>
+                <Button type="submit" disabled={this.state.selected.inst === -1}>create</Button>
             </FormGroup>
         </form>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>

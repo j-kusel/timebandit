@@ -1,6 +1,6 @@
 
 var scale = 1.0;
-var start = 500.0;
+var start = 0;
 var range = [0, 100];
 
 const DRAG_THRESHOLD_X = 10;
@@ -59,11 +59,9 @@ export default function measure(p) {
             });
             return ({ ...acc, ...(inst.measures) });
         }, {});
-        console.log(all_meas);
         range = calcRange(all_meas);
-        console.log(range);
         
-        //p.resizeCanvas(props.len*props.scope/props.sizing, 100);
+        p.resizeCanvas(p.width, 100*instruments.length);
         ({ API, CONSTANTS } = props);
 
     }
@@ -73,10 +71,7 @@ export default function measure(p) {
         // reset rollover cursor
         cursor = 'default';
 
-        p.stroke(255, 0, 0);
-        p.fill(255, 255, 255);
-        p.rect(0, 0, p.width-1, p.height-1);
-
+        
         // draw selection
         if (selected.inst > -1 && selected.meas !== -1) {
             p.stroke(240, 255, 240);
@@ -87,7 +82,12 @@ export default function measure(p) {
         };
 
 
-        instruments.forEach((inst) =>
+        instruments.forEach((inst, i_ind) => {
+            p.stroke(255, 0, 0);
+            p.fill(255, 255, 255);
+            let yloc = i_ind*100;
+            p.rect(0, yloc, p.width-1, yloc+99);
+
             Object.keys(inst.measures).forEach(key => {
 
                 let measure = inst.measures[key];
@@ -108,14 +108,14 @@ export default function measure(p) {
                     let loc = position(tick);
                     if (loc > p.width)
                         return
-                    p.line(loc, 0, loc, p.height);
+                    p.line(loc, yloc, loc, yloc+100);
                 });
 
                 // draw beats
                 p.stroke(255, 0, 0);
                 measure[beats].forEach((beat, index) => {
                     let coord = position(beat);
-                    p.line(coord, 0, coord, p.height);
+                    p.line(coord, yloc, coord, yloc+100);
 
                     // handle rollover
                     if (beats === 'beats')
@@ -134,12 +134,12 @@ export default function measure(p) {
 
                 // handle selection
                 if (measure.id === selected) {
-                    p.fill(255, 255, 255, 100);
+                    p.fill(0, 255, 0, 100);
                     p.rect(0, 0, measure.ms, p.height-1);
                 }
 
             })
-        );
+        });
 
         document.body.style.cursor = cursor;
                 
@@ -164,6 +164,7 @@ export default function measure(p) {
         var change = 0;
         let inst = Math.floor(p.mouseY*0.01);
         let meas = instruments[inst].measures;
+        console.log(inst);
 
         Object.keys(meas).forEach((key) => {
             let measure = meas[key];
@@ -173,7 +174,7 @@ export default function measure(p) {
                 key : -1;
         });
 
-        selected = {inst, meas: change};
+        selected = {inst, meas: change || -1};
         
         API.displaySelected(selected);
     }
