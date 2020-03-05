@@ -7,6 +7,8 @@ const DRAG_THRESHOLD_X = 10;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
 
+const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
+
 var calcRange = (measures) => {
     let ranged = [];
     Object.keys(measures).forEach((key) => {
@@ -27,6 +29,7 @@ export default function measure(p) {
     var len = 600;
     var rollover;
     var dragged = 0;
+    var modifiers = 0;
     var API, CONSTANTS;
     var selected = {inst: -1};
     var scope = window.innerWidth;
@@ -47,6 +50,7 @@ export default function measure(p) {
         }             
     }
 
+    var mod_check = (key, mods) => (mods & (1 << key)) != 0;
 
     p.setup = function () {
         p.createCanvas(len, INST_HEIGHT);
@@ -77,6 +81,13 @@ export default function measure(p) {
 
         // reset rollover cursor
         cursor = 'default';
+
+        // key check
+        modifiers = [CTRL, SHIFT, MOD, ALT].reduce((acc, mod, ind) =>
+            p.keyIsDown(mod) ?
+                acc |(1 << (ind + 1)) : acc
+            , 0);
+
 
         
         // draw selection
@@ -156,6 +167,10 @@ export default function measure(p) {
             })
         });
 
+        // draw cursor
+        p.stroke(240);
+        p.line(p.mouseX, 0, p.mouseX, p.height);
+
         document.body.style.cursor = cursor;
                 
     }
@@ -190,6 +205,10 @@ export default function measure(p) {
         });
 
         selected = {inst, meas: change || -1};
+
+        // LOCKING
+        // CTRL held?
+        //if (mod_check(1, modifiers)
         
         API.displaySelected(selected);
     }
