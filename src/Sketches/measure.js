@@ -4,6 +4,8 @@ var start = 0;
 var range = [0, 100];
 
 const DRAG_THRESHOLD_X = 10;
+const INST_HEIGHT = 100;
+const SCROLL_SENSITIVITY = 100.0;
 
 var calcRange = (measures) => {
     let ranged = [];
@@ -13,6 +15,11 @@ var calcRange = (measures) => {
     });
     return [Math.min(...ranged), Math.max(...ranged)];
 };
+
+// takes mouse location and boundaries, returns boolean for if mouse is inside
+/*var mouseBounding = (p, bounds) =>
+    
+    */
 
 
 export default function measure(p) {
@@ -32,17 +39,17 @@ export default function measure(p) {
 
     var beat_rollover = (beat, index) => {
         if (dragged)
-            return
+            return false;
         if (p.mouseX > beat-ROLLOVER_TOLERANCE && p.mouseX < beat+ROLLOVER_TOLERANCE) {
             cursor = "pointer";
             rollover = index;
+            return true;
         }             
-        //p.line(beat, 0, beat, p.height);
     }
 
 
     p.setup = function () {
-        p.createCanvas(len, 100);
+        p.createCanvas(len, INST_HEIGHT);
         p.background(0);
     };
 
@@ -61,7 +68,7 @@ export default function measure(p) {
         }, {});
         range = calcRange(all_meas);
         
-        p.resizeCanvas(p.width, 100*instruments.length);
+        p.resizeCanvas(p.width, INST_HEIGHT*instruments.length);
         ({ API, CONSTANTS } = props);
 
     }
@@ -78,14 +85,19 @@ export default function measure(p) {
             p.fill(240, 255, 240); 
 
             // check this later?
-            p.rect(instruments[selected.inst].measures[selected.meas].offset * scale + start, selected.inst*100, instruments[selected.inst].measures[selected.meas].ms * scale, 100);
+            p.rect(instruments[selected.inst].measures[selected.meas].offset * scale + start, selected.inst*INST_HEIGHT, instruments[selected.inst].measures[selected.meas].ms * scale, INST_HEIGHT);
         };
 
 
         instruments.forEach((inst, i_ind) => {
+            let yloc = i_ind*INST_HEIGHT;
             p.stroke(255, 0, 0);
             p.fill(255, 255, 255);
-            let yloc = i_ind*100;
+
+            // handle inst selection
+            if (selected.meas === -1 && selected.inst === i_ind)
+                p.fill(230);
+
             p.rect(0, yloc, p.width-1, yloc+99);
 
             Object.keys(inst.measures).forEach(key => {
@@ -108,34 +120,37 @@ export default function measure(p) {
                     let loc = position(tick);
                     if (loc > p.width)
                         return
-                    p.line(loc, yloc, loc, yloc+100);
+                    p.line(loc, yloc, loc, yloc + INST_HEIGHT);
                 });
 
                 // draw beats
-                p.stroke(255, 0, 0);
                 measure[beats].forEach((beat, index) => {
                     let coord = position(beat);
-                    p.line(coord, yloc, coord, yloc+100);
 
-                    // handle rollover
-                    if (beats === 'beats')
-                        beat_rollover(position(beat), index);
+                    // try rollover
+                    (beats === 'beats'
+                        && p.mouseY >= yloc
+                        && p.mouseY < yloc + INST_HEIGHT
+                        && beat_rollover(coord, index)
+                    ) ?
+                        p.stroke(255, 0, 0, 100) : p.stroke(255, 0, 0);
+                    p.line(coord, yloc, coord, yloc + INST_HEIGHT);
                 });
 
                 // draw tempo graph
                 p.stroke(240, 200, 200);
-                let scaleY = (input) => p.height - (input - range[0])/(range[1] - range[0])*p.height;
-                p.line(position(0), scaleY(measure.start), position(measure.beats.slice(-1)[0]), scaleY(measure.end));
+                let scaleY = (input) => INST_HEIGHT - (input - range[0])/(range[1] - range[0])*INST_HEIGHT;
+                p.line(position(0), yloc + scaleY(measure.start), position(measure.beats.slice(-1)[0]), yloc + scaleY(measure.end));
 
                 // draw origin
                 p.stroke(0, 255, 0);
                 let origin = position(measure.beats[0]);
-                p.line(origin, 0, origin, p.height);
+                p.line(origin, yloc, origin, yloc + INST_HEIGHT);
 
                 // handle selection
-                if (measure.id === selected) {
+                if (key === selected.meas) {
                     p.fill(0, 255, 0, 100);
-                    p.rect(0, 0, measure.ms, p.height-1);
+                    p.rect(origin, yloc, measure.ms*scale, INST_HEIGHT);
                 }
 
             })
@@ -146,7 +161,7 @@ export default function measure(p) {
     }
 
     p.mouseWheel = function(event) {
-        let change = 1.0-event.delta/100.0;
+        let change = 1.0-event.delta/SCROLL_SENSITIVITY;
         scale = scale*change;
         start = p.mouseX - change*(p.mouseX - start);
         API.newScaling(scale);
@@ -240,6 +255,11 @@ export default function measure(p) {
         API.updateMeasure(selected.inst, selected.meas, measure.start, BPM, measure.beats.length - 1);
         dragged = 0;
     }
+
+    p.mouseMoved = function(event) {
+        API.newCursor((p.mouseX - start)/scale);
+        return false;
+    };
 
 }
 

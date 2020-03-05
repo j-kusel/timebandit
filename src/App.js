@@ -39,7 +39,7 @@ class UI extends Component {
     shouldComponentUpdate(nextProps, nextState) {
         let flag = false;
         if (nextProps.instruments.length !== this.props.instruments.length)
-            flag = true;
+            return true;
         nextProps.instruments.forEach((inst, index) => {
             Object.keys(inst.measures).forEach((key) => {
                 if (!(key in this.props.instruments[index].measures)) {
@@ -84,6 +84,7 @@ class App extends Component {
       this.state = {
           instruments: [],
           sizing: 600.0,
+          cursor: 0.0,
           scroll: 0,
           PPQ: 24,
           time: 0,
@@ -117,7 +118,6 @@ class App extends Component {
 
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
-      //this.handleClick = this.handleClick.bind(this);
 
       this.inputs = {};
 
@@ -146,8 +146,9 @@ class App extends Component {
       var displaySelected = (selected) => self.setState(oldState => ({ selected }));
 
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
+      var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
 
-      return { select, updateMeasure, newScaling, displaySelected };
+      return { select, updateMeasure, newScaling, newCursor, displaySelected };
   }
 
   handleInst(e) {
@@ -158,8 +159,14 @@ class App extends Component {
           measures: {}
       }
 
+
       this.setState((oldState) => {
-          oldState.instruments.push(newInst);
+          // add after selected
+          let selected = oldState.selected.inst;
+          let loc = (selected === -1) ?
+              oldState.instruments.length :
+              selected;
+          oldState.instruments.splice(loc + 1, 0, newInst);
           return oldState;
       });
   }
@@ -195,6 +202,13 @@ class App extends Component {
         measures: Object.assign({}, inst.measures), 
         name: Object.assign({}, inst.name)
     }));
+
+    var cursor = [3600000, 60000, 1000]
+        .map((num) => parseInt(Math.abs(this.state.cursor / num, 10)))
+        .join(':');
+    cursor += '.' + parseInt(Math.abs(this.state.cursor % 1000));
+    if (this.state.cursor < 0.0)
+       cursor = '-' + cursor;
 
     return (
       <div className="App">
@@ -247,6 +261,7 @@ class App extends Component {
             </FormGroup>
         </form>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
+        <p id="location">Cursor location: {cursor}</p>
         <div id="workspace" className="workspace">
             <UI instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/> 
         </div>
