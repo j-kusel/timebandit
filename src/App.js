@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { Button, ControlLabel, FormControl, FormGroup } from 'react-bootstrap';
+import { ButtonGroup, ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
 import measure from './Sketches/measure';
 import P5Wrapper from 'react-p5-wrapper';
 import styled from 'styled-components';
@@ -37,9 +38,11 @@ class UI extends Component {
 
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
-        let flag = false;
+        if (nextProps.locks.length !== this.props.locks.length)
+            return true;
         if (nextProps.instruments.length !== this.props.instruments.length)
             return true;
+        let flag = false;
         nextProps.instruments.forEach((inst, index) => {
             Object.keys(inst.measures).forEach((key) => {
                 if (!(key in this.props.instruments[index].measures)) {
@@ -52,7 +55,6 @@ class UI extends Component {
                 };
             })
         });
-        console.log(flag);
         return flag;
     };
 
@@ -69,7 +71,7 @@ class UI extends Component {
         return (
             <div>
                 <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
                 </P5Container>
             </div>
         );
@@ -92,6 +94,7 @@ class App extends Component {
               inst: -1,
               meas: -1
           },
+          locks: [],
       }
 
       this.state.instruments.push(DEBUG ?
@@ -118,7 +121,7 @@ class App extends Component {
 
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
-
+      this.handleLock = this.handleLock.bind(this);
       this.inputs = {};
 
 
@@ -131,13 +134,11 @@ class App extends Component {
     
       var select = (inst, meas) => self.setState(oldState => ({selected: {inst: inst, measure: meas}}));
 
-      var updateMeasure = (inst, id, start, end, timesig) => {
-          var offset = this.state.instruments[inst].measures[id].offset;
+      var updateMeasure = (inst, id, start, end, timesig, offset) => {
+          offset = offset || this.state.instruments[inst].measures[id].offset;
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ });
           self.setState(oldState => {
               let instruments = oldState.instruments;
-              if (id in instruments[inst].measures)
-                  console.log('FOUND');
               instruments[inst].measures[id] = calc;
               return { instruments };
           });
@@ -191,13 +192,13 @@ class App extends Component {
           instruments[inst].measures[uuidv4()] = calc;
           return { instruments };
       });
-  }
+  };
+
+  handleLock(val, e) {
+      this.setState(oldState => ({ locks: val }));
+  };
 
   render() {
-
-    //let instOptions = this.state.insts.map((inst, index) => <option key={index} value={index}>{'inst'+index.toString()}</option>);
-
-
     var newInstruments = this.state.instruments.map((inst) => ({ 
         measures: Object.assign({}, inst.measures), 
         name: Object.assign({}, inst.name)
@@ -210,6 +211,7 @@ class App extends Component {
     if (this.state.cursor < 0.0)
        cursor = '-' + cursor;
 
+    
     return (
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
@@ -260,10 +262,14 @@ class App extends Component {
                 <Button type="submit" disabled={this.state.selected.inst === -1}>create</Button>
             </FormGroup>
         </form>
+        <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
+            { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
+                <ToggleButton value={index + 1}>{button}</ToggleButton>) }
+        </ToggleButtonGroup>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <p id="location">Cursor location: {cursor}</p>
         <div id="workspace" className="workspace">
-            <UI instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/> 
+            <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/> 
         </div>
       </div>
     );
