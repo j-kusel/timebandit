@@ -104,7 +104,7 @@ class App extends Component {
                   [uuidv4()]: MeasureCalc({ 
                       start: 60,
                       end: 120,
-                      timesig: 5,
+                      timesig: 4,
                       offset: 500
                   }, { PPQ: this.state.PPQ })
               }
@@ -149,7 +149,16 @@ class App extends Component {
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
 
-      return { select, updateMeasure, newScaling, newCursor, displaySelected };
+      var paste = (inst, measure, offset) => {
+          var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ });
+          self.setState(oldState => {
+              let instruments = oldState.instruments;
+              instruments[inst].measures[uuidv4()] = calc;
+              return { instruments };
+          });
+      };
+
+      return { select, updateMeasure, newScaling, newCursor, displaySelected, paste };
   }
 
   handleInst(e) {

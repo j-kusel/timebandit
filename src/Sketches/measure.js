@@ -4,10 +4,13 @@ var start = 0;
 var range = [0, 100];
 
 const DRAG_THRESHOLD_X = 10;
+const FLAT_THRESHOLD = 10;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
+const ROLLOVER_TOLERANCE = 3;
 
 const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
+const [KeyC, KeyV] = [67, 86];
 
 var calcRange = (measures) => {
     let ranged = [];
@@ -79,7 +82,8 @@ export default function measure(p) {
     var locks = 0;
     var amp_lock = 0;
     //var scope = window.innerWidth;
-    const ROLLOVER_TOLERANCE = 3;
+
+    var copied;
 
     var instruments = [];
     var cursor = 'default';
@@ -91,7 +95,11 @@ export default function measure(p) {
             rollover = index;
             return true;
         }             
-    }
+    };
+
+    var bit_loader = (acc, mod, ind) =>
+        p.keyIsDown(mod) ?
+            acc |(1 << (ind + 1)) : acc;
 
     var mod_check = (keys, mods) => 
         (typeof(keys) === 'object') ?
@@ -130,10 +138,7 @@ export default function measure(p) {
         cursor = 'default';
 
         // key check
-        modifiers = [CTRL, SHIFT, MOD, ALT].reduce((acc, mod, ind) =>
-            p.keyIsDown(mod) ?
-                acc |(1 << (ind + 1)) : acc
-            , 0);
+        modifiers = [CTRL, SHIFT, MOD, ALT].reduce(bit_loader, 0);
 
         // check if mouse within selected
         var measureBounds = (inst, measure) => {
@@ -269,6 +274,17 @@ export default function measure(p) {
                 
     }
 
+    p.keyPressed = function(e) {
+        if (p.keyCode === KeyC
+            && selected.inst > -1
+            && selected.meas !== -1
+        )
+            copied = instruments[selected.inst].measures[selected.meas];
+        else if (p.keyCode === KeyV && copied)
+            API.paste(selected.inst, copied, (p.mouseX-start)/scale);
+        return false;
+    };
+
     p.mouseWheel = function(event) {
         let change = 1.0-event.delta/SCROLL_SENSITIVITY;
         scale = scale*change;
@@ -332,7 +348,7 @@ export default function measure(p) {
         };
 
         // if nothing is locked, just drag the measure
-        if (!locks)
+        if (!(selected.meas in locked && locked[selected.meas].beats))
             drag_mode = 'measure';
     }
 
@@ -377,17 +393,30 @@ export default function measure(p) {
         let beatscale = (-dragged*scale); // /p.width
         var cumulative = 0;
 
-        let perc = grabbed/Math.abs(measure.start-measure.end);
+
+        let diff = measure.end - measure.start;
+        
+        let perc; 
+        if (Math.abs(diff) < 5)
+            perc = (dir === 1) ? -FLAT_THRESHOLD : FLAT_THRESHOLD
+        else
+            perc = grabbed/Math.abs(diff);
+
         amp_lock = beatscale/perc;
         let inc;
+        
 
         // if START is locked
         if (locks & (1 << 1))
-            inc = (measure.end-measure.start+amp_lock)/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
+            inc = (diff + amp_lock)/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
 
         // if END is locked
         else if (locks & (1 << 2))
-            inc = (measure.end-(measure.start+amp_lock))/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
+            inc = (diff - amp_lock)/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
+        else if (locks & (1 << 4))
+            inc = diff/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
+        else
+            inc = (diff + (amp_lock/2))/((measure.beats.length-1)*CONSTANTS.PPQ);
         // INVERT THIS DRAG AT SOME POINT?
         //inc = inc * ((dragged < 0
 
@@ -400,26 +429,24 @@ export default function measure(p) {
                 Math.max(inc, 0) : inc;
         };
 
-        console.log(amp_lock);
-            
-
-
-        if (locks & (1 << 2)) {
+        if (locks & (1 << 1)) {
+            measure.temp_start = measure.start;
+        } else if (locks & (1 << 2)) {
             measure.temp_start = measure.start + amp_lock;
             if (locks & (1 << 3))
                 measure.temp_start = (dir === 1) ?
-                    Math.min(measure.temp_start, measure.end) : Math.max(measure.temp_start, measure.end)
+                    Math.min(measure.temp_start, measure.end) : Math.max(measure.temp_start, measure.end);
+        } else {
+            measure.temp_start = measure.start + amp_lock/2;
         };
+
 
         measure.ticks.forEach((_, i) => {
             if (!(i%CONSTANTS.PPQ))
                 measure.temp_beats.push(cumulative);
             measure.temp_ticks.push(cumulative);
 
-            //if (locks & (1 << 1))
-                cumulative += (60000.0/(measure.temp_start + inc*i))/CONSTANTS.PPQ; //(beatscale*grabbed)
-            //else if (locks & (1 << 2))
-            //    cumulative += (60000.0/(start + inc*i))/CONSTANTS.PPQ 
+            cumulative += (60000.0/(measure.temp_start + inc*i))/CONSTANTS.PPQ;
         });
 
         var beat_lock = (selected.meas in locked && locked[selected.meas].beats) ?
