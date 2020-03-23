@@ -1,6 +1,8 @@
 import React, { Component } from 'react';
-import { Button, ControlLabel, FormControl, FormGroup } from 'react-bootstrap';
-import { ButtonGroup, ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
+import ReactDOM from 'react-dom';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import { Button, Form } from 'react-bootstrap';
+import { ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
 import measure from './Sketches/measure';
 import P5Wrapper from 'react-p5-wrapper';
 import styled from 'styled-components';
@@ -16,6 +18,7 @@ var MeasureCalc = (features, options) => {
     var ms;
     var beats = [];
     var ticks = [];
+    console.log(options.PPQ, timesig);
     let tick_num = options.PPQ * timesig;
     console.log(tick_num);
     let cumulative = 0.0;
@@ -164,8 +167,9 @@ class App extends Component {
   handleInst(e) {
       e.preventDefault();
 
+      console.log(ReactDOM.findDOMNode('instName'));
       let newInst = {
-          name: this.inputs.instName.value,
+          name: ReactDOM.findDOMNode('instName'),
           measures: {}
       }
 
@@ -187,14 +191,13 @@ class App extends Component {
       let inst = this.state.selected.inst;
       
       let newMeasure = {
-          start: parseInt(this.inputs.start.value),
-          end: parseInt(this.inputs.end.value),
-          timesig: parseInt(this.inputs.beats.value),
-          offset: parseInt(this.inputs.offset.value)
+          start: parseInt(this.inputs.start.value, 10),
+          end: parseInt(this.inputs.end.value, 10),
+          timesig: parseInt(this.inputs.beats.value, 10),
+          offset: parseInt(this.inputs.offset.value, 10)
       };
 
       var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ });
-      console.log(inst);
 
       this.setState(oldState => {
           let instruments = oldState.instruments;
@@ -213,67 +216,62 @@ class App extends Component {
         name: Object.assign({}, inst.name)
     }));
 
-    var cursor = [3600000, 60000, 1000]
-        .map((num) => parseInt(Math.abs(this.state.cursor / num, 10)))
+    var cursor = [parseInt(Math.abs(this.state.cursor / 3600000), 10)];
+    cursor = cursor.concat([60000, 1000].map((num) =>
+        parseInt(Math.abs(this.state.cursor / num), 10).toString().padStart(2, "0")))
         .join(':');
-    cursor += '.' + parseInt(Math.abs(this.state.cursor % 1000));
+    cursor += '.' + parseInt(Math.abs(this.state.cursor % 1000), 10).toString().padStart(3, "0");
     if (this.state.cursor < 0.0)
        cursor = '-' + cursor;
+
 
     
     return (
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
         <form onSubmit={this.handleInst} className="inst-form">
-            <FormGroup>
-                <ControlLabel>new instrument</ControlLabel>
-                <FormControl
+            <Form.Group>
+                <Form.Label>new instrument</Form.Label>
+                <Form.Control
                     type="text"
-                    inputRef={(ref) => {this.inputs.instName = ref}}
-                ></FormControl>
+                    ref="instName"
+                ></Form.Control>
                 <Button type="submit">new inst</Button>
-            </FormGroup>
+            </Form.Group>
         </form>
         <form onSubmit={this.handleMeasure} className="measure-form">
-            <FormGroup>
-                <ControlLabel>start tempo</ControlLabel>
-        {/*<FormControl
-                    componentClass="select"
-                    inputRef={(ref) => {this.inputs.inst = ref}}
-                >
-                    { instOptions }
-                </FormControl>
-                */}
-                <FormControl
+            <Form.Group>
+                <Form.Label>start tempo</Form.Label>
+                <Form.Control
                     type="text"
                     placeholder="start"
-                    inputRef={(ref) => {this.inputs.start = ref}}
+                    onChange={(ref) => {this.inputs.start = ref}}
                 >
-                </FormControl>
-                <FormControl
+                </Form.Control>
+                <Form.Control
                     type="text"
                     placeholder="end"
-                    inputRef={(ref) => {this.inputs.end = ref}}
+                    onChange={(ref) => {this.inputs.end = ref}}
                 >
-                </FormControl>
-                <FormControl
+                </Form.Control>
+                <Form.Control
                     type="text"
                     placeholder="beats"
-                    inputRef={(ref) => {this.inputs.beats = ref}}
+                    onChange={(ref) => {this.inputs.beats = ref}}
                 >
-                </FormControl>
-                <FormControl
+                </Form.Control>
+                <Form.Control
                     type="text"
                     placeholder="offset"
-                    inputRef={(ref) => {this.inputs.offset = ref}}
+                    onChange={(ref) => {this.inputs.offset = ref}}
                 >
-                </FormControl>
+                </Form.Control>
                 <Button type="submit" disabled={this.state.selected.inst === -1}>create</Button>
-            </FormGroup>
+            </Form.Group>
         </form>
         <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
             { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
-                <ToggleButton value={index + 1}>{button}</ToggleButton>) }
+                <ToggleButton key={button} value={index + 1}>{button}</ToggleButton>) }
         </ToggleButtonGroup>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <p id="location">Cursor location: {cursor}</p>

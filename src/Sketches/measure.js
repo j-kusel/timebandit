@@ -9,7 +9,7 @@ const NUDGE_THRESHOLD = 1;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
 const ROLLOVER_TOLERANCE = 3;
-const SNAP_TEST = {
+/*const SNAP_TEST = {
     '5000': [
         {
             inst: 0,
@@ -17,6 +17,7 @@ const SNAP_TEST = {
         }
     ]
 };
+*/
 
 const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
 const [KeyC, KeyV] = [67, 86];
@@ -90,6 +91,7 @@ export default function measure(p) {
     var locked = {};
     var locks = 0;
     var amp_lock = 0;
+    var snaps = [];
     var snapped = false;
     //var scope = window.innerWidth;
 
@@ -126,15 +128,31 @@ export default function measure(p) {
         instruments = props.instruments;
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
-        let all_meas = instruments.reduce((acc, inst) => {
+        let add_snaps1 = {};
+        let all_meas = instruments.reduce((acc, inst, i_ind) => {
             Object.keys(inst.measures).forEach((key) => {
                 let measure = inst.measures[key];
+                measure.beats.forEach((beat) => {
+                    let loc = (beat + measure.offset).toString();
+                    let obj = {
+                        inst: i_ind,
+                        meas: key
+                    };
+                    if (loc in add_snaps1)
+                        add_snaps1[loc].push(obj);
+                    else
+                        add_snaps1[loc] = [obj];
+                });
+
                 console.log(measure);
                 measure.temp_beats = [];
                 measure.temp_ticks = [];
             });
             return ({ ...acc, ...(inst.measures) });
         }, {});
+
+        // add downbeat snaps
+        snaps.push(add_snaps1);
         range = calcRange(all_meas);
         
         p.resizeCanvas(p.width, INST_HEIGHT*instruments.length);
@@ -292,7 +310,7 @@ export default function measure(p) {
             copied = instruments[selected.inst].measures[selected.meas];
         else if (p.keyCode === KeyV && copied)
             API.paste(selected.inst, copied, (p.mouseX-start)/scale);
-        return false;
+        return true;
     };
 
     p.mouseWheel = function(event) {
@@ -365,7 +383,7 @@ export default function measure(p) {
     p.mouseDragged = function(event) {
 
         var closest = (position) =>
-            Object.keys(SNAP_TEST).reduce((acc, key, ind, keys) =>
+            Object.keys(snaps[0]).reduce((acc, key, ind, keys) =>
                 (key - position) < (keys[acc] || keys[0]) ? key : acc
             , Infinity);
 
@@ -509,6 +527,7 @@ export default function measure(p) {
             measure.temp_ticks.push(cumulative);
             cumulative += K / (measure.temp_start + inc*i);
         });
+        measure.temp_beats.push(cumulative);
 
         var beat_lock = (selected.meas in locked && locked[selected.meas].beats) ?
             parse_bits(locked[selected.meas].beats) : [];
