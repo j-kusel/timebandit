@@ -17,19 +17,19 @@ var MeasureCalc = (features, options) => {
     var beats = [];
     var ticks = [];
     let tick_num = options.PPQ * timesig;
+    console.log(tick_num);
     let cumulative = 0.0;
     let inc = (end-start)/tick_num;
-    for (var i=0; i<tick_num; i++) {
-        let elapsed = (60000.0/(start + inc*i))/PPQ;
+    let K = 60000.0 / PPQ;
+    for (var i=0; i < tick_num; i++) {
         if (!(i%PPQ)) {
             beats.push(cumulative);
         };
         ticks.push(cumulative);
-        cumulative += elapsed;
+        cumulative += K / (start + inc*i);
     }
     ms = cumulative;
     beats.push(ms);
-    ticks.push(cumulative);
 
     return {start, end, beats, ms, ticks, offset: features.offset};
 }
@@ -104,7 +104,7 @@ class App extends Component {
                   [uuidv4()]: MeasureCalc({ 
                       start: 60,
                       end: 120,
-                      timesig: 4,
+                      timesig: 6,
                       offset: 500
                   }, { PPQ: this.state.PPQ })
               }

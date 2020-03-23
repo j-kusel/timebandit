@@ -5,9 +5,18 @@ var range = [0, 100];
 
 const DRAG_THRESHOLD_X = 10;
 const FLAT_THRESHOLD = 10;
+const NUDGE_THRESHOLD = 1;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
 const ROLLOVER_TOLERANCE = 3;
+const SNAP_TEST = {
+    '5000': [
+        {
+            inst: 0,
+            //meas: id
+        }
+    ]
+};
 
 const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
 const [KeyC, KeyV] = [67, 86];
@@ -81,6 +90,7 @@ export default function measure(p) {
     var locked = {};
     var locks = 0;
     var amp_lock = 0;
+    var snapped = false;
     //var scope = window.innerWidth;
 
     var copied;
@@ -201,7 +211,7 @@ export default function measure(p) {
                 }
 
                 // check for temporary display
-                if (measure.temp_ticks && measure.temp_ticks.length) {
+                if ((measure.temp_ticks && measure.temp_ticks.length) || measure.temp_offset) {
                     ticks = 'temp_ticks';
                     beats = 'temp_beats';
                     offset = 'temp_offset';
@@ -353,6 +363,12 @@ export default function measure(p) {
     }
 
     p.mouseDragged = function(event) {
+
+        var closest = (position) =>
+            Object.keys(SNAP_TEST).reduce((acc, key, ind, keys) =>
+                (key - position) < (keys[acc] || keys[0]) ? key : acc
+            , Infinity);
+
         if (rollover === 0)
             return;
         if (outside_origin)
@@ -378,47 +394,96 @@ export default function measure(p) {
         measure.temp_ticks = [];
         measure.temp_beats = [];
 
-
-
         if (drag_mode === 'measure') {
-            measure.ticks.forEach((tick, i) => {
-                if (!(i%CONSTANTS.PPQ))
-                    measure.temp_beats.push(tick + dragged/scale);
-                measure.temp_ticks.push(tick + dragged/scale);
-            });
+            let position = measure.offset + dragged/scale;
+            let snap_to = closest(measure.ms + position);
+            
+            let last_beat = measure.ms + position;
+            let gap = snap_to - last_beat;
+            if (Math.abs(gap) < 50)
+                position = snap_to - measure.ms;
+
+            measure.temp_ticks = measure.ticks.slice(0);
+            measure.temp_beats = measure.beats.slice(0);
+            measure.temp_offset = position;
+            
             return;
         };
 
 
         let beatscale = (-dragged*scale); // /p.width
-        var cumulative = 0;
 
 
-        let diff = measure.end - measure.start;
+        var slope = measure.end - measure.start;
         
-        let perc; 
-        if (Math.abs(diff) < 5)
-            perc = (dir === 1) ? -FLAT_THRESHOLD : FLAT_THRESHOLD
-        else
-            perc = grabbed/Math.abs(diff);
+        let perc = Math.abs(slope) < FLAT_THRESHOLD ?
+            ((dir === 1) ? -FLAT_THRESHOLD : FLAT_THRESHOLD) :
+            grabbed/Math.abs(slope);
 
         amp_lock = beatscale/perc;
-        let inc;
-        
+
+
+        let ticks = (measure.beats.length - 1) * CONSTANTS.PPQ;
 
         // if START is locked
-        if (locks & (1 << 1))
-            inc = (diff + amp_lock)/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
+        // change slope, preserve start
+        if (locks & (1 << 1)) {
+            slope += amp_lock;
+            measure.temp_start = measure.start;
+        }
 
         // if END is locked
-        else if (locks & (1 << 2))
-            inc = (diff - amp_lock)/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
-        else if (locks & (1 << 4))
-            inc = diff/((measure.beats.length-1)*CONSTANTS.PPQ) //(measure.end*beatscale)
-        else
-            inc = (diff + (amp_lock/2))/((measure.beats.length-1)*CONSTANTS.PPQ);
+        // change slope, preserve end by changing start to compensate
+        else if (locks & (1 << 2)) {
+            slope -= amp_lock;
+            measure.temp_start = measure.start + amp_lock;
+        // if SLOPE is locked
+        // split change between start and end
+        } else if (!(locks & (1 << 4))) {
+            slope += amp_lock/2; 
+            measure.temp_start = measure.start + amp_lock/2;
+        }
+
+
+        let C = (delta) => 60000.0 * (measure.beats.length - 1) / (delta);
+        let sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ * constant / 60000.0) + n)));
+
+        let C1 = C(slope);
+        let ms = C1 * measure.ticks.reduce((sum, _, i) => 
+            sum + sigma(measure.temp_start, C1)(i), 0);
+        
+        let diff = slope;
+
+        let snap_to = closest(ms);
+
+        // LENGTH GRADIENT DESCENT
+        var nudge = (gap, depth) => {
+            // limit recursion
+            if (depth > 99)
+                return diff;
+            if (gap > NUDGE_THRESHOLD)
+                diff *= 0.999;
+            else if (gap < -NUDGE_THRESHOLD)
+                diff *= 1.001;
+            else
+                return diff;
+
+            let new_C = C(diff)
+            let new_sigma = sigma(measure.temp_start, new_C);
+            let ms = new_C * measure.ticks.reduce((sum, _, i) => sum + new_sigma(i), 0);
+            return nudge(snap_to - (ms + (measure.temp_offset || measure.offset)), depth + 1);
+        };
+
+        let gap = snap_to - (ms + (measure.temp_offset || measure.offset));
+
+        if (Math.abs(gap) < 50) {
+            snapped = snapped || nudge(gap, 0);
+            slope = snapped;
+        } else
+            snapped = 0;
+            
         // INVERT THIS DRAG AT SOME POINT?
-        //inc = inc * ((dragged < 0
+        let inc = slope/ticks;
 
         // if DIRECTION is locked
         if (locks & (1 << 3)) {
@@ -427,36 +492,30 @@ export default function measure(p) {
                 return;
             inc = (dir === 1) ?
                 Math.max(inc, 0) : inc;
-        };
-
-        if (locks & (1 << 1)) {
-            measure.temp_start = measure.start;
-        } else if (locks & (1 << 2)) {
-            measure.temp_start = measure.start + amp_lock;
-            if (locks & (1 << 3))
+            if (locks & (1 << 2))
                 measure.temp_start = (dir === 1) ?
-                    Math.min(measure.temp_start, measure.end) : Math.max(measure.temp_start, measure.end);
-        } else {
-            measure.temp_start = measure.start + amp_lock/2;
+                    Math.min(measure.temp_start, measure.end) :
+                    Math.max(measure.temp_start, measure.end);
         };
 
+        let K = 60000.0 / CONSTANTS.PPQ;
 
+        let cumulative = 0;
+        console.log(ticks);
+        console.log(measure.ticks.length);
         measure.ticks.forEach((_, i) => {
             if (!(i%CONSTANTS.PPQ))
                 measure.temp_beats.push(cumulative);
             measure.temp_ticks.push(cumulative);
-
-            cumulative += (60000.0/(measure.temp_start + inc*i))/CONSTANTS.PPQ;
+            cumulative += K / (measure.temp_start + inc*i);
         });
 
         var beat_lock = (selected.meas in locked && locked[selected.meas].beats) ?
             parse_bits(locked[selected.meas].beats) : [];
 
-
+        measure.temp_slope = slope;
         measure.temp_offset = measure.offset;
-        if (beat_lock.length > 1)
-            return
-        else if (beat_lock.length === 1)
+        if (beat_lock.length === 1)
             measure.temp_offset += measure.beats[beat_lock[0]] - measure.temp_beats[beat_lock[0]];
 
 
@@ -480,23 +539,25 @@ export default function measure(p) {
         let measure = instruments[selected.inst].measures[selected.meas];
 
         if (drag_mode === 'measure') {
-            API.updateMeasure(selected.inst, selected.meas, measure.start, measure.end, measure.beats.length - 1, measure.offset + dragged/scale);
+            API.updateMeasure(selected.inst, selected.meas, measure.start, measure.end, measure.beats.length - 1, measure.temp_offset);
             dragged = 0;
             return;
         };
 
         if (drag_mode === 'tick') {
-            let tick = measure.temp_ticks.pop() - measure.temp_ticks.pop();
+            /*let tick = measure.temp_ticks.pop() - measure.temp_ticks.pop();
             let BPM = 60000.0/(tick * CONSTANTS.PPQ);
+            */
+            let end = measure.temp_start + measure.temp_slope;
             measure.temp_ticks = [];
             dragged = 0;
-            if (BPM < 10)
+            if (end < 10)
                 return;
             
             // if start changes, update accordingly.
             //let start = (locks & (1 << 2)) ? measure.start + amp_lock : measure.start;
             
-            API.updateMeasure(selected.inst, selected.meas, measure.temp_start, BPM, measure.beats.length - 1, measure.temp_offset);
+            API.updateMeasure(selected.inst, selected.meas, measure.temp_start, end, measure.beats.length - 1, measure.temp_offset);
 
             amp_lock = 0;
         };
