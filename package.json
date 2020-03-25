@@ -11,7 +11,7 @@
     "p5": "^0.10.2",
     "react": "^16.5.2",
     "react-bootstrap": "^1.0.0-beta.17",
-    "react-dom": "^16.5.2",
+    "react-dom": "^16.13.1",
     "react-p5-wrapper": "2.0.0",
     "react-scripts": "1.1.5",
     "styled-components": "^4.0.3",

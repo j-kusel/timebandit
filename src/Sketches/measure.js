@@ -1,4 +1,3 @@
-
 var scale = 1.0;
 var start = 0;
 var range = [0, 100];
@@ -126,8 +125,10 @@ export default function measure(p) {
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         instruments = props.instruments;
+        console.log(instruments);
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
+        snaps = [];
         let add_snaps1 = {};
         let all_meas = instruments.reduce((acc, inst, i_ind) => {
             Object.keys(inst.measures).forEach((key) => {
@@ -153,6 +154,7 @@ export default function measure(p) {
 
         // add downbeat snaps
         snaps.push(add_snaps1);
+        console.log(snaps);
         range = calcRange(all_meas);
         
         p.resizeCanvas(p.width, INST_HEIGHT*instruments.length);
@@ -382,11 +384,21 @@ export default function measure(p) {
 
     p.mouseDragged = function(event) {
 
-        var closest = (position) =>
+        var closest = (position, inst) =>
             Object.keys(snaps[0]).reduce((acc, key, ind, keys) =>
-                (key - position) < (keys[acc] || keys[0]) ? key : acc
+                (snaps[0][key][0].inst === inst) ?
+                    acc :
+                    (Math.abs(parseFloat(key, 10) - position) < (keys[acc] || keys[0]) ? parseFloat(key, 10) : acc)
             , Infinity);
 
+        /*var closest = (position, inst) =>
+            Object.keys(snaps[0]).reduce((acc, key, ind, keys) => {
+                console.log(snaps[0][key][0].inst);
+                console.log(inst);
+                return Infinity;
+            }, Infinity);
+            */
+        
         if (rollover === 0)
             return;
         if (outside_origin)
@@ -414,7 +426,7 @@ export default function measure(p) {
 
         if (drag_mode === 'measure') {
             let position = measure.offset + dragged/scale;
-            let snap_to = closest(measure.ms + position);
+            let snap_to = closest(measure.ms + position, selected.inst);
             
             let last_beat = measure.ms + position;
             let gap = snap_to - last_beat;
@@ -472,7 +484,8 @@ export default function measure(p) {
         
         let diff = slope;
 
-        let snap_to = closest(ms);
+        //console.log(ms + (measure.temp_offset || measure.offset));
+        let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst);
 
         // LENGTH GRADIENT DESCENT
         var nudge = (gap, depth) => {
@@ -489,10 +502,15 @@ export default function measure(p) {
             let new_C = C(diff)
             let new_sigma = sigma(measure.temp_start, new_C);
             let ms = new_C * measure.ticks.reduce((sum, _, i) => sum + new_sigma(i), 0);
-            return nudge(snap_to - (ms + (measure.temp_offset || measure.offset)), depth + 1);
+            let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
+            console.log(new_gap);
+            return nudge(new_gap, depth + 1);
         };
 
-        let gap = snap_to - (ms + (measure.temp_offset || measure.offset));
+        let loc = (ms + (measure.temp_offset || measure.offset));
+        let gap = loc - snap_to;
+
+        console.log(loc, gap, snap_to);
 
         if (Math.abs(gap) < 50) {
             snapped = snapped || nudge(gap, 0);
@@ -519,8 +537,6 @@ export default function measure(p) {
         let K = 60000.0 / CONSTANTS.PPQ;
 
         let cumulative = 0;
-        console.log(ticks);
-        console.log(measure.ticks.length);
         measure.ticks.forEach((_, i) => {
             if (!(i%CONSTANTS.PPQ))
                 measure.temp_beats.push(cumulative);

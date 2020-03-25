@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-import ReactDOM from 'react-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form } from 'react-bootstrap';
 import { ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
@@ -18,9 +17,7 @@ var MeasureCalc = (features, options) => {
     var ms;
     var beats = [];
     var ticks = [];
-    console.log(options.PPQ, timesig);
     let tick_num = options.PPQ * timesig;
-    console.log(tick_num);
     let cumulative = 0.0;
     let inc = (end-start)/tick_num;
     let K = 60000.0 / PPQ;
@@ -114,6 +111,17 @@ class App extends Component {
           } :
           { measures: {} });
           
+      DEBUG ? this.state.instruments.push({
+              name: 'asdf',
+              measures: {
+                  [uuidv4()]: MeasureCalc({ 
+                      start: 144,
+                      end: 72,
+                      timesig: 6,
+                      offset: 300
+                  }, { PPQ: this.state.PPQ })
+              }
+          }) : console.log(0);
 
       this.CONSTANTS = {
           PPQ: 24
@@ -125,6 +133,7 @@ class App extends Component {
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
       this.handleLock = this.handleLock.bind(this);
+      this.handleInput = this.handleInput.bind(this);
       this.inputs = {};
 
 
@@ -167,9 +176,8 @@ class App extends Component {
   handleInst(e) {
       e.preventDefault();
 
-      console.log(ReactDOM.findDOMNode('instName'));
       let newInst = {
-          name: ReactDOM.findDOMNode('instName'),
+          name: this.state.instName,
           measures: {}
       }
 
@@ -191,10 +199,10 @@ class App extends Component {
       let inst = this.state.selected.inst;
       
       let newMeasure = {
-          start: parseInt(this.inputs.start.value, 10),
-          end: parseInt(this.inputs.end.value, 10),
-          timesig: parseInt(this.inputs.beats.value, 10),
-          offset: parseInt(this.inputs.offset.value, 10)
+          start: parseInt(this.state.start, 10),
+          end: parseInt(this.state.end, 10),
+          timesig: parseInt(this.state.beats, 10),
+          offset: parseInt(this.state.offset, 10)
       };
 
       var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ });
@@ -208,6 +216,10 @@ class App extends Component {
 
   handleLock(val, e) {
       this.setState(oldState => ({ locks: val }));
+  };
+
+  handleInput(e) {
+      this.setState({ [e.target.name]: e.target.value });
   };
 
   render() {
@@ -226,48 +238,32 @@ class App extends Component {
 
 
     
+    let measure_inputs = ['start', 'end', 'beats', 'offset'].map((name) => 
+        <input
+            type="text"
+            key={name}
+            placeholder={name}
+            name={name}
+            onChange={this.handleInput}
+        ></input>
+    );
+
     return (
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
         <form onSubmit={this.handleInst} className="inst-form">
-            <Form.Group>
-                <Form.Label>new instrument</Form.Label>
-                <Form.Control
-                    type="text"
-                    ref="instName"
-                ></Form.Control>
-                <Button type="submit">new inst</Button>
-            </Form.Group>
+            <label>new instrument</label>
+            <input
+                type="text"
+                name="instName"
+                onChange={this.handleInput}
+            ></input>
+            <Button type="submit">new inst</Button>
         </form>
         <form onSubmit={this.handleMeasure} className="measure-form">
-            <Form.Group>
-                <Form.Label>start tempo</Form.Label>
-                <Form.Control
-                    type="text"
-                    placeholder="start"
-                    onChange={(ref) => {this.inputs.start = ref}}
-                >
-                </Form.Control>
-                <Form.Control
-                    type="text"
-                    placeholder="end"
-                    onChange={(ref) => {this.inputs.end = ref}}
-                >
-                </Form.Control>
-                <Form.Control
-                    type="text"
-                    placeholder="beats"
-                    onChange={(ref) => {this.inputs.beats = ref}}
-                >
-                </Form.Control>
-                <Form.Control
-                    type="text"
-                    placeholder="offset"
-                    onChange={(ref) => {this.inputs.offset = ref}}
-                >
-                </Form.Control>
-                <Button type="submit" disabled={this.state.selected.inst === -1}>create</Button>
-            </Form.Group>
+            <label>start tempo</label>
+            {measure_inputs}
+            <button type="submit" disabled={this.state.selected.inst === -1}>create</button>
         </form>
         <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
             { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
