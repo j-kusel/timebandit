@@ -391,22 +391,11 @@ export default function measure(p) {
                     (Math.abs(parseFloat(key, 10) - position) < (keys[acc] || keys[0]) ? parseFloat(key, 10) : acc)
             , Infinity);
 
-        /*var closest = (position, inst) =>
-            Object.keys(snaps[0]).reduce((acc, key, ind, keys) => {
-                console.log(snaps[0][key][0].inst);
-                console.log(inst);
-                return Infinity;
-            }, Infinity);
-            */
-        
         if (rollover === 0)
             return;
         if (outside_origin)
             return;
        
-        /*if (p.mouseY < 0 || p.mouseY > p.height)
-            return;
-            */
         dragged += event.movementX;
 
         if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
@@ -426,12 +415,22 @@ export default function measure(p) {
 
         if (drag_mode === 'measure') {
             let position = measure.offset + dragged/scale;
-            let snap_to = closest(measure.ms + position, selected.inst);
-            
-            let last_beat = measure.ms + position;
-            let gap = snap_to - last_beat;
-            if (Math.abs(gap) < 50)
-                position = snap_to - measure.ms;
+            let snaps_to = measure.beats.reduce((acc, beat, ind) => {
+                let next = (measure.temp_offset || measure.offset) + beat;
+                let gap = closest(next, selected.inst) - next;
+                return (Math.abs(gap) < acc[1]) ?
+                    [ind, gap + next] : acc;
+            }, [-1, Infinity]);
+            //console.log(snaps_to);
+            //###########################################################
+
+            if (measure.beats.indexOf(snaps_to[0])) {
+                let _beat = measure.beats[snaps_to[0]];
+                let gap = snaps_to[1] - _beat;
+                console.log(gap);
+                if (Math.abs(gap) < 50)
+                    position = _beat - measure.ms;
+            };
 
             measure.temp_ticks = measure.ticks.slice(0);
             measure.temp_beats = measure.beats.slice(0);
