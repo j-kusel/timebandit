@@ -30,6 +30,8 @@ var calcRange = (measures) => {
     return [Math.min(...ranged), Math.max(...ranged)];
 };
 
+
+
 var bit_toggle = (list, item) => list ^ (1 << item);
 
 var parse_bits = (n) => {
@@ -385,51 +387,51 @@ export default function measure(p) {
     p.mouseDragged = function(event) {
 
         var closest = (position, inst) =>
-            Object.keys(snaps[0]).reduce((acc, key, ind, keys) =>
-                (snaps[0][key][0].inst === inst) ?
-                    acc :
-                    (Math.abs(parseFloat(key, 10) - position) < (keys[acc] || keys[0]) ? parseFloat(key, 10) : acc)
-            , Infinity);
+            Object.keys(snaps[0]).reduce((acc, key, ind, keys) => {
+                if (snaps[0][key][0].inst === inst)
+                    return acc;
+                let gap = parseFloat(key, 10) - position;
+                return (Math.abs(gap) < Math.abs(acc[1]) ? 
+                    [parseFloat(key, 10), gap] :
+                    acc);
+            }, [-1, Infinity]);
 
-        if (rollover === 0)
+        var snap_eval = (position, candidates) =>
+            candidates.reduce((acc, candidate, ind) => {
+                let next = position + candidate;
+                let gap, target;
+                [target, gap] = closest(next, selected.inst);
+                if (Math.abs(gap) < Math.abs(acc[2])) 
+                    return [ind, target, gap];
+                return acc;
+            }, [-1, Infinity, Infinity]);
+
+        if (rollover === 0
+            || outside_origin
+            || selected.meas === -1)
             return;
-        if (outside_origin)
-            return;
-       
+      
         dragged += event.movementX;
 
         if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
-            if (selected.meas !== -1) {
-                instruments[selected.inst].measures[selected.meas].temp_ticks = [];
-            };
+            instruments[selected.inst].measures[selected.meas].temp_ticks = [];
             return;
         };
-
-        if (selected.meas === -1) 
-            return;
 
         let measure = instruments[selected.inst].measures[selected.meas];
                 
         measure.temp_ticks = [];
         measure.temp_beats = [];
 
+
         if (drag_mode === 'measure') {
             let position = measure.offset + dragged/scale;
-            let snaps_to = measure.beats.reduce((acc, beat, ind) => {
-                let next = (measure.temp_offset || measure.offset) + beat;
-                let gap = closest(next, selected.inst) - next;
-                return (Math.abs(gap) < acc[1]) ?
-                    [ind, gap + next] : acc;
-            }, [-1, Infinity]);
-            //console.log(snaps_to);
-            //###########################################################
+            let close = snap_eval(position, measure.beats);
 
-            if (measure.beats.indexOf(snaps_to[0])) {
-                let _beat = measure.beats[snaps_to[0]];
-                let gap = snaps_to[1] - _beat;
-                console.log(gap);
+            if (close[0] !== -1) {
+                let gap = close[1] - measure.beats[close[0]] + position;
                 if (Math.abs(gap) < 50)
-                    position = _beat - measure.ms;
+                    position += gap;
             };
 
             measure.temp_ticks = measure.ticks.slice(0);
@@ -484,7 +486,7 @@ export default function measure(p) {
         let diff = slope;
 
         //console.log(ms + (measure.temp_offset || measure.offset));
-        let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst);
+        let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst)[0];
 
         // LENGTH GRADIENT DESCENT
         var nudge = (gap, depth) => {
