@@ -94,6 +94,7 @@ export default function measure(p) {
     var amp_lock = 0;
     var snaps = [];
     var snapped = false;
+    var snapped_inst = -1;
     //var scope = window.innerWidth;
 
     var copied;
@@ -295,7 +296,17 @@ export default function measure(p) {
                 let scaleY = (input) => INST_HEIGHT - (input - range[0])/(range[1] - range[0])*INST_HEIGHT;
                 p.line(position(0), yloc + scaleY(measure.start), position(measure.beats.slice(-1)[0]), yloc + scaleY(measure.end));
 
-            })
+            });
+
+            // draw snap
+            if (snapped_inst) {
+                p.stroke(200, 240, 200);
+                let x = snapped_inst.target * scale + start;
+                let spread = [, ];
+                //p.line(x, 0, x, 100);
+                p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*INST_HEIGHT,
+                    x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*INST_HEIGHT);
+            };
         });
 
         // draw cursor
@@ -391,20 +402,20 @@ export default function measure(p) {
                 if (snaps[0][key][0].inst === inst)
                     return acc;
                 let gap = parseFloat(key, 10) - position;
-                return (Math.abs(gap) < Math.abs(acc[1]) ? 
-                    [parseFloat(key, 10), gap] :
+                return (Math.abs(gap) < Math.abs(acc.gap) ? 
+                    { target: parseFloat(key, 10), gap, inst: snaps[0][key][0].inst } :
                     acc);
-            }, [-1, Infinity]);
+            }, { target: -1, gap: Infinity, inst: -1 });
 
         var snap_eval = (position, candidates) =>
-            candidates.reduce((acc, candidate, ind) => {
+            candidates.reduce((acc, candidate, index) => {
                 let next = position + candidate;
-                let gap, target;
-                [target, gap] = closest(next, selected.inst);
-                if (Math.abs(gap) < Math.abs(acc[2])) 
-                    return [ind, target, gap];
+                let target, gap, inst;
+                ({ target, gap, inst } = closest(next, selected.inst));
+                if (Math.abs(gap) < Math.abs(acc.gap)) 
+                    return { index, target, gap, inst };
                 return acc;
-            }, [-1, Infinity, Infinity]);
+            }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
         if (rollover === 0
             || outside_origin
@@ -428,10 +439,13 @@ export default function measure(p) {
             let position = measure.offset + dragged/scale;
             let close = snap_eval(position, measure.beats);
 
-            if (close[0] !== -1) {
-                let gap = close[1] - measure.beats[close[0]] + position;
-                if (Math.abs(gap) < 50)
+            if (close.index !== -1) {
+                let gap = close.target - (measure.beats[close.index] + position);
+                if (Math.abs(gap) < 50) {
+                    snapped_inst = { ...close, origin: selected.inst };
                     position += gap;
+                } else
+                    snapped_inst = 0;
             };
 
             measure.temp_ticks = measure.ticks.slice(0);
@@ -486,7 +500,18 @@ export default function measure(p) {
         let diff = slope;
 
         //console.log(ms + (measure.temp_offset || measure.offset));
-        let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst)[0];
+        //let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst)[0];
+        let close = snap_eval((measure.temp_offset || measure.offset), measure.beats);
+
+        // NEWWWWWWWWWWWWWWWWW##########################
+        if (close.index !== -1) {
+            let gap = close.target - (measure.beats[close.index] + position);
+            if (Math.abs(gap) < 50) {
+                snapped_inst = { ...close, origin: selected.inst };
+                position += gap;
+            } else
+                snapped_inst = 0;
+        };
 
         // LENGTH GRADIENT DESCENT
         var nudge = (gap, depth) => {
