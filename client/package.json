@@ -1,8 +1,9 @@
 {
-  "name": "jsbandit",
+  "name": "timebandit",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "axios": "^0.19.2",
     "bootstrap": "^4.4.1",
     "dependencies": "0.0.1",
     "jquery": "^1.9.1",
@@ -38,5 +39,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "main": "index.js",
+  "devDependencies": {},
+  "author": "",
+  "license": "Unlicense",
+  "description": ""
 }

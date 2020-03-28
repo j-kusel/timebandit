@@ -3,13 +3,15 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form } from 'react-bootstrap';
 import { ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
 import measure from './Sketches/measure';
+import axios from 'axios';
 import P5Wrapper from 'react-p5-wrapper';
 import styled from 'styled-components';
 import uuidv4 from 'uuid/v4';
 
-const DEBUG = true;
+const DEBUG = false;
 
 var MeasureCalc = (features, options) => {
+    console.log(features);
     let start, end, timesig;
     let PPQ;
     ({ start, end, timesig } = features);
@@ -31,7 +33,7 @@ var MeasureCalc = (features, options) => {
     ms = cumulative;
     beats.push(ms);
 
-    return {start, end, beats, ms, ticks, offset: features.offset};
+    return {start, end, timesig, beats, ms, ticks, offset: features.offset};
 }
 
 class UI extends Component {
@@ -134,6 +136,8 @@ class App extends Component {
       this.handleInst = this.handleInst.bind(this);
       this.handleLock = this.handleLock.bind(this);
       this.handleInput = this.handleInput.bind(this);
+      this.save = this.save.bind(this);
+      this.load = this.load.bind(this);
       this.inputs = {};
 
 
@@ -222,6 +226,69 @@ class App extends Component {
       this.setState({ [e.target.name]: e.target.value });
   };
 
+  save() {
+      let insts = this.state.instruments;
+      let rows = [['inst', 'start', 'end', 'timesig', 'offset']];
+
+      Object.keys(insts).forEach((inst) => 
+          Object.keys(insts[inst].measures).forEach((meas) => 
+              rows.push(
+                  [inst].concat(['start', 'end', 'timesig', 'offset']
+                      .map((key) => insts[inst].measures[meas][key]))
+              )
+          )
+      );
+      
+      var downloadLink = document.createElement('a');
+      downloadLink.href = encodeURI(`data:text/csv;utf-8,`.concat(rows.join('\n')));
+      downloadLink.download = 'filename.csv';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+  };
+
+  load(e) {
+      //let req = new XMLHttpRequest();
+      //req.open("GET", "file://
+      /*var uploadLink = document.createElement('input');
+      uploadLink.type = "file";
+      uploadLink.name = "file";
+      uploadLink.onChange = (e) => console.log(e.target.files[0]);
+      uploadLink.click();
+      */
+
+      var reader = new FileReader();
+      reader.onload = (e) =>
+          this.setState({ instruments: 
+              e.target.result
+                  .split('\n')
+                  .slice(1) // remove headers
+                  .reduce((acc, line) => {
+                      let params = line.split(',');
+                      let newMeas = MeasureCalc(
+                          ['start', 'end', 'timesig', 'offset']
+                              .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
+                          , { PPQ: this.state.PPQ }
+                      );
+
+                      let pad = params[0] - (acc.length - 1);
+                      if (pad > 0) {
+                          for (let i=0; i<=pad; i++) {
+                              acc.push({ measures: {} });
+                          }
+                      };
+
+                      acc[params[0]].measures[uuidv4()] = newMeas;
+                      return acc;
+                  }, [])
+          });
+
+
+      reader.readAsText(e.target.files[0]);
+  };
+
+
+
   render() {
     var newInstruments = this.state.instruments.map((inst) => ({ 
         measures: Object.assign({}, inst.measures), 
@@ -251,6 +318,10 @@ class App extends Component {
     return (
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
+        <button onClick={this.save}>save</button>
+        <form>
+            <input type="file" name="file" onChange={this.load}/>
+        </form>
         <form onSubmit={this.handleInst} className="inst-form">
             <label>new instrument</label>
             <input
