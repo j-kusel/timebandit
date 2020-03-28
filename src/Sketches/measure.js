@@ -302,7 +302,6 @@ export default function measure(p) {
             if (snapped_inst) {
                 p.stroke(200, 240, 200);
                 let x = snapped_inst.target * scale + start;
-                let spread = [, ];
                 //p.line(x, 0, x, 100);
                 p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*INST_HEIGHT,
                     x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*INST_HEIGHT);
@@ -500,10 +499,12 @@ export default function measure(p) {
         let diff = slope;
 
         //console.log(ms + (measure.temp_offset || measure.offset));
-        //let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst)[0];
-        let close = snap_eval((measure.temp_offset || measure.offset), measure.beats);
+        let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst).target;
 
-        // NEWWWWWWWWWWWWWWWWW##########################
+        // TODOOOOOOOOO##########################
+        // beat snapping with drag
+        /*
+        let close = snap_eval((measure.temp_offset || measure.offset), measure.beats);
         if (close.index !== -1) {
             let gap = close.target - (measure.beats[close.index] + position);
             if (Math.abs(gap) < 50) {
@@ -512,6 +513,7 @@ export default function measure(p) {
             } else
                 snapped_inst = 0;
         };
+        */
 
         // LENGTH GRADIENT DESCENT
         var nudge = (gap, depth) => {
