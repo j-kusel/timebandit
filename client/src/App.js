@@ -8,6 +8,8 @@ import P5Wrapper from 'react-p5-wrapper';
 import styled from 'styled-components';
 import uuidv4 from 'uuid/v4';
 
+import audio from './Audio/index';
+
 const DEBUG = false;
 
 var MeasureCalc = (features, options) => {
@@ -136,6 +138,8 @@ class App extends Component {
       this.handleInst = this.handleInst.bind(this);
       this.handleLock = this.handleLock.bind(this);
       this.handleInput = this.handleInput.bind(this);
+      this.play = this.play.bind(this);
+      this.kill = this.kill.bind(this);
       this.save = this.save.bind(this);
       this.load = this.load.bind(this);
       this.inputs = {};
@@ -225,6 +229,18 @@ class App extends Component {
   handleInput(e) {
       this.setState({ [e.target.name]: e.target.value });
   };
+
+  play() {
+      let threads = this.state.instruments.map((inst, ind) =>
+          [ind, Object.keys(inst.measures).reduce((m_acc, meas) => 
+              [ ...m_acc, ...inst.measures[meas].beats.map((beat) => beat + inst.measures[meas].offset) ]
+          , [])]);
+      audio.play(threads);
+  }
+
+  kill() {
+      audio.kill();
+  }
 
   save() {
       let insts = this.state.instruments;
@@ -319,6 +335,10 @@ class App extends Component {
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
         <button onClick={this.save}>save</button>
+
+        <button onClick={this.play}>play</button>
+
+        <button onClick={this.kill}>kill</button>
         <form>
             <input type="file" name="file" onChange={this.load}/>
         </form>
