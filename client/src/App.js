@@ -246,8 +246,8 @@ class App extends Component {
 
   midi() {
 
-      let beats = [];
-      let tempi = this.state.instruments.map((inst, i_ind) => {
+      let tracks = this.state.instruments.map((inst, i_ind) => {
+
 
           // this would be solved by sorting measures on entry
           // looking for gaps between measures
@@ -260,7 +260,8 @@ class App extends Component {
           let last = 0;
 
           let tpm = 60000.0 / this.state.PPQ;
-          beats.push([]);
+
+          let beats = [];
           let map = Object.keys(inst.measures).reduce((acc, key, ind) => {
               let meas = inst.measures[key];
               // push empty message if within delta threshold
@@ -272,9 +273,10 @@ class App extends Component {
                       acc.push({ delta, tempo: last.end });
                   };
               } else {
-                  // or default to 60 bpm for initial gap
-                  delta = parseInt(meas.offset / (tpm / 60), 10);
-                  acc.push({ delta, tempo: 60 });
+                  // or default to ? bpm for initial gap
+                  delta = Math.round(meas.offset / (tpm / 300));
+                  let tempo = delta/(meas.offset / tpm);
+                  acc.push({ delta, tempo });
               };
 
               let wait = `T${delta}`;
@@ -286,7 +288,7 @@ class App extends Component {
                       let new_beat = { duration: '4', pitch: ['C4'] };
                       if (i === 0)
                           new_beat.wait = wait;
-                      beats[i_ind].push(new_beat); // kinda meaningless
+                      beats.push(new_beat); // kinda meaningless
                   };
                   return ({ tempo: meas.start + i * slope })
               });
@@ -296,16 +298,14 @@ class App extends Component {
               return acc.concat(ticks);
           }, []);
           
-          beats[i_ind].push({ duration: '4', pitch: ['C4'] });
+          beats.push({ duration: '4', pitch: ['C4'] });
           map.push({ tempo: last.end });
-          return map;
-
+          return ({ tempi: map, beats, name: inst.name });;
       });
-      console.log(tempi);
-      console.log(beats);
+      console.log(tracks);
 
       
-      midi(tempi, beats, this.state.PPQ);
+      midi(tracks, this.state.PPQ);
 
               
 

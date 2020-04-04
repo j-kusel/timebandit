@@ -1,4 +1,6 @@
 import MidiWriter from 'midi-writer-js';
+import JSZip from 'jszip';
+
 //import TempoEvent from 'midi-writer-js/src'; ///track'; //meta-events/tempo-event';
 //import {TempoEvent} from 'midi-writer-js/meta-events/tempo-event.js';
 //import {Utils} from 'midi-writer-js/utils.js';
@@ -56,54 +58,42 @@ class _TempoEvent {
 
 var track = new MidiWriter.Track();
 
-export default (tracks, beats, PPQ) => {
+export default (tracks, PPQ) => {
     MidiWriter.Constants.HEADER_CHUNK_DIVISION = [0x00, PPQ.toString(16)];
+    var zip = new JSZip();
+    var score = zip.folder('score');
 
-    var new_track = [new MidiWriter.Track(), new MidiWriter.Track()];
-    // handle initial gap, if any
-    let offset = tracks[0].slice(0, 1);
-    new_track[0].setTempo(offset[0].tempo);
+    tracks.forEach((track) => {
+        var new_track = [new MidiWriter.Track(), new MidiWriter.Track()];
+        // handle initial gap, if any
+        let offset = track.tempi.slice(0, 1);
+        console.log(offset);
+        new_track[0].setTempo(offset[0].tempo);
 
-    
-    new_track[0].addEvent(new _TempoEvent(offset[0].delta, offset[0].tempo));
-    let delta = 0;
-    tracks[0].slice(1).forEach((tick) => {
-        new_track[0].addEvent(new _TempoEvent(delta, tick.tempo));
-        delta = ('delta' in tick) ?
-            tick.delta : 1;
+        
+        //new_track[0].addEvent(new _TempoEvent(offset[0].delta, offset[0].tempo));
+        //let delta = 0;
+        let delta = offset[0].delta;
+        track.tempi.slice(1).forEach((tick) => {
+            new_track[0].addEvent(new _TempoEvent(delta, tick.tempo));
+            delta = ('delta' in tick) ?
+                tick.delta : 1;
+        });
+       
+        track.beats.forEach((beat) => new_track[1].addEvent(new MidiWriter.NoteEvent(beat)));
+        
+        var write = new MidiWriter.Writer(new_track);
+        let blob = new Blob([write.buildFile()], {type: "audio/midi"});
+        score.file(track.name + '.mid', blob);
     });
-    /*var note = new MidiWriter.NoteEvent({
-        pitch: 'C5',
-        duration: '4',
-    });
-    new_track[0].addEvent(note);
-    */
-
-    beats[0].forEach((beat) => new_track[1].addEvent(new MidiWriter.NoteEvent(beat)));
-    /*new_track[1].addEvent(
-        new MidiWriter.NoteEvent({
-            wait: 'T2',
-            duration: '4',
-        })
-    );
-
-    for (let i=0; i < 11; i++) {
-        new_track[1].addEvent(
-            new MidiWriter.NoteEvent({
-                duration: '4',
-            })
-        );
-    };
-    */
-
-    var write = new MidiWriter.Writer(new_track);
-    console.log(write.dataUri());
 
     var dlLink = document.createElement('a');
-    var blob = new Blob([write.buildFile()], {type: "audio/midi"});
-    dlLink.href = window.URL.createObjectURL(blob);
-    dlLink.download = 'midi.mid';
-    document.body.appendChild(dlLink);
-    dlLink.click();
-    document.body.removeChild(dlLink);
+    zip.generateAsync({ type: 'blob' })
+        .then((blob) => {
+            dlLink.href = window.URL.createObjectURL(blob);
+            dlLink.download = 'score.zip';
+            document.body.appendChild(dlLink);
+            dlLink.click();
+            document.body.removeChild(dlLink);
+        }, (err) => console.log(err));
 };
