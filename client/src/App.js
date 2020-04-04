@@ -7,10 +7,13 @@ import axios from 'axios';
 import P5Wrapper from 'react-p5-wrapper';
 import styled from 'styled-components';
 import uuidv4 from 'uuid/v4';
-
+import midi from './Audio/midi';
 import audio from './Audio/index';
 
-const DEBUG = false;
+
+
+const DEBUG = true;
+const DELTA_THRESHOLD = 5; // in milliseconds
 
 var MeasureCalc = (features, options) => {
     console.log(features);
@@ -92,7 +95,7 @@ class App extends Component {
           sizing: 600.0,
           cursor: 0.0,
           scroll: 0,
-          PPQ: 24,
+          PPQ: 4,
           time: 0,
           selected: {
               inst: -1,
@@ -110,6 +113,12 @@ class App extends Component {
                       end: 120,
                       timesig: 6,
                       offset: 500
+                  }, { PPQ: this.state.PPQ }),
+                  [uuidv4()]: MeasureCalc({ 
+                      start: 60,
+                      end: 120,
+                      timesig: 5,
+                      offset: 4722
                   }, { PPQ: this.state.PPQ })
               }
           } :
@@ -128,7 +137,7 @@ class App extends Component {
           }) : console.log(0);
 
       this.CONSTANTS = {
-          PPQ: 24
+          PPQ: this.state.PPQ
       };
 
       this.sizing = 600.0;
@@ -138,6 +147,7 @@ class App extends Component {
       this.handleInst = this.handleInst.bind(this);
       this.handleLock = this.handleLock.bind(this);
       this.handleInput = this.handleInput.bind(this);
+      this.midi = this.midi.bind(this);
       this.play = this.play.bind(this);
       this.kill = this.kill.bind(this);
       this.save = this.save.bind(this);
@@ -228,6 +238,78 @@ class App extends Component {
 
   handleInput(e) {
       this.setState({ [e.target.name]: e.target.value });
+  };
+
+  midiDebug() {
+      midi(this.state.PPQ);
+  }
+
+  midi() {
+
+      let beats = [];
+      let tempi = this.state.instruments.map((inst, i_ind) => {
+
+          // this would be solved by sorting measures on entry
+          // looking for gaps between measures
+          // lets assume they're in order for now.
+          /*let spreads = Object.keys(inst.measures).reduce((acc, key) =>
+              [inst.measures[key].offset, inst.measures[key].ms], []);
+              */
+
+          // fill gaps with appropriate number of ticks at given BPM
+          let last = 0;
+
+          let tpm = 60000.0 / this.state.PPQ;
+          beats.push([]);
+          let map = Object.keys(inst.measures).reduce((acc, key, ind) => {
+              let meas = inst.measures[key];
+              // push empty message if within delta threshold
+              let delta = 0
+              if (last) {
+                  let d = meas.offset - (last.ms + last.offset);
+                  if (d > DELTA_THRESHOLD) {
+                      delta = parseInt(delta / (tpm / last.end), 10);
+                      acc.push({ delta, tempo: last.end });
+                  };
+              } else {
+                  // or default to 60 bpm for initial gap
+                  delta = parseInt(meas.offset / (tpm / 60), 10);
+                  acc.push({ delta, tempo: 60 });
+              };
+
+              let wait = `T${delta}`;
+              last = meas;
+
+              let slope = (meas.end - meas.start)/meas.ticks.length;
+              let ticks = meas.ticks.map((_, i) => {
+                  if (!(i % this.state.PPQ)) {
+                      let new_beat = { duration: '4', pitch: ['C4'] };
+                      if (i === 0)
+                          new_beat.wait = wait;
+                      beats[i_ind].push(new_beat); // kinda meaningless
+                  };
+                  return ({ tempo: meas.start + i * slope })
+              });
+              
+              // get this a little more foolproof later
+
+              return acc.concat(ticks);
+          }, []);
+          
+          beats[i_ind].push({ duration: '4', pitch: ['C4'] });
+          map.push({ tempo: last.end });
+          return map;
+
+      });
+      console.log(tempi);
+      console.log(beats);
+
+      
+      midi(tempi, beats, this.state.PPQ);
+
+              
+
+
   };
 
   play() {
@@ -339,6 +421,9 @@ class App extends Component {
         <button onClick={this.play}>play</button>
 
         <button onClick={this.kill}>kill</button>
+
+        <button onClick={this.midi}>midi</button>
+        <button onClick={() => audio.init()}>unmute</button>
         <form>
             <input type="file" name="file" onChange={this.load}/>
         </form>

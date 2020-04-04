@@ -2,6 +2,8 @@ const AudioContext = window.AudioContext || window.webkitAudioContext;
 
 const aC = new AudioContext();
 
+navigator.requestMIDIAccess()
+    .then((midiAccess) => console.log(midiAccess.inputs));
 
 var gains = [];
 for (let i=0; i < 5; i++) {
@@ -41,6 +43,7 @@ var trigger = (osc, time, params) => {
 };
 
 var audio = {
+    init: () => aC.resume().then(() => console.log('resumed')),
     play: (score) => score.forEach((inst, ind) =>
         inst[1].forEach((beat) => trigger(ind, beat, adsr))),
     kill: () => gains.forEach((gain) => gain.setValueAtTime(0.0, aC.currentTime))
