@@ -128,7 +128,6 @@ export default function measure(p) {
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         instruments = props.instruments;
-        console.log(instruments);
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
         snaps = [];
@@ -148,7 +147,6 @@ export default function measure(p) {
                         add_snaps1[loc] = [obj];
                 });
 
-                console.log(measure);
                 measure.temp_beats = [];
                 measure.temp_ticks = [];
             });
@@ -157,7 +155,6 @@ export default function measure(p) {
 
         // add downbeat snaps
         snaps.push(add_snaps1);
-        console.log(snaps);
         range = calcRange(all_meas);
         
         p.resizeCanvas(p.width, INST_HEIGHT*instruments.length);
