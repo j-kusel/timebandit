@@ -1,89 +1,23 @@
 import React, { Component } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { Button, Form } from 'react-bootstrap';
+import { Container, Row, Col } from 'react-bootstrap';
 import { ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
-import measure from './Sketches/measure';
-import axios from 'axios';
-import P5Wrapper from 'react-p5-wrapper';
 import styled from 'styled-components';
 import uuidv4 from 'uuid/v4';
 import midi from './Audio/midi';
 import audio from './Audio/index';
 
+import { MeasureCalc } from './Util/index';
+import UI from './Components/Canvas';
 
 
+
+const TRACK_HEIGHT = 100;
 const DEBUG = true;
 const DELTA_THRESHOLD = 5; // in milliseconds
 
-var MeasureCalc = (features, options) => {
-    console.log(features);
-    let start, end, timesig;
-    let PPQ;
-    ({ start, end, timesig } = features);
-    ({ PPQ } = options);
-    var ms;
-    var beats = [];
-    var ticks = [];
-    let tick_num = options.PPQ * timesig;
-    let cumulative = 0.0;
-    let inc = (end-start)/tick_num;
-    let K = 60000.0 / PPQ;
-    for (var i=0; i < tick_num; i++) {
-        if (!(i%PPQ)) {
-            beats.push(cumulative);
-        };
-        ticks.push(cumulative);
-        cumulative += K / (start + inc*i);
-    }
-    ms = cumulative;
-    beats.push(ms);
 
-    return {start, end, timesig, beats, ms, ticks, offset: features.offset};
-}
-
-class UI extends Component {
-
-    // NEVER UPDATE
-    shouldComponentUpdate(nextProps, nextState) {
-        if (nextProps.locks.length !== this.props.locks.length)
-            return true;
-        if (nextProps.instruments.length !== this.props.instruments.length)
-            return true;
-        let flag = false;
-        nextProps.instruments.forEach((inst, index) => {
-            Object.keys(inst.measures).forEach((key) => {
-                if (!(key in this.props.instruments[index].measures)) {
-                    flag = true;
-                } else {
-                    ['start', 'end', 'offset'].forEach((attr) => {
-                        if (inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr])
-                            flag = true;
-                    });
-                };
-            })
-        });
-        return flag;
-    };
-
-    render() {
-        var paddingLeft = 0;
-
-        var P5Container = styled.div`
-            div {
-                padding-left: ${paddingLeft}px;
-            }
-        `;
-
-
-        return (
-            <div>
-                <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
-                </P5Container>
-            </div>
-        );
-    };
-};
 
 
 class App extends Component {
@@ -300,15 +234,10 @@ class App extends Component {
           
           beats.push({ duration: '4', pitch: ['C4'] });
           map.push({ tempo: last.end });
-          return ({ tempi: map, beats, name: inst.name });;
+          return ({ tempi: map, beats, name: inst.name });
       });
-      console.log(tracks);
-
       
       midi(tracks, this.state.PPQ);
-
-              
-
 
   };
 
@@ -346,15 +275,6 @@ class App extends Component {
   };
 
   load(e) {
-      //let req = new XMLHttpRequest();
-      //req.open("GET", "file://
-      /*var uploadLink = document.createElement('input');
-      uploadLink.type = "file";
-      uploadLink.name = "file";
-      uploadLink.onChange = (e) => console.log(e.target.files[0]);
-      uploadLink.click();
-      */
-
       var reader = new FileReader();
       reader.onload = (e) =>
           this.setState({ instruments: 
@@ -390,7 +310,7 @@ class App extends Component {
   render() {
     var newInstruments = this.state.instruments.map((inst) => ({ 
         measures: Object.assign({}, inst.measures), 
-        name: Object.assign({}, inst.name)
+        name: inst.name
     }));
 
     var cursor = [parseInt(Math.abs(this.state.cursor / 3600000), 10)];
@@ -413,17 +333,37 @@ class App extends Component {
         ></input>
     );
 
+    let Panel = styled(({ className, children }) => (<Col className={className} xs={2}>{children}</Col>))`
+        text-align: center;    
+        width: 100%;
+        padding: 0px;
+    `;
+
+    let Pane = styled(({ className, children }) => (
+        <div className={className}>
+            {children}
+        </div>
+    ))`
+        height: ${TRACK_HEIGHT}px;
+        border: 1px solid black;
+    `;
+
+    let Controls = styled(({ className, children }) => (
+        <div className={className}>
+            {newInstruments.map((inst, ind) => (<Pane className="pane" key={ind}>{inst.name}</Pane>))}
+        </div>
+    ))`
+        height: ${newInstruments.length * TRACK_HEIGHT}px;
+    `;
+
     return (
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
         <button onClick={this.save}>save</button>
-
         <button onClick={this.play}>play</button>
-
         <button onClick={this.kill}>kill</button>
-
         <button onClick={this.midi}>midi</button>
-        <button onClick={() => audio.init()}>unmute</button>
+        <button onClick={audio.init}>unmute</button>
         <form>
             <input type="file" name="file" onChange={this.load}/>
         </form>
@@ -447,9 +387,14 @@ class App extends Component {
         </ToggleButtonGroup>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <p id="location">Cursor location: {cursor}</p>
-        <div id="workspace" className="workspace">
-            <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/> 
-        </div>
+        <Container>
+          <Row>
+            <Panel><Controls /></Panel>
+            <Col xs={10}>
+              <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/>
+            </Col>
+          </Row>
+        </Container>
       </div>
     );
   }

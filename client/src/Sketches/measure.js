@@ -2,21 +2,14 @@ var scale = 1.0;
 var start = 0;
 var range = [0, 100];
 
+const WINDOW_PERCENTAGE = 0.80;
+
 const DRAG_THRESHOLD_X = 10;
 const FLAT_THRESHOLD = 10;
 const NUDGE_THRESHOLD = 1;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
 const ROLLOVER_TOLERANCE = 3;
-/*const SNAP_TEST = {
-    '5000': [
-        {
-            inst: 0,
-            //meas: id
-        }
-    ]
-};
-*/
 
 const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
 const [KeyC, KeyV] = [67, 86];
@@ -29,8 +22,6 @@ var calcRange = (measures) => {
     });
     return [Math.min(...ranged), Math.max(...ranged)];
 };
-
-
 
 var bit_toggle = (list, item) => list ^ (1 << item);
 
@@ -79,7 +70,6 @@ var insert = (list, item) => {
 
 export default function measure(p) {
 
-    var len = 600;
     var rollover;
     var grabbed;
     var dragged = 0;
@@ -95,7 +85,7 @@ export default function measure(p) {
     var snaps = [];
     var snapped = false;
     var snapped_inst = -1;
-    //var scope = window.innerWidth;
+    var scope = window.innerWidth * WINDOW_PERCENTAGE;
 
     var copied;
 
@@ -122,7 +112,7 @@ export default function measure(p) {
             : (mods & (1 << keys)) !== 0;
 
     p.setup = function () {
-        p.createCanvas(len, INST_HEIGHT);
+        p.createCanvas(scope, INST_HEIGHT);
         p.background(0);
     };
 
