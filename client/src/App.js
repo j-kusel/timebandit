@@ -167,7 +167,14 @@ class App extends Component {
   };
 
   handleLock(val, e) {
+
+      console.log(val);
       this.setState(oldState => ({ locks: val }));
+  };
+
+  handleAudio(val, e, ind) {
+      console.log(e);
+      console.log(val);
   };
 
   handleInput(e) {
@@ -339,22 +346,25 @@ class App extends Component {
         padding: 0px;
     `;
 
-    let Pane = styled(({ className, children }) => (
-        <div className={className}>
-            {children}
-        </div>
-    ))`
+    let Pane = styled.div`
         height: ${TRACK_HEIGHT}px;
         border: 1px solid black;
     `;
 
-    let Controls = styled(({ className, children }) => (
-        <div className={className}>
-            {newInstruments.map((inst, ind) => (<Pane className="pane" key={ind}>{inst.name}</Pane>))}
-        </div>
-    ))`
-        height: ${newInstruments.length * TRACK_HEIGHT}px;
+    let AudioButton = styled(ToggleButton)`
+        display: inline;
+        background-color: #FFFFCC;
     `;
+
+    let panes = this.state.instruments.map((inst, ind) => (
+        <Pane className="pane" key={ind}>
+            <ToggleButtonGroup name={"playback"+ind} onChange={this.handleAudio} type="radio">
+                <ToggleButton key={"mute"+ind} value="mute">mute</ToggleButton>
+                <ToggleButton key={"solo"+ind} value="solo">solo</ToggleButton>
+            </ToggleButtonGroup>
+        </Pane>
+    ));
+
 
     return (
       <div className="App">
@@ -389,7 +399,7 @@ class App extends Component {
         <p id="location">Cursor location: {cursor}</p>
         <Container>
           <Row>
-            <Panel><Controls /></Panel>
+            <Panel>{panes}</Panel>
             <Col xs={10}>
               <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/>
             </Col>
