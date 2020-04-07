@@ -12,9 +12,26 @@ class _TempoEvent {
             [0x03], // Size
             MidiWriter.Utils.numberToBytes(tempo, 3), // Tempo, 3 bytes
         );
-        console.log(this.data);
     }
 };
+
+class _TimeSignatureEvent {
+    constructor(numerator, denominator, notespermidiclock, midiclockspertick) {
+        this.type = 'time-signature';
+
+        // Start with zero time delta
+        this.data = MidiWriter.Utils.numberToVariableLength(0x00).concat(
+            0xFF,
+            0x58,
+            [0x04], // Size
+            MidiWriter.Utils.numberToBytes(numerator, 1), // Numerator, 1 bytes
+            MidiWriter.Utils.numberToBytes(Math.log2(denominator), 1), // Denominator is expressed as pow of 2, 1 bytes
+            MidiWriter.Utils.numberToBytes(midiclockspertick || 24, 1), // MIDI Clocks per tick, 1 bytes
+            MidiWriter.Utils.numberToBytes(notespermidiclock || 8, 1), // Number of 1/32 notes per MIDI clocks, 1 bytes
+        );
+        console.log(this.data);
+    };
+}
 
 export default (tracks, PPQ) => {
     MidiWriter.Constants.HEADER_CHUNK_DIVISION = [0x00, PPQ.toString(16)];
@@ -30,6 +47,8 @@ export default (tracks, PPQ) => {
         let delta = offset[0].delta;
         track.tempi.slice(1).forEach((tick) => {
             new_track[0].addEvent(new _TempoEvent(delta, tick.tempo));
+            if ('timesig' in tick)
+                new_track[0].addEvent(new _TimeSignatureEvent(tick.timesig, 4, PPQ));
             delta = ('delta' in tick) ?
                 tick.delta : 1;
         });

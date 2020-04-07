@@ -243,7 +243,7 @@ export default function measure(p) {
                 p.textFont('Helvetica');
                 p.textAlign(p.LEFT, p.TOP);
                 let siglocX = position(0) + TIMESIG_PADDING;
-                p.text(measure.beats.length, siglocX, yloc + TIMESIG_PADDING);
+                p.text(measure.timesig, siglocX, yloc + TIMESIG_PADDING);
                 p.textAlign(p.LEFT, p.BOTTOM);
                 p.text('4', siglocX, yloc + INST_HEIGHT - TIMESIG_PADDING);
 

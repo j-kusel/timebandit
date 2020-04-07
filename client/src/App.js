@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Button, Form } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import { Container, Row, Col } from 'react-bootstrap';
 import { ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
 import styled from 'styled-components';
@@ -86,7 +86,7 @@ class App extends Component {
                   [uuidv4()]: MeasureCalc({ 
                       start: 144,
                       end: 72,
-                      timesig: 6,
+                      timesig: 7,
                       offset: 300
                   }, { PPQ: this.state.PPQ })
               }
@@ -250,13 +250,16 @@ class App extends Component {
 
               let slope = (meas.end - meas.start)/meas.ticks.length;
               let ticks = meas.ticks.map((_, i) => {
+                  let new_tick = { tempo: meas.start + i * slope };
                   if (!(i % this.state.PPQ)) {
                       let new_beat = { duration: '4', pitch: ['C4'] };
-                      if (i === 0)
+                      if (i === 0) {
+                          new_tick.timesig = meas.timesig;
                           new_beat.wait = wait;
+                      };
                       beats.push(new_beat); // kinda meaningless
                   };
-                  return ({ tempo: meas.start + i * slope })
+                  return new_tick;
               });
               
               // get this a little more foolproof later
