@@ -10,6 +10,7 @@ const NUDGE_THRESHOLD = 1;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
 const ROLLOVER_TOLERANCE = 3;
+const TIMESIG_PADDING = 5;
 
 const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
 const [KeyC, KeyV] = [67, 86];
@@ -235,6 +236,16 @@ export default function measure(p) {
                         return
                     p.line(loc, yloc, loc, yloc + INST_HEIGHT);
                 });
+
+                // draw timesig
+                p.fill(100);
+                p.textSize(INST_HEIGHT*0.5);
+                p.textFont('Helvetica');
+                p.textAlign(p.LEFT, p.TOP);
+                let siglocX = position(0) + TIMESIG_PADDING;
+                p.text(measure.beats.length, siglocX, yloc + TIMESIG_PADDING);
+                p.textAlign(p.LEFT, p.BOTTOM);
+                p.text('4', siglocX, yloc + INST_HEIGHT - TIMESIG_PADDING);
 
                 // draw beats
                 measure[beats].forEach((beat, index) => {

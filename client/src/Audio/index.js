@@ -6,11 +6,13 @@ const aC = new AudioContext();
     .then((midiAccess) => console.log(midiAccess.inputs));
     */
 
+var muted = [];
 var gains = [];
 for (let i=0; i < 5; i++) {
     let gain = aC.createGain();
     gain.gain.setValueAtTime(0.0, aC.currentTime);
     gains.push(gain);
+    muted.push(false);
 };
 
 [440, 220, 110].forEach((freq, ind) => {
@@ -27,6 +29,9 @@ var sustain = 50;
 var adsr = [2, 200, 0.5, 10];
 
 var trigger = (osc, time, params) => {
+
+    if (muted[osc])
+        return;
     let timing = aC.currentTime + time/1000.0;
     let ms = params.map(param => param/1000.0);
 
@@ -39,9 +44,10 @@ var trigger = (osc, time, params) => {
 
 var audio = {
     init: () => aC.resume().then(() => console.log('resumed')),
+    mute: (target, mute) => muted[target] = mute,
     play: (score) => score.forEach((inst, ind) =>
         inst[1].forEach((beat) => trigger(ind, beat, adsr))),
-    kill: () => gains.forEach((gain) => gain.setValueAtTime(0.0, aC.currentTime))
+    kill: () => gains.forEach((gain) => gain.gain.setValueAtTime(0.0, aC.currentTime))
 }
             
             

@@ -17,6 +17,28 @@ const TRACK_HEIGHT = 100;
 const DEBUG = true;
 const DELTA_THRESHOLD = 5; // in milliseconds
 
+var Panel = styled(({ className, children }) => (<Col className={className} xs={2}>{children}</Col>))`
+    text-align: center;    
+    width: 100%;
+    padding: 0px;
+`;
+
+var Pane = styled.div`
+    height: ${TRACK_HEIGHT}px;
+    border: 1px solid black;
+`;
+
+var AudioButton = styled(ToggleButton)`
+    display: inline;
+    border: 1px solid black;
+    border-radius: 2px;
+    background-color: #FFFFCC;
+`;
+
+var InstName = styled.h3`
+    color: red;
+`;
+
 
 
 
@@ -172,9 +194,12 @@ class App extends Component {
       this.setState(oldState => ({ locks: val }));
   };
 
-  handleAudio(val, e, ind) {
-      console.log(e);
-      console.log(val);
+  handleMuting(val, e, ind) {
+      (val.indexOf('mute') > -1) ?
+          audio.mute(ind, true) : audio.mute(ind, false);
+      if (val.indexOf('solo') > -1)
+          this.state.instruments.forEach((inst, i) =>
+              audio.mute(i, (i === ind) ? false : true));
   };
 
   handleInput(e) {
@@ -313,7 +338,6 @@ class App extends Component {
   };
 
 
-
   render() {
     var newInstruments = this.state.instruments.map((inst) => ({ 
         measures: Object.assign({}, inst.measures), 
@@ -340,27 +364,14 @@ class App extends Component {
         ></input>
     );
 
-    let Panel = styled(({ className, children }) => (<Col className={className} xs={2}>{children}</Col>))`
-        text-align: center;    
-        width: 100%;
-        padding: 0px;
-    `;
-
-    let Pane = styled.div`
-        height: ${TRACK_HEIGHT}px;
-        border: 1px solid black;
-    `;
-
-    let AudioButton = styled(ToggleButton)`
-        display: inline;
-        background-color: #FFFFCC;
-    `;
 
     let panes = this.state.instruments.map((inst, ind) => (
         <Pane className="pane" key={ind}>
-            <ToggleButtonGroup name={"playback"+ind} onChange={this.handleAudio} type="radio">
-                <ToggleButton key={"mute"+ind} value="mute">mute</ToggleButton>
-                <ToggleButton key={"solo"+ind} value="solo">solo</ToggleButton>
+            <ToggleButtonGroup name={"playback"+ind} onChange={(val, e) => this.handleMuting(val, e, ind)} type="checkbox">
+                <InstName>{inst.name}</InstName>
+                <hr></hr>
+                <AudioButton value="mute">mute</AudioButton>
+                <AudioButton value="solo">solo</AudioButton>
             </ToggleButtonGroup>
         </Pane>
     ));
