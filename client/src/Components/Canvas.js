@@ -11,6 +11,8 @@ class UI extends Component {
             return true;
         if (nextProps.instruments.length !== this.props.instruments.length)
             return true;
+        if (nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ)
+            return true;
         let flag = false;
         nextProps.instruments.forEach((inst, index) => {
             Object.keys(inst.measures).forEach((key) => {

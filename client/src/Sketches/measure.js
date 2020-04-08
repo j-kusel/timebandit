@@ -11,9 +11,14 @@ const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
 const ROLLOVER_TOLERANCE = 3;
 const TIMESIG_PADDING = 5;
+const TEMPO_PADDING = 5;
+const TEMPO_PT = 8; // font size
 
 const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
 const [KeyC, KeyV] = [67, 86];
+const NUM = []
+for (let i=48; i < 58; i++)
+    NUM.push(i);
 
 var calcRange = (measures) => {
     let ranged = [];
@@ -86,6 +91,7 @@ export default function measure(p) {
     var snaps = [];
     var snapped = false;
     var snapped_inst = -1;
+    var snap_div = 0;
     var scope = window.innerWidth * WINDOW_PERCENTAGE;
 
     var copied;
@@ -150,6 +156,7 @@ export default function measure(p) {
         
         p.resizeCanvas(p.width, INST_HEIGHT*instruments.length);
         ({ API, CONSTANTS } = props);
+        console.log(CONSTANTS.PPQ);
 
     }
 
@@ -292,8 +299,49 @@ export default function measure(p) {
                 // draw tempo graph
                 p.stroke(240, 200, 200);
                 let scaleY = (input) => INST_HEIGHT - (input - range[0])/(range[1] - range[0])*INST_HEIGHT;
-                p.line(position(0), yloc + scaleY(measure.start), position(measure.beats.slice(-1)[0]), yloc + scaleY(measure.end));
+                let ystart = yloc + scaleY(measure.start);
+                let yend = yloc + scaleY(measure.end);
+                p.line(position(0), ystart, position(measure.beats.slice(-1)[0]), yend);
 
+                // draw tempo markings
+                p.fill(100);
+                p.textSize(TEMPO_PT);
+                let tempo_loc = { x: position(0) + TEMPO_PADDING };
+                if (ystart > yloc + TEMPO_PT + TEMPO_PADDING) {
+                    p.textAlign(p.LEFT, p.BOTTOM);
+                    tempo_loc.y = ystart - TEMPO_PADDING;
+                } else {
+                    p.textAlign(p.LEFT, p.TOP);
+                    tempo_loc.y = ystart + TEMPO_PADDING;
+                };
+                p.text(measure.start, tempo_loc.x, tempo_loc.y);
+
+                tempo_loc = { x: position(measure.ms) - TEMPO_PADDING };
+                if (yend > yloc + TEMPO_PT + TEMPO_PADDING) {
+                    p.textAlign(p.RIGHT, p.BOTTOM);
+                    tempo_loc.y = yend - TEMPO_PADDING;
+                } else {
+                    p.textAlign(p.RIGHT, p.TOP);
+                    tempo_loc.y = yend + TEMPO_PADDING;
+                };
+                p.text(measure.end, tempo_loc.x, tempo_loc.y);
+
+                /*if (range[0] > range[1]) {
+                    p.textAlign(p.LEFT, p.TOP);
+                    tStart = { x: position(0) + TEMPO_PADDING, y: yloc + scaleY(measure.start) };
+                    p.text(measure.start, tStart.x, tStart.y);
+                    p.textAlign(p.RIGHT, p.BOTTOM);
+                    tEnd = { x: position(measure.ms) - TEMPO_PADDING, y: yloc + scaleY(measure.end) };
+                    p.text(measure.end, tEnd.x, tEnd.y);
+                } else {
+                    p.textAlign(p.LEFT, p.BOTTOM);
+                    tStart = { x: position(0) - TEMPO_PADDING, y: yloc + scaleY(measure.start) };
+                    p.text(measure.start, tStart.x, tStart.y);
+                    p.textAlign(p.RIGHT, p.TOP);
+                    tEnd = { x: position(measure.ms) + TEMPO_PADDING, y: yloc + scaleY(measure.end) };
+                    p.text(measure.end, tEnd.x, tEnd.y);
+                };*/
+            
             });
 
             // draw snap
@@ -345,16 +393,19 @@ export default function measure(p) {
         outside_origin = false;
 
         dragged = 0;
-        var change = 0;
+        var change = -1;
         let inst = Math.floor(p.mouseY*0.01);
         let meas = instruments[inst].measures;
 
         Object.keys(meas).forEach((key) => {
             let measure = meas[key];
-            var left = (measure.offset + measure.beats[0])*scale + start;
+            var left = (measure.offset)*scale + start;
             var right = (measure.offset + measure.ms)*scale + start;
-            change = (p.mouseX > left && p.mouseX < right && p.mouseY > 0 && p.mouseY < p.height) ?
-                key : -1;
+            if (p.mouseX > left
+                    && p.mouseX < right
+                    && p.mouseY > 0 
+                    && p.mouseY < p.height)
+                change = key;
         });
 
         selected = {inst, meas: change || -1};
@@ -362,7 +413,7 @@ export default function measure(p) {
 
         if (mod_check([1, 2], modifiers)) {
             let measure = instruments[selected.inst].measures[selected.meas];
-            grabbed = 60000.0/(measure.ticks[(rollover * CONSTANTS.PPQ)]);
+            grabbed = 60000.0/(measure.ticks[(rollover * CONSTANTS.PPQ_tempo)]);
             dir = 0;
             measure.temp_start = measure.start;
             if (measure.end > measure.start)
@@ -394,13 +445,13 @@ export default function measure(p) {
 
     p.mouseDragged = function(event) {
 
-        var closest = (position, inst) =>
-            Object.keys(snaps[0]).reduce((acc, key, ind, keys) => {
-                if (snaps[0][key][0].inst === inst)
+        var closest = (position, inst, div) =>
+            Object.keys(snaps[div]).reduce((acc, key, ind, keys) => {
+                if (snaps[div][key][0].inst === inst)
                     return acc;
                 let gap = parseFloat(key, 10) - position;
                 return (Math.abs(gap) < Math.abs(acc.gap) ? 
-                    { target: parseFloat(key, 10), gap, inst: snaps[0][key][0].inst } :
+                    { target: parseFloat(key, 10), gap, inst: snaps[div][key][0].inst } :
                     acc);
             }, { target: -1, gap: Infinity, inst: -1 });
 
@@ -408,7 +459,7 @@ export default function measure(p) {
             candidates.reduce((acc, candidate, index) => {
                 let next = position + candidate;
                 let target, gap, inst;
-                ({ target, gap, inst } = closest(next, selected.inst));
+                ({ target, gap, inst } = closest(next, selected.inst, snap_div));
                 if (Math.abs(gap) < Math.abs(acc.gap)) 
                     return { index, target, gap, inst };
                 return acc;
@@ -465,7 +516,7 @@ export default function measure(p) {
         amp_lock = beatscale/perc;
 
 
-        let ticks = (measure.beats.length - 1) * CONSTANTS.PPQ;
+        let ticks = (measure.beats.length - 1) * CONSTANTS.PPQ_tempo;
 
         // if START is locked
         // change slope, preserve start
@@ -488,7 +539,7 @@ export default function measure(p) {
 
 
         let C = (delta) => 60000.0 * (measure.beats.length - 1) / (delta);
-        let sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ * constant / 60000.0) + n)));
+        let sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
 
         let C1 = C(slope);
         let ms = C1 * measure.ticks.reduce((sum, _, i) => 
@@ -497,7 +548,7 @@ export default function measure(p) {
         let diff = slope;
 
         //console.log(ms + (measure.temp_offset || measure.offset));
-        let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst).target;
+        let snap_to = closest(ms + (measure.temp_offset || measure.offset), selected.inst, snap_div).target;
 
         // TODOOOOOOOOO##########################
         // beat snapping with drag
@@ -529,14 +580,11 @@ export default function measure(p) {
             let new_sigma = sigma(measure.temp_start, new_C);
             let ms = new_C * measure.ticks.reduce((sum, _, i) => sum + new_sigma(i), 0);
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
-            console.log(new_gap);
             return nudge(new_gap, depth + 1);
         };
 
         let loc = (ms + (measure.temp_offset || measure.offset));
         let gap = loc - snap_to;
-
-        console.log(loc, gap, snap_to);
 
         if (Math.abs(gap) < 50) {
             snapped = snapped || nudge(gap, 0);
@@ -560,11 +608,11 @@ export default function measure(p) {
                     Math.max(measure.temp_start, measure.end);
         };
 
-        let K = 60000.0 / CONSTANTS.PPQ;
+        let K = 60000.0 / CONSTANTS.PPQ_tempo;
 
         let cumulative = 0;
         measure.ticks.forEach((_, i) => {
-            if (!(i%CONSTANTS.PPQ))
+            if (!(i%CONSTANTS.PPQ_tempo))
                 measure.temp_beats.push(cumulative);
             measure.temp_ticks.push(cumulative);
             cumulative += K / (measure.temp_start + inc*i);
@@ -606,9 +654,6 @@ export default function measure(p) {
         };
 
         if (drag_mode === 'tick') {
-            /*let tick = measure.temp_ticks.pop() - measure.temp_ticks.pop();
-            let BPM = 60000.0/(tick * CONSTANTS.PPQ);
-            */
             let end = measure.temp_start + measure.temp_slope;
             measure.temp_ticks = [];
             dragged = 0;

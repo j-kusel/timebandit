@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Button } from 'react-bootstrap';
+import { Button, Dropdown } from 'react-bootstrap';
 import { Container, Row, Col } from 'react-bootstrap';
 import { ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
 import styled from 'styled-components';
@@ -16,7 +16,18 @@ import UI from './Components/Canvas';
 const TRACK_HEIGHT = 100;
 const DEBUG = true;
 const DELTA_THRESHOLD = 5; // in milliseconds
+const PPQ_default = 300;
+const PPQ_OPTIONS = [
+    [24, 'default'],
+    [4, 'ableton live'],
+    [256, 'sibelius'],
+].map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 
+
+
+// later do custom PPQs
+
+var ppqs = PPQ_OPTIONS.map((ppq, ind) => <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>);
 var Panel = styled(({ className, children }) => (<Col className={className} xs={2}>{children}</Col>))`
     text-align: center;    
     width: 100%;
@@ -51,14 +62,16 @@ class App extends Component {
           sizing: 600.0,
           cursor: 0.0,
           scroll: 0,
-          PPQ: 4,
           time: 0,
           selected: {
               inst: -1,
               meas: -1
           },
           locks: [],
+          PPQ: PPQ_default
       }
+
+      Object.assign(this.state, PPQ_OPTIONS[1]);
 
       this.state.instruments.push(DEBUG ?
           {
@@ -69,13 +82,13 @@ class App extends Component {
                       end: 120,
                       timesig: 6,
                       offset: 500
-                  }, { PPQ: this.state.PPQ }),
+                  }, { PPQ: this.state.PPQ_tempo }),
                   [uuidv4()]: MeasureCalc({ 
                       start: 60,
                       end: 120,
                       timesig: 5,
                       offset: 4722
-                  }, { PPQ: this.state.PPQ })
+                  }, { PPQ: this.state.PPQ_tempo })
               }
           } :
           { measures: {} });
@@ -88,14 +101,11 @@ class App extends Component {
                       end: 72,
                       timesig: 7,
                       offset: 300
-                  }, { PPQ: this.state.PPQ })
+                  }, { PPQ: this.state.PPQ_tempo })
               }
           }) : console.log(0);
 
-      this.CONSTANTS = {
-          PPQ: this.state.PPQ
-      };
-
+      
       this.sizing = 600.0;
       this.location = 0.0;
 
@@ -103,6 +113,7 @@ class App extends Component {
       this.handleInst = this.handleInst.bind(this);
       this.handleLock = this.handleLock.bind(this);
       this.handleInput = this.handleInput.bind(this);
+      this.handlePPQ = this.handlePPQ.bind(this);
       this.midi = this.midi.bind(this);
       this.play = this.play.bind(this);
       this.kill = this.kill.bind(this);
@@ -122,7 +133,7 @@ class App extends Component {
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
           offset = offset || this.state.instruments[inst].measures[id].offset;
-          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ });
+          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
               instruments[inst].measures[id] = calc;
@@ -136,7 +147,7 @@ class App extends Component {
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
 
       var paste = (inst, measure, offset) => {
-          var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ });
+          var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
               instruments[inst].measures[uuidv4()] = calc;
@@ -179,7 +190,7 @@ class App extends Component {
           offset: parseInt(this.state.offset, 10)
       };
 
-      var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ });
+      var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ_tempo });
 
       this.setState(oldState => {
           let instruments = oldState.instruments;
@@ -206,8 +217,15 @@ class App extends Component {
       this.setState({ [e.target.name]: e.target.value });
   };
 
+  handlePPQ(eventKey) {
+      let new_PPQ = PPQ_OPTIONS[eventKey];
+      console.log(new_PPQ);
+      this.setState(oldState => new_PPQ);
+
+  };
+
   midiDebug() {
-      midi(this.state.PPQ);
+      midi(this.state.PPQ_tempo);
   }
 
   midi() {
@@ -225,7 +243,7 @@ class App extends Component {
           // fill gaps with appropriate number of ticks at given BPM
           let last = 0;
 
-          let tpm = 60000.0 / this.state.PPQ;
+          let tpm = 60000.0 / this.state.PPQ_tempo;
 
           let beats = [];
           let map = Object.keys(inst.measures).reduce((acc, key, ind) => {
@@ -251,7 +269,7 @@ class App extends Component {
               let slope = (meas.end - meas.start)/meas.ticks.length;
               let ticks = meas.ticks.map((_, i) => {
                   let new_tick = { tempo: meas.start + i * slope };
-                  if (!(i % this.state.PPQ)) {
+                  if (!(i % this.state.PPQ_tempo)) {
                       let new_beat = { duration: '4', pitch: ['C4'] };
                       if (i === 0) {
                           new_tick.timesig = meas.timesig;
@@ -272,7 +290,7 @@ class App extends Component {
           return ({ tempi: map, beats, name: inst.name });
       });
       
-      midi(tracks, this.state.PPQ);
+      midi(tracks, this.state.PPQ_tempo);
 
   };
 
@@ -321,7 +339,7 @@ class App extends Component {
                       let newMeas = MeasureCalc(
                           ['start', 'end', 'timesig', 'offset']
                               .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
-                          , { PPQ: this.state.PPQ }
+                          , { PPQ: this.state.PPQ_tempo }
                       );
 
                       let pad = params[0] - (acc.length - 1);
@@ -342,6 +360,11 @@ class App extends Component {
 
 
   render() {
+    let CONSTANTS = {
+      PPQ: this.state.PPQ,
+      PPQ_tempo: this.state.PPQ_tempo
+    };
+
     var newInstruments = this.state.instruments.map((inst) => ({ 
         measures: Object.assign({}, inst.measures), 
         name: inst.name
@@ -411,11 +434,19 @@ class App extends Component {
         </ToggleButtonGroup>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <p id="location">Cursor location: {cursor}</p>
+        <Dropdown onSelect={this.handlePPQ}>
+          <Dropdown.Toggle>
+            PPQ: {this.state.PPQ_tempo} ({this.state.PPQ_desc})
+          </Dropdown.Toggle>
+          <Dropdown.Menu>
+            {ppqs}
+          </Dropdown.Menu>
+        </Dropdown>
         <Container>
           <Row>
             <Panel>{panes}</Panel>
             <Col xs={10}>
-              <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={this.CONSTANTS}/>
+              <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={CONSTANTS}/>
             </Col>
           </Row>
         </Container>
