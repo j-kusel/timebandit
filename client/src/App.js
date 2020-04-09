@@ -23,6 +23,9 @@ const PPQ_OPTIONS = [
     [24, 'default'],
     [4, 'ableton live'],
     [256, 'sibelius'],
+    [480, 'digital performer'],
+    [960, 'reaper'],
+    [1024, 'finale']
 ].map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 
 
