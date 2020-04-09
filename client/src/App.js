@@ -16,7 +16,9 @@ import UI from './Components/Canvas';
 const TRACK_HEIGHT = 100;
 const DEBUG = true;
 const DELTA_THRESHOLD = 5; // in milliseconds
-const PPQ_default = 300;
+const PPQ_default = 4;
+
+
 const PPQ_OPTIONS = [
     [24, 'default'],
     [4, 'ableton live'],
@@ -27,7 +29,8 @@ const PPQ_OPTIONS = [
 
 // later do custom PPQs
 
-var ppqs = PPQ_OPTIONS.map((ppq, ind) => <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>);
+var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>);
+
 var Panel = styled(({ className, children }) => (<Col className={className} xs={2}>{children}</Col>))`
     text-align: center;    
     width: 100%;
@@ -73,6 +76,8 @@ class App extends Component {
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
 
+      this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
+
       this.state.instruments.push(DEBUG ?
           {
               name: 'default',
@@ -82,13 +87,13 @@ class App extends Component {
                       end: 120,
                       timesig: 6,
                       offset: 500
-                  }, { PPQ: this.state.PPQ_tempo }),
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
                   [uuidv4()]: MeasureCalc({ 
                       start: 60,
                       end: 120,
                       timesig: 5,
                       offset: 4722
-                  }, { PPQ: this.state.PPQ_tempo })
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
               }
           } :
           { measures: {} });
@@ -101,7 +106,7 @@ class App extends Component {
                       end: 72,
                       timesig: 7,
                       offset: 300
-                  }, { PPQ: this.state.PPQ_tempo })
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
               }
           }) : console.log(0);
 
@@ -114,6 +119,7 @@ class App extends Component {
       this.handleLock = this.handleLock.bind(this);
       this.handleInput = this.handleInput.bind(this);
       this.handlePPQ = this.handlePPQ.bind(this);
+      this.handleTempoPPQ = this.handleTempoPPQ.bind(this);
       this.midi = this.midi.bind(this);
       this.play = this.play.bind(this);
       this.kill = this.kill.bind(this);
@@ -133,7 +139,7 @@ class App extends Component {
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
           offset = offset || this.state.instruments[inst].measures[id].offset;
-          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ_tempo });
+          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
               instruments[inst].measures[id] = calc;
@@ -147,7 +153,7 @@ class App extends Component {
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
 
       var paste = (inst, measure, offset) => {
-          var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ_tempo });
+          var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
               instruments[inst].measures[uuidv4()] = calc;
@@ -190,7 +196,7 @@ class App extends Component {
           offset: parseInt(this.state.offset, 10)
       };
 
-      var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ_tempo });
+      var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
 
       this.setState(oldState => {
           let instruments = oldState.instruments;
@@ -217,11 +223,20 @@ class App extends Component {
       this.setState({ [e.target.name]: e.target.value });
   };
 
-  handlePPQ(eventKey) {
+  handleTempoPPQ(eventKey) {
       let new_PPQ = PPQ_OPTIONS[eventKey];
-      console.log(new_PPQ);
       this.setState(oldState => new_PPQ);
+  };
 
+  handlePPQ(eventKey) {
+    tempo_ppqs = PPQ_OPTIONS.reduce((acc, ppq, ind) => {
+        console.log(ppq.PPQ_tempo);
+        console.log(eventKey % ppq.PPQ_tempo);
+        return (eventKey % ppq.PPQ_tempo) ?
+            acc :
+            [...acc, <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>]},
+        []);
+    this.setState(oldState => ({ PPQ: eventKey }));
   };
 
   midiDebug() {
@@ -339,7 +354,7 @@ class App extends Component {
                       let newMeas = MeasureCalc(
                           ['start', 'end', 'timesig', 'offset']
                               .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
-                          , { PPQ: this.state.PPQ_tempo }
+                          , { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
                       );
 
                       let pad = params[0] - (acc.length - 1);
@@ -402,6 +417,8 @@ class App extends Component {
         </Pane>
     ));
 
+    //tempo_ppqs.forEach((p) => console.log(p));
+
 
     return (
       <div className="App">
@@ -436,10 +453,22 @@ class App extends Component {
         <p id="location">Cursor location: {cursor}</p>
         <Dropdown onSelect={this.handlePPQ}>
           <Dropdown.Toggle>
-            PPQ: {this.state.PPQ_tempo} ({this.state.PPQ_desc})
+            PPQ: {this.state.PPQ}
           </Dropdown.Toggle>
           <Dropdown.Menu>
-            {ppqs}
+            <Dropdown.Item eventKey={256}>256</Dropdown.Item>
+            <Dropdown.Item eventKey={96}>96</Dropdown.Item>
+            <Dropdown.Item eventKey={24}>24</Dropdown.Item>
+
+
+          </Dropdown.Menu>
+        </Dropdown>
+        <Dropdown onSelect={this.handleTempoPPQ}>
+          <Dropdown.Toggle>
+            Tempo PPQ: {this.state.PPQ_tempo} ({this.state.PPQ_desc})
+          </Dropdown.Toggle>
+          <Dropdown.Menu>
+            {tempo_ppqs}
           </Dropdown.Menu>
         </Dropdown>
         <Container>

@@ -14,7 +14,7 @@ const TIMESIG_PADDING = 5;
 const TEMPO_PADDING = 5;
 const TEMPO_PT = 8; // font size
 
-const [CTRL, SHIFT, MOD, ALT] = [17, 16, 91, 18];
+const [MOD, SHIFT, CTRL, ALT] = [17, 16, 91, 18];
 const [KeyC, KeyV] = [67, 86];
 const NUM = []
 for (let i=48; i < 58; i++)
@@ -118,6 +118,11 @@ export default function measure(p) {
                 bool && (mods & (1 << key)) !== 0, true)
             : (mods & (1 << keys)) !== 0;
 
+    var num_check = () =>
+        NUM.reduce((acc, num, ind) =>
+            p.keyIsDown(num) ? 
+                [...acc, ind] : acc, []);
+
     p.setup = function () {
         p.createCanvas(scope, INST_HEIGHT);
         p.background(0);
@@ -125,23 +130,23 @@ export default function measure(p) {
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         instruments = props.instruments;
+        ({ API, CONSTANTS } = props);
+
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
         snaps = [];
-        let add_snaps1 = {};
-        let all_meas = instruments.reduce((acc, inst, i_ind) => {
+
+        let add_snaps = {};
+        /*let all_meas = instruments.reduce((acc, inst, i_ind) => {
             Object.keys(inst.measures).forEach((key) => {
                 let measure = inst.measures[key];
                 measure.beats.forEach((beat) => {
                     let loc = (beat + measure.offset).toString();
-                    let obj = {
-                        inst: i_ind,
-                        meas: key
-                    };
-                    if (loc in add_snaps1)
-                        add_snaps1[loc].push(obj);
+                    let obj = { inst: i_ind, meas: key };
+                    if (loc in add_snaps)
+                        add_snaps[loc].push(obj);
                     else
-                        add_snaps1[loc] = [obj];
+                        add_snaps[loc] = [obj];
                 });
 
                 measure.temp_beats = [];
@@ -149,14 +154,36 @@ export default function measure(p) {
             });
             return ({ ...acc, ...(inst.measures) });
         }, {});
+        snaps.push(add_snaps);
+        */
+
+        NUM.slice(1).forEach((num, n_ind) => {
+            add_snaps = {};
+            instruments.forEach((inst, i_ind) =>
+                Object.keys(inst.measures).forEach((key) => {
+                    let measure = inst.measures[key];
+                    let div = CONSTANTS.PPQ / (n_ind + 1);
+                    for (let i=0; i < measure.ticks.length; i += div) {
+                        let tick = Math.round(i);
+                        let target = (tick >= measure.ticks.length) ?
+                            measure.ms : measure.ticks[tick];
+                        let loc = (target + measure.offset).toString();
+                        let obj = { inst: i_ind, meas: key };
+                        if (loc in add_snaps)
+                            add_snaps[loc].push(obj)
+                        else
+                            add_snaps[loc] = [obj];
+                    };
+                }) , {});
+            snaps.push(add_snaps);
+        });
+        console.log(snaps);
 
         // add downbeat snaps
-        snaps.push(add_snaps1);
+        let all_meas = instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {});
         range = calcRange(all_meas);
         
         p.resizeCanvas(p.width, INST_HEIGHT*instruments.length);
-        ({ API, CONSTANTS } = props);
-        console.log(CONSTANTS.PPQ);
 
     }
 
@@ -178,8 +205,9 @@ export default function measure(p) {
                 && true);
         };
 
-
-
+        let nums = num_check();
+        snap_div = (nums.length) ?
+            nums[0] - 1 : 0;
         
         // check and draw selection
         if (selected.inst > -1 && selected.meas !== -1) {
@@ -450,6 +478,7 @@ export default function measure(p) {
                 if (snaps[div][key][0].inst === inst)
                     return acc;
                 let gap = parseFloat(key, 10) - position;
+                console.log(acc);
                 return (Math.abs(gap) < Math.abs(acc.gap) ? 
                     { target: parseFloat(key, 10), gap, inst: snaps[div][key][0].inst } :
                     acc);
@@ -470,6 +499,7 @@ export default function measure(p) {
             || selected.meas === -1)
             return;
       
+        console.log(snap_div);
         dragged += event.movementX;
 
         if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
@@ -608,14 +638,17 @@ export default function measure(p) {
                     Math.max(measure.temp_start, measure.end);
         };
 
-        let K = 60000.0 / CONSTANTS.PPQ_tempo;
-
         let cumulative = 0;
+        let K = 60000.0 / CONSTANTS.PPQ_tempo;
+        let PPQ_mod = CONSTANTS.PPQ / CONSTANTS.PPQ_tempo;
+        let last = 0;
         measure.ticks.forEach((_, i) => {
-            if (!(i%CONSTANTS.PPQ_tempo))
+            if (!(i%CONSTANTS.PPQ))
                 measure.temp_beats.push(cumulative);
             measure.temp_ticks.push(cumulative);
-            cumulative += K / (measure.temp_start + inc*i);
+            if (i%PPQ_mod === 0)
+                last = K / (measure.temp_start + inc*i);
+            cumulative += last;
         });
         measure.temp_beats.push(cumulative);
 
