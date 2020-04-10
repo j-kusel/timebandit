@@ -16,7 +16,7 @@ import UI from './Components/Canvas';
 const TRACK_HEIGHT = 100;
 const DEBUG = true;
 const DELTA_THRESHOLD = 5; // in milliseconds
-const PPQ_default = 4;
+const PPQ_default = 48;
 
 
 const PPQ_OPTIONS = [
