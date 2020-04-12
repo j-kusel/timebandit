@@ -351,7 +351,7 @@ export default function measure(p) {
                     p.textAlign(p.LEFT, p.TOP);
                     tempo_loc.y = ystart + TEMPO_PADDING;
                 };
-                p.text(measure.start, tempo_loc.x, tempo_loc.y);
+                p.text(measure.start.toFixed(2), tempo_loc.x, tempo_loc.y);
 
                 tempo_loc = { x: position(measure.ms) - TEMPO_PADDING };
                 if (yend > yloc + TEMPO_PT + TEMPO_PADDING) {
@@ -361,7 +361,7 @@ export default function measure(p) {
                     p.textAlign(p.RIGHT, p.TOP);
                     tempo_loc.y = yend + TEMPO_PADDING;
                 };
-                p.text(measure.end, tempo_loc.x, tempo_loc.y);
+                p.text(measure.end.toFixed(2), tempo_loc.x, tempo_loc.y);
 
             });
 
@@ -369,7 +369,6 @@ export default function measure(p) {
             if (snapped_inst) {
                 p.stroke(200, 240, 200);
                 let x = snapped_inst.target * scale + start;
-                //p.line(x, 0, x, 100);
                 p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*INST_HEIGHT,
                     x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*INST_HEIGHT);
             };
@@ -547,12 +546,17 @@ export default function measure(p) {
       
         dragged += event.movementX;
 
+        let measure = instruments[selected.inst].measures[selected.meas];
+
         if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
-            instruments[selected.inst].measures[selected.meas].temp_ticks = [];
+            measure.temp_beats = [];
+            measure.temp_ticks = [];
+            delete measure.temp_start;
+            delete measure.temp_slope;
+            delete measure.temp_offset;
             return;
         };
 
-        let measure = instruments[selected.inst].measures[selected.meas];
                 
         measure.temp_ticks = [];
         measure.temp_beats = [];
@@ -621,7 +625,13 @@ export default function measure(p) {
 
         let C1 = C(slope);
         let ms = C1 * tick_array.reduce((sum, _, i) => sum + sigma(temp_start, C1)(i), 0);
-        //console.log(ms);
+        console.log(measure.ms, ms);
+        if (Math.abs(ms - measure.ms) < DRAG_THRESHOLD_X) {
+            measure.temp_offset = measure.offset;
+            measure.temp_start = measure.start;
+            slope = measure.end - measure.start;
+            return;
+        };
         
         let diff = slope;
 
@@ -631,38 +641,58 @@ export default function measure(p) {
 
         // LENGTH GRADIENT DESCENT
         // ONLY WORKS WITH NO LOCK, START LOCK
-        var nudge = (gap, alpha, depth) => {
-            //if (diff < 10)
-            //    alpha = 0.005;
-            
-            // limit recursion
-            if (depth > 99) {
-                debug_message = 'LIMIT';
-                return diff;
-            } else {
-                debug_message = '';
-            };
-            if (gap > NUDGE_THRESHOLD)
-                diff *= (1 - alpha);
-            else if (gap < -NUDGE_THRESHOLD)
-                diff *= (1 + alpha);
-            else
-                return diff;
 
-            let new_C = C(diff)
-            let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(temp_start, new_C)(i), 0);
+        var nudgeS = (gap, alpha, depth) => {
+            if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
+                return diff;
+            diff *= (gap > NUDGE_THRESHOLD) ?
+                (1 + alpha) : (1 - alpha);
+            let new_C = C(diff);
+            let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
-            //console.log(ms);
-            //console.log(snap_to);
-            return nudge(new_gap, alpha, depth + 1);
+            if (Math.abs(new_gap) > Math.abs(gap))
+                alpha *= -1;
+            return nudgeS(new_gap, alpha, depth + 1);
         };
 
+        var nudgeE = (gap, alpha, depth) => {
+            if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
+                return diff;
+            measure.temp_start *= (gap > NUDGE_THRESHOLD) ?
+                (1 + alpha) : (1 - alpha);
+            diff = measure.end - measure.temp_start;
+            let new_C = C(diff);
+            let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
+            let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
+            if (Math.abs(new_gap) > Math.abs(gap))
+                alpha *= -1;
+            return nudgeE(new_gap, alpha, depth + 1);
+        };
+
+        var nudgeSE = (gap, alpha, depth) => {
+            if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
+                return diff;
+            measure.temp_start *= (gap > NUDGE_THRESHOLD) ?
+                (1 + alpha*0.5) : (1 - alpha*0.5);
+            // slope (diff) doesn't change.
+            let new_C = C(diff);
+            let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
+            let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
+            if (Math.abs(new_gap) > Math.abs(gap))
+                alpha *= -1;
+            return nudgeSE(new_gap, alpha, depth + 1);
+        };
 
         if (Math.abs(gap) < 50) {
             // if initial snap, update measure.temp_start 
             // for the last time and nudge.
             if (!snapped) {
                 measure.temp_start = temp_start;
+                // check what's locked to determine nudge algo
+                let nudge = (locks & (1 << 1)) ?
+                    nudgeS :
+                    (locks & (1 << 2)) ? nudgeE : nudgeSE;
+                // invert learning rate depending on slope
                 snapped = nudge(gap, 0.001, 0);
             };
             slope = snapped;
