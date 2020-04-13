@@ -48,6 +48,14 @@ var parse_bits = (n) => {
     return bits;
 };
 
+var monitor = (gap, new_gap, alpha) => {
+    let progress = Math.abs(gap) - Math.abs(new_gap);
+    let perc = Math.abs(progress)/Math.abs(gap);
+    if (progress < 0)
+        alpha *= -1;
+    return alpha * (1-perc)/perc;
+};
+
 /* THIS SYSTEM MAY WORK BETTER FOR FRACTIONAL BEATS
 var insert = (list, item) => {
     if (!list.length)
@@ -593,6 +601,7 @@ export default function measure(p) {
             ((dir === 1) ? -FLAT_THRESHOLD : FLAT_THRESHOLD) :
             grabbed/Math.abs(slope);
 
+        // divide this by scale? depending on zoom?
         amp_lock = beatscale/perc;
 
 
@@ -613,10 +622,13 @@ export default function measure(p) {
             temp_start = measure.start + amp_lock;
         // if SLOPE is locked
         // split change between start and end
-        } else if (!(locks & (1 << 4))) {
+        } else if (locks & (1 << 4)) {
+            //slope += amp_lock/2; 
+            temp_start = measure.start + amp_lock;
+        } else {
             slope += amp_lock/2; 
             temp_start = measure.start + amp_lock/2;
-        }
+        };
 
 
         let PPQ_mod = CONSTANTS.PPQ / CONSTANTS.PPQ_tempo;
@@ -625,7 +637,6 @@ export default function measure(p) {
 
         let C1 = C(slope);
         let ms = C1 * tick_array.reduce((sum, _, i) => sum + sigma(temp_start, C1)(i), 0);
-        console.log(measure.ms, ms);
         if (Math.abs(ms - measure.ms) < DRAG_THRESHOLD_X) {
             measure.temp_offset = measure.offset;
             measure.temp_start = measure.start;
@@ -640,7 +651,7 @@ export default function measure(p) {
         let gap = loc - snap_to;
 
         // LENGTH GRADIENT DESCENT
-        // ONLY WORKS WITH NO LOCK, START LOCK
+        // ADD SELF-MONITORING HERE
 
         var nudgeS = (gap, alpha, depth) => {
             if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
@@ -650,8 +661,7 @@ export default function measure(p) {
             let new_C = C(diff);
             let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
-            if (Math.abs(new_gap) > Math.abs(gap))
-                alpha *= -1;
+            alpha = monitor(gap, new_gap, alpha);
             return nudgeS(new_gap, alpha, depth + 1);
         };
 
@@ -664,8 +674,7 @@ export default function measure(p) {
             let new_C = C(diff);
             let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
-            if (Math.abs(new_gap) > Math.abs(gap))
-                alpha *= -1;
+            alpha = monitor(gap, new_gap, alpha);
             return nudgeE(new_gap, alpha, depth + 1);
         };
 
@@ -678,8 +687,7 @@ export default function measure(p) {
             let new_C = C(diff);
             let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
-            if (Math.abs(new_gap) > Math.abs(gap))
-                alpha *= -1;
+            alpha = monitor(gap, new_gap, alpha);
             return nudgeSE(new_gap, alpha, depth + 1);
         };
 
