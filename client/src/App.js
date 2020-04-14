@@ -242,10 +242,6 @@ class App extends Component {
     this.setState(oldState => ({ PPQ: eventKey }));
   };
 
-  midiDebug() {
-      midi(this.state.PPQ_tempo);
-  }
-
   midi() {
 
       let tracks = this.state.instruments.map((inst, i_ind) => {
@@ -261,16 +257,17 @@ class App extends Component {
           // fill gaps with appropriate number of ticks at given BPM
           let last = 0;
 
-          let tpm = 60000.0 / this.state.PPQ_tempo;
+          let tpm = 60000.0 / this.state.PPQ;
+
+          let rest = `T${this.state.PPQ - 1}`;
 
           let beats = [];
-          let map = Object.keys(inst.measures).reduce((acc, key, ind) => {
+          let tempi = Object.keys(inst.measures).reduce((acc, key, ind) => {
               let meas = inst.measures[key];
               // push empty message if within delta threshold
-              let delta = 0
+              let delta = this.state.PPQ - 1;
               if (last) {
-                  let d = meas.offset - (last.ms + last.offset);
-                  if (d > DELTA_THRESHOLD) {
+                  if (meas.offset - (last.offset + last.ms) > DELTA_THRESHOLD) {
                       delta = parseInt(delta / (tpm / last.end), 10);
                       acc.push({ delta, tempo: last.end });
                   };
@@ -285,30 +282,54 @@ class App extends Component {
               last = meas;
 
               let slope = (meas.end - meas.start)/meas.ticks.length;
-              let ticks = meas.ticks.map((_, i) => {
-                  let new_tick = { tempo: meas.start + i * slope };
-                  if (!(i % this.state.PPQ_tempo)) {
-                      let new_beat = { duration: '4', pitch: ['C4'] };
-                      if (i === 0) {
-                          new_tick.timesig = meas.timesig;
-                          new_beat.wait = wait;
-                      };
-                      beats.push(new_beat); // kinda meaningless
+
+              let new_tick = {};
+              let new_beat = { duration: 'T1', pitch: ['C4'] };
+
+              let ticks = [{ ...new_tick, tempo: meas.start, timesig: meas.timesig }];
+              beats.push({ ...new_beat, wait });
+
+              meas.ticks.forEach((_, i) => {
+                  if (i === 0)
+                      return;
+                  if (!(i % this.state.PPQ_mod)) {
+                      if (!(i % (meas.ticks.length / meas.timesig)))
+                          beats.push({ ...new_beat, wait: rest });
+                      ticks.push({ ...new_tick, tempo: meas.start + i * slope });
                   };
-                  return new_tick;
               });
+
+
+              // OLD, WORKING
+              /*meas.ticks.forEach((_, i) => {
+                  // check for tempo change
+                  if (!(i % this.state.PPQ_mod)) {
+                      let tick = { ...new_tick, tempo: meas.start + i * slope };
+                      // check for metronome tick
+                      if (!(i % (meas.ticks.length / meas.timesig))) {
+                          if (i == 0)
+                              tick.timesig = meas.timesig;
+                          beats.push({ 
+                              ...new_beat, 
+                              wait: (i === 0) ? offset : rest
+                          });
+                      };
+                      ticks.push(tick);
+                  };
+              });
+              */
               
               // get this a little more foolproof later
 
               return acc.concat(ticks);
           }, []);
           
-          beats.push({ duration: '4', pitch: ['C4'] });
-          map.push({ tempo: last.end });
-          return ({ tempi: map, beats, name: inst.name });
+          beats.push({ duration: '4', pitch: ['C4'], wait: rest });
+          tempi.push({ tempo: last.end });
+          return ({ tempi, beats, name: inst.name });
       });
       
-      midi(tracks, this.state.PPQ_tempo);
+      midi(tracks, this.state.PPQ, this.state.PPQ_tempo);
 
   };
 

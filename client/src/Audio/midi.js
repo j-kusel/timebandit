@@ -34,9 +34,10 @@ class _TimeSignatureEvent {
 }
 
 export default (tracks, PPQ, PPQ_tempo) => {
-    MidiWriter.Constants.HEADER_CHUNK_DIVISION = [0x00, PPQ.toString(16)];
+    MidiWriter.Constants.HEADER_CHUNK_DIVISION = [0x00, PPQ];
     var zip = new JSZip();
     var score = zip.folder('score');
+    let PPQ_mod = PPQ / PPQ_tempo;
 
     tracks.forEach((track) => {
         var new_track = [new MidiWriter.Track(), new MidiWriter.Track()];
@@ -50,7 +51,7 @@ export default (tracks, PPQ, PPQ_tempo) => {
             if ('timesig' in tick)
                 new_track[0].addEvent(new _TimeSignatureEvent(tick.timesig, 4, PPQ));
             delta = ('delta' in tick) ?
-                tick.delta : 1;
+                tick.delta : PPQ_mod;
         });
        
         track.beats.forEach((beat) => new_track[1].addEvent(new MidiWriter.NoteEvent(beat)));
