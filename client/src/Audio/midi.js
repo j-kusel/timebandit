@@ -33,7 +33,7 @@ class _TimeSignatureEvent {
     };
 }
 
-export default (tracks, PPQ) => {
+export default (tracks, PPQ, PPQ_tempo) => {
     MidiWriter.Constants.HEADER_CHUNK_DIVISION = [0x00, PPQ.toString(16)];
     var zip = new JSZip();
     var score = zip.folder('score');
