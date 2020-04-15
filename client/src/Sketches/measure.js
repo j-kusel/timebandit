@@ -19,19 +19,25 @@ const TIMESIG_PADDING = 5;
 const TEMPO_PADDING = 5;
 const TEMPO_PT = 8; // font size
 
-const [MOD, SHIFT, CTRL, ALT] = [17, 16, 91, 18];
+const [MOD, SHIFT, CTRL, ALT, SPACE] = [17, 16, 91, 18, 32];
 const [KeyC, KeyV] = [67, 86];
 const NUM = []
 for (let i=48; i < 58; i++)
     NUM.push(i);
 
 var calcRange = (measures) => {
-    let ranged = [];
+    let tempo = [];
+    let span = [];
     Object.keys(measures).forEach((key) => {
-        ranged.push(measures[key].start);
-        ranged.push(measures[key].end);
+        tempo.push(measures[key].start);
+        tempo.push(measures[key].end);
+        span.push(measures[key].offset);
+        span.push(measures[key].offset + measures[key].ms);
     });
-    return [Math.min(...ranged), Math.max(...ranged)];
+    return {
+        tempo: [Math.min(...tempo), Math.max(...tempo)],
+        span: [Math.min(...span), Math.max(...span)],
+    };
 };
 
 var bit_toggle = (list, item) => list ^ (1 << item);
@@ -106,6 +112,8 @@ export default function measure(p) {
     var snapped_inst = -1;
     var snap_div = 0;
     var scope = window.innerWidth * WINDOW_PERCENTAGE;
+    var tracking_start = {};
+    var isPlaying = false;
 
     var debug_message;
 
@@ -343,7 +351,7 @@ export default function measure(p) {
 
                 // draw tempo graph
                 p.stroke(240, 200, 200);
-                let scaleY = (input) => INST_HEIGHT - (input - range[0])/(range[1] - range[0])*INST_HEIGHT;
+                let scaleY = (input) => INST_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*INST_HEIGHT;
                 let ystart = yloc + scaleY(measure.start);
                 let yend = yloc + scaleY(measure.end);
                 p.line(position(0), ystart, position(measure.beats.slice(-1)[0]), yend);
@@ -380,6 +388,7 @@ export default function measure(p) {
                 p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*INST_HEIGHT,
                     x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*INST_HEIGHT);
             };
+
         });
 
         // draw snaps
@@ -440,11 +449,36 @@ export default function measure(p) {
         p.stroke(240);
         p.line(p.mouseX, 0, p.mouseX, INST_HEIGHT*instruments.length);
 
+        p.stroke(0);
+        p.fill(0);
+        p.textAlign(p.LEFT, p.TOP);
+        p.textSize(12);
+        p.text(`${isPlaying}, ${Math.round(start)}`, 0, 0);
+        if (isPlaying) {
+            let tracking = (API.exposeTracking().currentTime*1000 - tracking_start.time + tracking_start.location);
+            // check for final measure here;
+            if (tracking > range.span[1] + 1000)
+                isPlaying = false;
+            let tracking_vis = tracking*scale+start;
+            p.line(tracking_vis, 0, tracking_vis, INST_HEIGHT*2);
+        };
         document.body.style.cursor = cursor;
                 
     }
 
     p.keyPressed = function(e) {
+        if (p.keyCode === SPACE) {
+            isPlaying = !isPlaying;
+            let location = (p.mouseX-start)/scale;
+            if (isPlaying)
+                tracking_start = {
+                    time: API.exposeTracking().currentTime*1000.0,
+                    location
+                };
+
+            API.play(isPlaying, location);
+            return true;
+        }
         if (p.keyCode === KeyC
             && selected.inst > -1
             && selected.meas !== -1
@@ -463,6 +497,7 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
+
         // return if outside canvas
         if (p.mouseX === Infinity 
             || p.mouseY === Infinity 

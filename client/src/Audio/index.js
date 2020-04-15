@@ -75,11 +75,10 @@ function scheduler(start, target, beats) {
 };
 
 var playback = (isPlaying, score, tracking) => {
-    let start = aC.currentTime + tracking;
     if (isPlaying) {
         if (aC.state === 'suspended')
             aC.resume();
-        score.map((inst, ind) => scheduler(start, ind, inst[1].map(x => x*0.001)));
+        score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
     } else
         timerIDs.forEach(ID => window.clearTimeout(ID));
 };
@@ -105,22 +104,19 @@ var compile = (score) => {
             null : score[lowest.ind][1][pointer];
         lowest = current.reduce((acc, val, ind) => (val < acc.val) ? { val, ind } : acc, { val: Infinity });
     };
-    console.log(ordered);
     return ordered;
 };
 
 
 var audio = {
     init: () => aC.resume().then(() => console.log('resumed')),
-    play: (score) => playback(true, score, 0),//compile(score), //score.forEach((inst, ind) =>
+    play: playback, //compile(score), //score.forEach((inst, ind) =>
         //inst[1].forEach((beat) => trigger(ind, beat, adsr))),
-    kill: () => //gains.forEach((gain) => gain.setValueAtTime(0.0, aC.currentTime))
-        timerIDs.forEach(ID => {
-            window.clearTimeout(ID);
-        }),
+    kill: () => playback(false),
     set: (param, val) => {
         PARAMS[param] = val;
-    }
+    },
+    context: aC
 }
 
 

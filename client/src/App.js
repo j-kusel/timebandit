@@ -73,6 +73,7 @@ class App extends Component {
               inst: -1,
               meas: -1
           },
+          isPlaying: false,
           locks: [],
           PPQ: PPQ_default
       }
@@ -164,7 +165,14 @@ class App extends Component {
           });
       };
 
-      return { select, updateMeasure, newScaling, newCursor, displaySelected, paste };
+      var play = (isPlaying, cursor) => {
+          this.setState(oldState => ({ isPlaying }));
+          this.play(isPlaying, cursor);
+      };
+
+      var exposeTracking = () => audio.context;
+
+      return { select, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking };
   }
 
   handleInst(e) {
@@ -174,7 +182,6 @@ class App extends Component {
           name: this.state.instName,
           measures: {}
       }
-
 
       this.setState((oldState) => {
           // add after selected
@@ -333,12 +340,15 @@ class App extends Component {
 
   };
 
-  play() {
-      let threads = this.state.instruments.map((inst, ind) =>
+  play(isPlaying, locator) {
+      console.log(isPlaying);
+      if (!isPlaying)
+          audio.kill();
+      var threads = this.state.instruments.map((inst, ind) =>
           [ind, Object.keys(inst.measures).reduce((m_acc, meas) => 
               [ ...m_acc, ...inst.measures[meas].beats.map((beat) => beat + inst.measures[meas].offset) ]
           , [])]);
-      audio.play(threads);
+      audio.play(isPlaying, threads, locator);
   }
 
   kill() {
@@ -448,8 +458,8 @@ class App extends Component {
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
         <button onClick={this.save}>save</button>
-        <button onClick={this.play}>play</button>
-        <button onClick={this.kill}>kill</button>
+        <button onClick={() => this.play(true, 0)}>play</button>
+        <button onClick={() => this.play(false, 0)}>kill</button>
         <button onClick={this.midi}>midi</button>
         <button onClick={audio.init}>unmute</button>
         <form>
