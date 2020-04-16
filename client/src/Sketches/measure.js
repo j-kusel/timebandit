@@ -112,7 +112,10 @@ export default function measure(p) {
     var snapped_inst = -1;
     var snap_div = 0;
     var scope = window.innerWidth * WINDOW_PERCENTAGE;
-    var tracking_start = {};
+    var tracking_start = {
+        time: 0,
+        location: 0
+    };
     var isPlaying = false;
 
     var debug_message;
@@ -229,6 +232,7 @@ export default function measure(p) {
                 && true);
         };
 
+
         let nums = num_check();
         snap_div = (nums.length) ?
             nums[0] - 1 : 0;
@@ -236,7 +240,7 @@ export default function measure(p) {
         
         // check and draw selection
         if (selected.inst > -1 && selected.meas !== -1) {
-
+            let select = instruments[selected.inst].measures[selected.meas];
             // change cursor
             if (mod_check([2], modifiers) && measureBounds(selected.inst, instruments[selected.inst].measures[selected.meas]))
                 cursor = 'ew-resize';
@@ -245,7 +249,7 @@ export default function measure(p) {
             p.fill(240, 255, 240); 
 
             // check this later?
-            p.rect(instruments[selected.inst].measures[selected.meas].offset * scale + start, selected.inst*INST_HEIGHT, instruments[selected.inst].measures[selected.meas].ms * scale, INST_HEIGHT);
+            p.rect(select.offset * scale + start, selected.inst*INST_HEIGHT, select.ms * scale, INST_HEIGHT);
         };
 
 
@@ -407,11 +411,21 @@ export default function measure(p) {
             p.stroke(200, 240, 200);
             p.textSize(DEBUG_TEXT);
             p.textAlign(p.LEFT, p.TOP);
-            let lines = [
-                `selected: ${selected.inst} - ${selected.meas}`,
-                `snapped slope: ${snapped}`,
-                debug_message || ''
-            ];
+            let lines = (selected.inst !== -1 && selected.meas !== -1) ?
+                [`selected: ${instruments[selected.inst].measures[selected.meas].timesig} beats - ${instruments[selected.inst].measures[selected.meas].ms.toFixed(1)} ms`] :
+                [''];
+
+            let mouse = (p.mouseX - start)/scale;
+            let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
+            cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
+                parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
+                .join(':');
+            cursor_loc += '.' + parseInt(Math.abs(mouse % 1000), 10).toString().padStart(3, "0");
+            if (mouse < 0.0)
+               cursor_loc = '-' + cursor_loc;
+
+            lines.push(`location: ${cursor_loc}`);
+            lines.push(debug_message || '');
             lines.forEach((line, i) => p.text(line, DEBUG_TEXT, lineY(i)));
 
             p.textAlign(p.CENTER, p.CENTER);
@@ -449,16 +463,27 @@ export default function measure(p) {
         p.stroke(240);
         p.line(p.mouseX, 0, p.mouseX, INST_HEIGHT*instruments.length);
 
+
+
+        isPlaying = API.get('isPlaying');
+
         p.stroke(0);
         p.fill(0);
         p.textAlign(p.LEFT, p.TOP);
         p.textSize(12);
         p.text(`${isPlaying}, ${Math.round(start)}`, 0, 0);
+
+        
         if (isPlaying) {
-            let tracking = (API.exposeTracking().currentTime*1000 - tracking_start.time + tracking_start.location);
+            debug_message = tracking_start.time;
+            let time = tracking_start.time || API.exposeTracking().currentTime;
+            let tracking = API.exposeTracking().locator();
             // check for final measure here;
-            if (tracking > range.span[1] + 1000)
+            if (tracking > range.span[1] + 1000) {
+                console.log('EXPIRED', isPlaying);
                 isPlaying = false;
+                API.play(isPlaying, null);
+            };
             let tracking_vis = tracking*scale+start;
             p.line(tracking_vis, 0, tracking_vis, INST_HEIGHT*2);
         };
@@ -468,16 +493,15 @@ export default function measure(p) {
 
     p.keyPressed = function(e) {
         if (p.keyCode === SPACE) {
-            isPlaying = !isPlaying;
             let location = (p.mouseX-start)/scale;
-            if (isPlaying)
-                tracking_start = {
-                    time: API.exposeTracking().currentTime*1000.0,
-                    location
-                };
-
-            API.play(isPlaying, location);
+            /*tracking_start = {
+                time: API.exposeTracking().currentTime*1000.0,
+                location
+            };
+            API.play(!isPlaying, location);
             return true;
+            */
+            API.play(location);
         }
         if (p.keyCode === KeyC
             && selected.inst > -1

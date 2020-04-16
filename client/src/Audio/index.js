@@ -1,6 +1,8 @@
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 
 const aC = new AudioContext();
+var locator = {};
+var subscriptions = [];
 
 
 /*navigator.requestMIDIAccess()
@@ -67,15 +69,22 @@ function scheduler(start, target, beats) {
     while (candidates.length) {
          scheduled.push(trigger(target, candidates.pop() - aC.currentTime, PARAMS.adsr));
     };
+
+    subscriptions.forEach(sub => sub({
+        tracking: aC.currentTime - start
+    }));
     let new_id = window.setTimeout(() => {
         scheduler(start, target, beats);
-        //scheduled.forEach((id) => window.clearTimeout(id));
     }, PARAMS.lookahead);
     timerIDs.push(new_id);
 };
 
 var playback = (isPlaying, score, tracking) => {
     if (isPlaying) {
+        locator = {
+            origin: tracking/1000.0,
+            start: aC.currentTime
+        };
         if (aC.state === 'suspended')
             aC.resume();
         score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
@@ -116,7 +125,9 @@ var audio = {
     set: (param, val) => {
         PARAMS[param] = val;
     },
-    context: aC
+    subscribe: (func) => subscriptions.push(func),
+    context: aC,
+    locator: () => (aC.currentTime - locator.start + locator.origin)*1000.0
 }
 
 

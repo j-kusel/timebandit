@@ -34,6 +34,11 @@ const PPQ_OPTIONS = [
 
 var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>);
 
+var Playback = styled.button`
+    background-color: ${props => props.status === "true" ? 'green' : 'gray'};
+`;
+
+
 var Panel = styled(({ className, children }) => (<Col className={className} xs={2}>{children}</Col>))`
     text-align: center;    
     width: 100%;
@@ -57,6 +62,17 @@ var InstName = styled.h3`
 `;
 
 
+var timeToChrono = (time) => {
+    let chrono = [parseInt(Math.abs(time / 3600000), 10)];
+    chrono = chrono.concat([60000, 1000].map((num) =>
+        parseInt(Math.abs(time / num), 10).toString().padStart(2, "0")))
+        .join(':');
+    chrono += '.' + parseInt(Math.abs(time % 1000), 10).toString().padStart(3, "0");
+    if (time < 0.0)
+       chrono = '-' + chrono;
+    return chrono;
+};
+
 
 
 class App extends Component {
@@ -74,11 +90,15 @@ class App extends Component {
               meas: -1
           },
           isPlaying: false,
+          tracking: 0,
           locks: [],
           PPQ: PPQ_default
       }
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
+
+      // subscribe to audio updates
+      audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
 
@@ -141,6 +161,11 @@ class App extends Component {
     
       var select = (inst, meas) => self.setState(oldState => ({selected: {inst: inst, measure: meas}}));
 
+      var get = (name) => {
+          if (name === 'isPlaying')
+            return self.state.isPlaying;
+      };
+
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
           offset = offset || this.state.instruments[inst].measures[id].offset;
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
@@ -165,14 +190,17 @@ class App extends Component {
           });
       };
 
-      var play = (isPlaying, cursor) => {
-          this.setState(oldState => ({ isPlaying }));
-          this.play(isPlaying, cursor);
+      var play = (cursor) => {
+
+          this.play(!this.state.isPlaying, cursor ? cursor : 0);
       };
 
-      var exposeTracking = () => audio.context;
+      var exposeTracking = () => ({
+          context: audio.context,
+          locator: audio.locator
+      });
 
-      return { select, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking };
+      return { get, select, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking };
   }
 
   handleInst(e) {
@@ -340,15 +368,18 @@ class App extends Component {
 
   };
 
-  play(isPlaying, locator) {
-      console.log(isPlaying);
+  play(isPlaying, cursor) {
       if (!isPlaying)
-          audio.kill();
-      var threads = this.state.instruments.map((inst, ind) =>
-          [ind, Object.keys(inst.measures).reduce((m_acc, meas) => 
-              [ ...m_acc, ...inst.measures[meas].beats.map((beat) => beat + inst.measures[meas].offset) ]
-          , [])]);
-      audio.play(isPlaying, threads, locator);
+          audio.kill()
+      else {
+          audio.play(isPlaying, 
+              this.state.instruments.map((inst, ind) =>
+              [ind, Object.keys(inst.measures).reduce((m_acc, meas) => 
+                  [ ...m_acc, ...inst.measures[meas].beats.map((beat) => beat + inst.measures[meas].offset) ]
+              , [])])
+          , cursor);
+      };
+      this.setState(oldState => ({ isPlaying }));
   }
 
   kill() {
@@ -419,15 +450,7 @@ class App extends Component {
         name: inst.name
     }));
 
-    var cursor = [parseInt(Math.abs(this.state.cursor / 3600000), 10)];
-    cursor = cursor.concat([60000, 1000].map((num) =>
-        parseInt(Math.abs(this.state.cursor / num), 10).toString().padStart(2, "0")))
-        .join(':');
-    cursor += '.' + parseInt(Math.abs(this.state.cursor % 1000), 10).toString().padStart(3, "0");
-    if (this.state.cursor < 0.0)
-       cursor = '-' + cursor;
-
-
+    var cursor = timeToChrono(this.state.cursor);
     
     let measure_inputs = ['start', 'end', 'beats', 'offset'].map((name) => 
         <input
@@ -452,6 +475,8 @@ class App extends Component {
     ));
 
     //tempo_ppqs.forEach((p) => console.log(p));
+      //
+
 
 
     return (
@@ -493,8 +518,6 @@ class App extends Component {
             <Dropdown.Item eventKey={256}>256</Dropdown.Item>
             <Dropdown.Item eventKey={96}>96</Dropdown.Item>
             <Dropdown.Item eventKey={24}>24</Dropdown.Item>
-
-
           </Dropdown.Menu>
         </Dropdown>
         <Dropdown onSelect={this.handleTempoPPQ}>
@@ -505,6 +528,8 @@ class App extends Component {
             {tempo_ppqs}
           </Dropdown.Menu>
         </Dropdown>
+        <Playback status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
+        <p id="tracking">{timeToChrono(this.state.tracking*1000)}</p>
         <Container>
           <Row>
             <Panel>{panes}</Panel>
