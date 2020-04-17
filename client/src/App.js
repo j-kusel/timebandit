@@ -118,6 +118,12 @@ class App extends Component {
                       timesig: 5,
                       offset: 4722
                   }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
+                  [uuidv4()]: MeasureCalc({ 
+                      start: 60,
+                      end: 120,
+                      timesig: 5,
+                      offset: 12000
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
               }
           } :
           { measures: {} });
@@ -176,6 +182,12 @@ class App extends Component {
           });
       };
 
+      var deleteMeasure = (selected) => self.setState(oldState => {
+          delete oldState.instruments[selected.inst].measures[selected.meas];
+          console.log(oldState.instruments[selected.inst].measures);
+          return ({ instruments: oldState.instruments });
+      });
+
       var displaySelected = (selected) => self.setState(oldState => ({ selected }));
 
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
@@ -200,7 +212,7 @@ class App extends Component {
           locator: audio.locator
       });
 
-      return { get, select, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking };
+      return { get, select, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking };
   }
 
   handleInst(e) {

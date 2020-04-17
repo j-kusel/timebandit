@@ -12,6 +12,7 @@ const WINDOW_PERCENTAGE = 0.80;
 const DRAG_THRESHOLD_X = 10;
 const FLAT_THRESHOLD = 10;
 const NUDGE_THRESHOLD = 1;
+const SNAP_THRESHOLD = 50;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
 const ROLLOVER_TOLERANCE = 3;
@@ -19,8 +20,8 @@ const TIMESIG_PADDING = 5;
 const TEMPO_PADDING = 5;
 const TEMPO_PT = 8; // font size
 
-const [MOD, SHIFT, CTRL, ALT, SPACE] = [17, 16, 91, 18, 32];
-const [KeyC, KeyV] = [67, 86];
+const [MOD, SHIFT, CTRL, ALT, SPACE, DEL] = [17, 16, 91, 18, 32, 46];
+const [KeyC, KeyV, KeyZ] = [67, 86, 90];
 const NUM = []
 for (let i=48; i < 58; i++)
     NUM.push(i);
@@ -39,6 +40,27 @@ var calcRange = (measures) => {
         span: [Math.min(...span), Math.max(...span)],
     };
 };
+
+// CAN THIS BE CACHED?
+var calcGaps = (measures, id) => {
+    var last = false;
+    // ASSUMES MEASURES ARE IN ORDER
+    return Object.keys(measures).reduce((acc, key, i) => {
+        // skip measure in question
+        if (id && (key === id))
+            return acc;
+        acc = [...acc, [
+            (last) ? last.offset + last.ms : -Infinity,
+            measures[key].offset
+        ]];
+        last = measures[key];
+        return acc
+    }, [])
+        .concat([[ last.offset + last.ms, Infinity ]]);
+};
+
+
+var checkSelect = (selected) => selected.inst > -1 && selected.meas !== -1;
 
 var bit_toggle = (list, item) => list ^ (1 << item);
 
@@ -239,7 +261,7 @@ export default function measure(p) {
 
         
         // check and draw selection
-        if (selected.inst > -1 && selected.meas !== -1) {
+        if (checkSelect(selected)) {
             let select = instruments[selected.inst].measures[selected.meas];
             // change cursor
             if (mod_check([2], modifiers) && measureBounds(selected.inst, instruments[selected.inst].measures[selected.meas]))
@@ -332,8 +354,7 @@ export default function measure(p) {
                     // change rollover cursor
                     if (mod_check(1, modifiers)
                         && ro
-                        && selected.inst > -1
-                        && selected.meas !== -1
+                        && checkSelect(selected)
                     ) {
 
                         let shifted = mod_check(2, modifiers)
@@ -411,7 +432,7 @@ export default function measure(p) {
             p.stroke(200, 240, 200);
             p.textSize(DEBUG_TEXT);
             p.textAlign(p.LEFT, p.TOP);
-            let lines = (selected.inst !== -1 && selected.meas !== -1) ?
+            let lines = (checkSelect(selected)) ?
                 [`selected: ${instruments[selected.inst].measures[selected.meas].timesig} beats - ${instruments[selected.inst].measures[selected.meas].ms.toFixed(1)} ms`] :
                 [''];
 
@@ -492,6 +513,13 @@ export default function measure(p) {
     }
 
     p.keyPressed = function(e) {
+        if (p.keyCode === DEL
+            && checkSelect(selected)
+        ) {
+            console.log(selected);
+            API.deleteMeasure(selected);
+        };
+
         if (p.keyCode === SPACE) {
             let location = (p.mouseX-start)/scale;
             /*tracking_start = {
@@ -503,13 +531,21 @@ export default function measure(p) {
             */
             API.play(location);
         }
-        if (p.keyCode === KeyC
-            && selected.inst > -1
-            && selected.meas !== -1
-        )
-            copied = instruments[selected.inst].measures[selected.meas];
-        else if (p.keyCode === KeyV && copied)
-            API.paste(selected.inst, copied, (p.mouseX-start)/scale);
+
+        // CTRL/MOD functions
+        if (p.keyIsDown(MOD)) {
+            if (p.keyCode === KeyC
+                && checkSelect(selected)
+            )
+                copied = instruments[selected.inst].measures[selected.meas];
+            else if (p.keyCode === KeyV && copied)
+                API.paste(selected.inst, copied, (p.mouseX-start)/scale);
+            /* ADD UNDO HISTORY HERE
+            else if (p.keyCode === KeyZ)
+                p.keyIsDown(SHIFT) ?
+                    API.redo() : API.undo();
+            */
+        };
         return true;
     };
 
@@ -633,6 +669,41 @@ export default function measure(p) {
             let position = measure.offset + dragged/scale;
             let close = snap_eval(position, measure.beats);
 
+            // check for overlaps
+            if (!('gaps' in measure))
+                measure.gaps = calcGaps(instruments[selected.inst].measures, selected.meas);
+            let crowding = measure.gaps
+                .reduce((acc, gap) => {
+                    // does it even fit in the gap?
+                    if (gap[1] - gap[0] < measure.ms)
+                        return acc;
+                    let start = [gap[0], position - gap[0]];
+                    let end = [gap[1], gap[1] - (position + measure.ms)];
+                    if (Math.abs(start[1]) < Math.abs(acc.start[1]))
+                        acc.start = start;
+                    if (Math.abs(end[1]) < Math.abs(acc.end[1]))
+                        acc.end = end;
+                    return acc;
+                }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
+
+            // determine whether start or end are closer
+            // negative numbers signify conflicts
+            if (Math.abs(crowding.start[1]) < Math.abs(crowding.end[1])) {
+                if (crowding.start[1] - SNAP_THRESHOLD < 0) {
+                    measure.temp_offset = crowding.start[0];
+                    measure.temp_ticks = measure.ticks.slice(0);
+                    measure.temp_beats = measure.beats.slice(0);
+                    return;
+                }
+            } else {
+                if (crowding.end[1] - SNAP_THRESHOLD < 0) {
+                    measure.temp_offset = crowding.end[0] - measure.ms;
+                    measure.temp_ticks = measure.ticks.slice(0);
+                    measure.temp_beats = measure.beats.slice(0);
+                    return;
+                }
+            }
+
             if (close.index !== -1) {
                 let gap = close.target - (measure.beats[close.index] + position);
                 if (Math.abs(gap) < 50) {
@@ -750,7 +821,7 @@ export default function measure(p) {
             return nudgeSE(new_gap, alpha, depth + 1);
         };
 
-        if (Math.abs(gap) < 50) {
+        if (Math.abs(gap) < SNAP_THRESHOLD) {
             // if initial snap, update measure.temp_start 
             // for the last time and nudge.
             if (!snapped) {
@@ -813,7 +884,7 @@ export default function measure(p) {
             return;
         // handle threshold
         if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
-            if (selected.meas !== -1) {
+            if (checkSelect(selected)) {
                 instruments[selected.inst].measures[selected.meas].temp_ticks = [];
             };
             dragged = 0;

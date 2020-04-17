@@ -15,6 +15,8 @@ class UI extends Component {
             return true;
         let flag = false;
         nextProps.instruments.forEach((inst, index) => {
+            if (Object.keys(inst.measures).length !== Object.keys(this.props.instruments[index].measures).length)
+                flag = true;
             Object.keys(inst.measures).forEach((key) => {
                 if (!(key in this.props.instruments[index].measures)) {
                     flag = true;
