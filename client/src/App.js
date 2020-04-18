@@ -102,28 +102,30 @@ class App extends Component {
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
 
+      let ids = [uuidv4(), uuidv4(), uuidv4(), uuidv4(), uuidv4()];
       this.state.instruments.push(DEBUG ?
           {
               name: 'default',
               measures: {
-                  [uuidv4()]: MeasureCalc({ 
-                      start: 60,
-                      end: 120,
-                      timesig: 6,
-                      offset: 500
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
-                  [uuidv4()]: MeasureCalc({ 
-                      start: 60,
-                      end: 120,
-                      timesig: 5,
-                      offset: 4722
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
-                  [uuidv4()]: MeasureCalc({ 
+                  [ids[0]]: { ...MeasureCalc({ 
                       start: 60,
                       end: 120,
                       timesig: 5,
                       offset: 12000
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[0] },
+
+                  [ids[1]]: { ...MeasureCalc({ 
+                      start: 60,
+                      end: 120,
+                      timesig: 6,
+                      offset: 500
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[1] },
+                  [ids[2]]: { ...MeasureCalc({ 
+                      start: 60,
+                      end: 120,
+                      timesig: 5,
+                      offset: 4722
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[2] },
               }
           } :
           { measures: {} });
@@ -131,12 +133,19 @@ class App extends Component {
       DEBUG ? this.state.instruments.push({
               name: 'asdf',
               measures: {
-                  [uuidv4()]: MeasureCalc({ 
+                  [ids[3]]: { ...MeasureCalc({ 
+                      start: 60,
+                      end: 120,
+                      timesig: 5,
+                      offset: 12000
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[3] },
+
+                  [ids[4]]: { ...MeasureCalc({ 
                       start: 144,
                       end: 72,
                       timesig: 7,
                       offset: 300
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }),
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[4] },
               }
           }) : console.log(0);
 
@@ -177,7 +186,7 @@ class App extends Component {
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
-              instruments[inst].measures[id] = calc;
+              instruments[inst].measures[id] = { ...calc, id };
               return { instruments };
           });
       };
@@ -197,7 +206,8 @@ class App extends Component {
           var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
-              instruments[inst].measures[uuidv4()] = calc;
+              let id = uuidv4();
+              instruments[inst].measures[id] = { ...calc, id };
               return { instruments };
           });
       };
@@ -250,7 +260,8 @@ class App extends Component {
 
       this.setState(oldState => {
           let instruments = oldState.instruments;
-          instruments[inst].measures[uuidv4()] = calc;
+          let id = uuidv4();
+          instruments[inst].measures[id] = { ...calc, id };
           return { instruments };
       });
   };
@@ -441,7 +452,8 @@ class App extends Component {
                           }
                       };
 
-                      acc[params[0]].measures[uuidv4()] = newMeas;
+                      let id = uuidv4();
+                      acc[params[0]].measures[id] = { ...newMeas, id };
                       return acc;
                   }, [])
           });

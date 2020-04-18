@@ -41,19 +41,45 @@ var calcRange = (measures) => {
     };
 };
 
+var order_by_key = (measures, key) => {
+    var merge = (arrL, arrR) => {
+        let lI = 0, rI = 0, sorted=[];
+        while (lI < arrL.length && rI < arrR.length)
+            sorted.push((arrL[lI][key] < arrR[rI][key]) ?
+                arrL[lI++] : arrR[rI++]);
+        return sorted.concat(arrL.slice(lI)).concat(arrR.slice(rI));
+    };
+
+    var sort = (arr) => {
+        let m = Math.floor(arr.length / 2);
+        return (m ?
+            merge(sort(arr.slice(0, m)), sort(arr.slice(m))) 
+            : arr)
+    };
+
+    let sorted = sort(Object.keys(measures).map(key => measures[key]));
+    console.log(sorted);
+    return sorted;
+};
+        
+    
+                
+        
+
+
 // CAN THIS BE CACHED?
 var calcGaps = (measures, id) => {
     var last = false;
     // ASSUMES MEASURES ARE IN ORDER
-    return Object.keys(measures).reduce((acc, key, i) => {
+    return measures.reduce((acc, meas, i) => {
         // skip measure in question
-        if (id && (key === id))
+        if (id && (meas.id === id))
             return acc;
         acc = [...acc, [
             (last) ? last.offset + last.ms : -Infinity,
-            measures[key].offset
+            meas.offset
         ]];
-        last = measures[key];
+        last = meas;
         return acc
     }, [])
         .concat([[ last.offset + last.ms, Infinity ]]);
@@ -179,7 +205,7 @@ export default function measure(p) {
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         instruments = props.instruments;
         ({ API, CONSTANTS } = props);
-        console.log(CONSTANTS);
+        
 
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
@@ -205,6 +231,9 @@ export default function measure(p) {
         }, {});
         snaps.push(add_snaps);
         */
+        
+        // REFACTOR ORDERING INTO NUM ITERATIONS LATER
+        instruments.forEach((inst) => inst.ordered = order_by_key(inst.measures, 'offset'));
 
         NUM.slice(1).forEach((num, n_ind) => {
             add_snaps = {};
@@ -660,18 +689,16 @@ export default function measure(p) {
             return;
         };
 
-                
-        measure.temp_ticks = [];
-        measure.temp_beats = [];
+        // CACHE THIS
+        if (!('gaps' in measure))
+            measure.gaps = calcGaps(instruments[selected.inst].ordered, selected.meas);
 
-
+        console.log(measure.gaps);
         if (drag_mode === 'measure') {
             let position = measure.offset + dragged/scale;
             let close = snap_eval(position, measure.beats);
 
             // check for overlaps
-            if (!('gaps' in measure))
-                measure.gaps = calcGaps(instruments[selected.inst].measures, selected.meas);
             let crowding = measure.gaps
                 .reduce((acc, gap) => {
                     // does it even fit in the gap?
@@ -766,22 +793,41 @@ export default function measure(p) {
         let sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
 
         let C1 = C(slope);
-        let ms = C1 * tick_array.reduce((sum, _, i) => sum + sigma(temp_start, C1)(i), 0);
+        var beat_lock = (selected.meas in locked && locked[selected.meas].beats) ?
+            parse_bits(locked[selected.meas].beats) : [];
+        let lock = 0;
+        let ms = C1 * tick_array.reduce((sum, _, i) => {
+            if (beat_lock.length && (i === beat_lock[0]*CONSTANTS.PPQ_tempo))
+                lock = sum*C1;
+            return sum + sigma(temp_start, C1)(i);
+        }, 0);
         if (Math.abs(ms - measure.ms) < DRAG_THRESHOLD_X) {
             measure.temp_offset = measure.offset;
             measure.temp_start = measure.start;
             slope = measure.end - measure.start;
             return;
         };
-        
-        let diff = slope;
 
-        let loc = (ms + (measure.temp_offset || measure.offset));
+
+        let temp_offset = measure.offset;
+        if (lock)
+            temp_offset += measure.beats[beat_lock] - lock;
+
+        let loc = ms + temp_offset;
+
+        // check for gap
+        let crowding = measure.gaps
+            .filter((gap) => {
+                return (temp_offset > gap[0] && loc < gap[1]);
+            });
+        if (!crowding.length)
+            return;
+
         let snap_to = closest(loc, selected.inst, snap_div).target;
         let gap = loc - snap_to;
+        let diff = slope;
 
         // LENGTH GRADIENT DESCENT
-        // ADD SELF-MONITORING HERE
 
         var nudgeS = (gap, alpha, depth) => {
             if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
@@ -839,7 +885,7 @@ export default function measure(p) {
             measure.temp_start = temp_start;
         };
 
-            
+                   
         // INVERT THIS DRAG AT SOME POINT?
         let inc = slope/(measure.ticks.length);
 
@@ -859,23 +905,29 @@ export default function measure(p) {
         let cumulative = 0.0;
         let K = 60000.0 / CONSTANTS.PPQ;
         let last = 0;
+
+        let new_beats = [];
+        let new_ticks = [];
         measure.ticks.forEach((_, i) => {
             if (!(i%CONSTANTS.PPQ))
-                measure.temp_beats.push(cumulative);
-            measure.temp_ticks.push(cumulative);
+                new_beats.push(cumulative);
+            new_ticks.push(cumulative);
             if (i%PPQ_mod === 0) 
                 last = K / (measure.temp_start + inc*i);
             cumulative += last;
         });
-        measure.temp_beats.push(cumulative);
+        new_beats.push(cumulative);
 
-        var beat_lock = (selected.meas in locked && locked[selected.meas].beats) ?
-            parse_bits(locked[selected.meas].beats) : [];
 
         measure.temp_slope = slope;
         measure.temp_offset = measure.offset;
         if (beat_lock.length === 1)
-            measure.temp_offset += measure.beats[beat_lock[0]] - measure.temp_beats[beat_lock[0]];
+            measure.temp_offset += measure.beats[beat_lock[0]] - new_beats[beat_lock[0]];
+
+
+        measure.temp_ticks = new_ticks;
+        measure.temp_beats = new_beats;
+
 
     };
 
