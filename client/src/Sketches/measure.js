@@ -829,53 +829,25 @@ export default function measure(p) {
 
         // LENGTH GRADIENT DESCENT
 
-        var nudgeS = (gap, alpha, depth) => {
-            if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
-                return diff;
-            diff *= (gap > NUDGE_THRESHOLD) ?
-                (1 + alpha) : (1 - alpha);
-            let new_C = C(diff);
-            let locked = 0;
-            let lock_target = beat_lock[0] * CONSTANTS.PPQ_tempo;
-            let ms = new_C * tick_array.reduce((sum, _, i) => {
-                if (i === lock_target)
-                    locked = sum*new_C;
-                return sum + sigma(measure.temp_start, new_C)(i);
-            }, 0);
-            if (locked)
-                measure.temp_offset = measure.offset + measure.beats[beat_lock[0]] - locked;
-            let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
-            alpha = monitor(gap, new_gap, alpha);
-            return nudgeS(new_gap, alpha, depth + 1);
-        };
+        // check what's locked to determine nudge algo
+        let delta = (!(locks & (1 << 1)) && !(locks & (1 << 2))) ? 
+            1.0 : 0.5;
+        let diff_null = !!(locks & (1 << 2));
 
-        var nudgeE = (gap, alpha, depth) => {
+        var nudge = (gap, alpha, depth) => {
             if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
                 return diff;
-            measure.temp_start *= (gap > NUDGE_THRESHOLD) ?
-                (1 + alpha) : (1 - alpha);
-            diff = measure.end - measure.temp_start;
-            let new_C = C(diff);
-            let locked = 0;
-            let lock_target = beat_lock[0] * CONSTANTS.PPQ_tempo;
-            let ms = new_C * tick_array.reduce((sum, _, i) => {
-                if (i === lock_target)
-                    locked = sum*new_C;
-                return sum + sigma(measure.temp_start, new_C)(i);
-            }, 0);
-            if (locked)
-                measure.temp_offset = measure.offset + measure.beats[beat_lock[0]] - locked;
-            let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
-            alpha = monitor(gap, new_gap, alpha);
-            return nudgeE(new_gap, alpha, depth + 1);
-        };
 
-        var nudgeSE = (gap, alpha, depth) => {
-            if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
-                return diff;
-            measure.temp_start *= (gap > NUDGE_THRESHOLD) ?
-                (1 + alpha*0.5) : (1 - alpha*0.5);
-            // slope (diff) doesn't change.
+            // if END is locked
+            if (diff_null) {
+                measure.temp_start *= (gap > NUDGE_THRESHOLD) ?
+                    (1 + alpha) : (1 - alpha);
+                diff = measure.end - measure.temp_start;
+            // else change alpha multiplier based on start or slope lock
+            } else
+                diff *= (gap > NUDGE_THRESHOLD) ?
+                    (1 + alpha*delta) : (1 - alpha*delta);
+            
             let new_C = C(diff);
             let locked = 0;
             let lock_target = beat_lock[0] * CONSTANTS.PPQ_tempo;
@@ -888,7 +860,7 @@ export default function measure(p) {
                 measure.temp_offset = measure.offset + measure.beats[beat_lock[0]] - locked;
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
             alpha = monitor(gap, new_gap, alpha);
-            return nudgeSE(new_gap, alpha, depth + 1);
+            return nudge(new_gap, alpha, depth + 1);
         };
 
 
@@ -897,12 +869,6 @@ export default function measure(p) {
             // for the last time and nudge.
             if (!snapped) {
                 measure.temp_start = temp_start;
-
-                // check what's locked to determine nudge algo
-                let nudge = (locks & (1 << 1)) ?
-                    nudgeS :
-                    (locks & (1 << 2)) ? nudgeE : nudgeSE;
-                // invert learning rate depending on slope
                 snapped = nudge(gap, 0.001, 0);
             };
             slope = snapped;
