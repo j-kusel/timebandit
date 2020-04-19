@@ -23,9 +23,28 @@ var MeasureCalc = (features, options) => {
     ms = cumulative;
     beats.push(ms);
 
-    console.log(beats);
-
     return {start, end, timesig, beats, ms, ticks, offset: features.offset};
 }
 
-export { MeasureCalc };
+var order_by_key = (obj, key) => {
+    var merge = (arrL, arrR) => {
+        let lI = 0, rI = 0, sorted=[];
+        while (lI < arrL.length && rI < arrR.length)
+            sorted.push((arrL[lI][key] < arrR[rI][key]) ?
+                arrL[lI++] : arrR[rI++]);
+        return sorted.concat(arrL.slice(lI)).concat(arrR.slice(rI));
+    };
+
+    var sort = (arr) => {
+        let m = Math.floor(arr.length / 2);
+        return (m ?
+            merge(sort(arr.slice(0, m)), sort(arr.slice(m)))
+            : arr);
+    };
+
+    return sort(Object.keys(obj).map(key => obj[key]));
+};
+
+export { MeasureCalc, order_by_key };
+
+

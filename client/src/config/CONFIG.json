@@ -1,0 +1,31 @@
+{
+    "primary": "#FAE4E8",
+    "secondary": "#301C0F",
+
+
+    "DEBUG_HEIGHT": 200,
+    "DEBUG_TEXT": 12,
+    "WINDOW_PERCENTAGE": 0.80,
+    "DRAG_THRESHOLD_X": 10,
+    "FLAT_THRESHOLD": 10,
+    "NUDGE_THRESHOLD": 0.5,
+    "SNAP_THRESHOLD": 50,
+    "INST_HEIGHT": 100,
+    "SCROLL_SENSITIVITY": 100.0,
+    "ROLLOVER_TOLERANCE": 3,
+    "TIMESIG_PADDING": 5,
+    "TEMPO_PADDING": 5,
+    "TEMPO_PT": 8,
+
+    "PPQ_OPTIONS": [
+        [24, "default"],
+        [4, "ableton live"],
+        [256, "sibelius"],
+        [480, "digital performer"],
+        [960, "reaper"],
+        [1024, "finale"]
+    ],
+    "TRACK_HEIGHT": 100, 
+    "DELTA_THRESHOLD": 5, 
+    "PPQ_default": 48
+}

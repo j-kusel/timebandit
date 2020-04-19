@@ -1,24 +1,12 @@
+import { order_by_key } from '../Util/index.js';
+import c from '../config/CONFIG.json';
+import { primary, secondary } from '../config/CONFIG.json';
+
 var scale = 1.0;
 var start = 0;
 var range = [0, 100];
 
 const DEBUG = true;
-
-const DEBUG_HEIGHT = 200;
-const DEBUG_TEXT = 12;
-
-const WINDOW_PERCENTAGE = 0.80;
-
-const DRAG_THRESHOLD_X = 10;
-const FLAT_THRESHOLD = 10;
-const NUDGE_THRESHOLD = 0.5;
-const SNAP_THRESHOLD = 50;
-const INST_HEIGHT = 100;
-const SCROLL_SENSITIVITY = 100.0;
-const ROLLOVER_TOLERANCE = 3;
-const TIMESIG_PADDING = 5;
-const TEMPO_PADDING = 5;
-const TEMPO_PT = 8; // font size
 
 const [MOD, SHIFT, CTRL, ALT, SPACE, DEL] = [17, 16, 91, 18, 32, 46];
 const [KeyC, KeyV, KeyZ] = [67, 86, 90];
@@ -41,31 +29,6 @@ var calcRange = (measures) => {
     };
 };
 
-var order_by_key = (measures, key) => {
-    var merge = (arrL, arrR) => {
-        let lI = 0, rI = 0, sorted=[];
-        while (lI < arrL.length && rI < arrR.length)
-            sorted.push((arrL[lI][key] < arrR[rI][key]) ?
-                arrL[lI++] : arrR[rI++]);
-        return sorted.concat(arrL.slice(lI)).concat(arrR.slice(rI));
-    };
-
-    var sort = (arr) => {
-        let m = Math.floor(arr.length / 2);
-        return (m ?
-            merge(sort(arr.slice(0, m)), sort(arr.slice(m))) 
-            : arr)
-    };
-
-    let sorted = sort(Object.keys(measures).map(key => measures[key]));
-    console.log(sorted);
-    return sorted;
-};
-        
-    
-                
-        
-
 
 // CAN THIS BE CACHED?
 var calcGaps = (measures, id) => {
@@ -80,7 +43,7 @@ var calcGaps = (measures, id) => {
             meas.offset
         ]];
         last = meas;
-        return acc
+        return acc;
     }, [])
         .concat([[ last.offset + last.ms, Infinity ]]);
 };
@@ -159,7 +122,7 @@ export default function measure(p) {
     var snapped = false;
     var snapped_inst = -1;
     var snap_div = 0;
-    var scope = window.innerWidth * WINDOW_PERCENTAGE;
+    var scope = window.innerWidth * c.WINDOW_PERCENTAGE;
     var tracking_start = {
         time: 0,
         location: 0
@@ -176,7 +139,7 @@ export default function measure(p) {
     var beat_rollover = (beat, index) => {
         if (dragged)
             return false;
-        if (p.mouseX > beat-ROLLOVER_TOLERANCE && p.mouseX < beat+ROLLOVER_TOLERANCE) {
+        if (p.mouseX > beat-c.ROLLOVER_TOLERANCE && p.mouseX < beat+c.ROLLOVER_TOLERANCE) {
             rollover = index;
             return true;
         }             
@@ -198,7 +161,7 @@ export default function measure(p) {
                 [...acc, ind] : acc, []);
 
     p.setup = function () {
-        p.createCanvas(scope, INST_HEIGHT + DEBUG_HEIGHT);
+        p.createCanvas(scope, c.INST_HEIGHT + c.DEBUG_HEIGHT);
         p.background(0);
     };
 
@@ -261,7 +224,7 @@ export default function measure(p) {
         let all_meas = instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {});
         range = calcRange(all_meas);
         
-        p.resizeCanvas(p.width, INST_HEIGHT*instruments.length + DEBUG_HEIGHT);
+        p.resizeCanvas(p.width, c.INST_HEIGHT*instruments.length + c.DEBUG_HEIGHT);
 
     }
 
@@ -278,8 +241,8 @@ export default function measure(p) {
             let position = (tick) => ((measure.offset + tick)*scale + start);
             return (p.mouseX > position(0) 
                 && p.mouseX < position(measure.ms)
-                && p.mouseY >= inst*INST_HEIGHT
-                && p.mouseY < (inst + 1)*INST_HEIGHT 
+                && p.mouseY >= inst*c.INST_HEIGHT
+                && p.mouseY < (inst + 1)*c.INST_HEIGHT 
                 && true);
         };
 
@@ -300,12 +263,12 @@ export default function measure(p) {
             p.fill(240, 255, 240); 
 
             // check this later?
-            p.rect(select.offset * scale + start, selected.inst*INST_HEIGHT, select.ms * scale, INST_HEIGHT);
+            p.rect(select.offset * scale + start, selected.inst*c.INST_HEIGHT, select.ms * scale, c.INST_HEIGHT);
         };
 
 
         instruments.forEach((inst, i_ind) => {
-            let yloc = i_ind*INST_HEIGHT;
+            let yloc = i_ind*c.INST_HEIGHT;
             p.stroke(255, 0, 0);
             p.fill(255, 255, 255);
 
@@ -328,12 +291,12 @@ export default function measure(p) {
 
                 // draw origin
                 p.stroke(0, 255, 0);
-                p.line(origin, yloc, origin, yloc + INST_HEIGHT);
+                p.line(origin, yloc, origin, yloc + c.INST_HEIGHT);
 
                 // handle selection
                 if (key === selected.meas) {
                     p.fill(0, 255, 0, 20);
-                    p.rect(origin, yloc, measure.ms*scale, INST_HEIGHT);
+                    p.rect(origin, yloc, measure.ms*scale, c.INST_HEIGHT);
                 }
 
                 // check for temporary display
@@ -349,18 +312,18 @@ export default function measure(p) {
                     let loc = position(tick);
                     if (loc > p.width)
                         return
-                    p.line(loc, yloc, loc, yloc + INST_HEIGHT);
+                    p.line(loc, yloc, loc, yloc + c.INST_HEIGHT);
                 });
 
                 // draw timesig
                 p.fill(100);
-                p.textSize(INST_HEIGHT*0.5);
+                p.textSize(c.INST_HEIGHT*0.5);
                 p.textFont('Helvetica');
                 p.textAlign(p.LEFT, p.TOP);
-                let siglocX = position(0) + TIMESIG_PADDING;
-                p.text(measure.timesig, siglocX, yloc + TIMESIG_PADDING);
+                let siglocX = position(0) + c.TIMESIG_PADDING;
+                p.text(measure.timesig, siglocX, yloc + c.TIMESIG_PADDING);
                 p.textAlign(p.LEFT, p.BOTTOM);
-                p.text('4', siglocX, yloc + INST_HEIGHT - TIMESIG_PADDING);
+                p.text('4', siglocX, yloc + c.INST_HEIGHT - c.TIMESIG_PADDING);
 
                 // draw beats
                 measure[beats].forEach((beat, index) => {
@@ -373,7 +336,7 @@ export default function measure(p) {
                     // try rollover
                     let ro = (beats === 'beats'
                         && p.mouseY >= yloc
-                        && p.mouseY < yloc + INST_HEIGHT
+                        && p.mouseY < yloc + c.INST_HEIGHT
                         && beat_rollover(coord, index)
                     );
 
@@ -400,36 +363,36 @@ export default function measure(p) {
                     };
 
                     p.stroke(...color, alpha);
-                    p.line(coord, yloc, coord, yloc + INST_HEIGHT);
+                    p.line(coord, yloc, coord, yloc + c.INST_HEIGHT);
                 });
 
                 // draw tempo graph
                 p.stroke(240, 200, 200);
-                let scaleY = (input) => INST_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*INST_HEIGHT;
+                let scaleY = (input) => c.INST_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*c.INST_HEIGHT;
                 let ystart = yloc + scaleY(measure.start);
                 let yend = yloc + scaleY(measure.end);
                 p.line(position(0), ystart, position(measure.beats.slice(-1)[0]), yend);
 
                 // draw tempo markings
                 p.fill(100);
-                p.textSize(TEMPO_PT);
-                let tempo_loc = { x: position(0) + TEMPO_PADDING };
-                if (ystart > yloc + TEMPO_PT + TEMPO_PADDING) {
+                p.textSize(c.TEMPO_PT);
+                let tempo_loc = { x: position(0) + c.TEMPO_PADDING };
+                if (ystart > yloc + c.TEMPO_PT + c.TEMPO_PADDING) {
                     p.textAlign(p.LEFT, p.BOTTOM);
-                    tempo_loc.y = ystart - TEMPO_PADDING;
+                    tempo_loc.y = ystart - c.TEMPO_PADDING;
                 } else {
                     p.textAlign(p.LEFT, p.TOP);
-                    tempo_loc.y = ystart + TEMPO_PADDING;
+                    tempo_loc.y = ystart + c.TEMPO_PADDING;
                 };
                 p.text(measure.start.toFixed(2), tempo_loc.x, tempo_loc.y);
 
-                tempo_loc = { x: position(measure.ms) - TEMPO_PADDING };
-                if (yend > yloc + TEMPO_PT + TEMPO_PADDING) {
+                tempo_loc = { x: position(measure.ms) - c.TEMPO_PADDING };
+                if (yend > yloc + c.TEMPO_PT + c.TEMPO_PADDING) {
                     p.textAlign(p.RIGHT, p.BOTTOM);
-                    tempo_loc.y = yend - TEMPO_PADDING;
+                    tempo_loc.y = yend - c.TEMPO_PADDING;
                 } else {
                     p.textAlign(p.RIGHT, p.TOP);
-                    tempo_loc.y = yend + TEMPO_PADDING;
+                    tempo_loc.y = yend + c.TEMPO_PADDING;
                 };
                 p.text(measure.end.toFixed(2), tempo_loc.x, tempo_loc.y);
 
@@ -439,8 +402,8 @@ export default function measure(p) {
             if (snapped_inst) {
                 p.stroke(200, 240, 200);
                 let x = snapped_inst.target * scale + start;
-                p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*INST_HEIGHT,
-                    x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*INST_HEIGHT);
+                p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*c.INST_HEIGHT,
+                    x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*c.INST_HEIGHT);
             };
 
         });
@@ -449,17 +412,17 @@ export default function measure(p) {
         p.stroke(100, 255, 100);
         Object.keys(snaps[snap_div]).forEach(key => {
             let inst = snaps[snap_div][key][0].inst;
-            p.line(key*scale + start, inst * INST_HEIGHT, key*scale + start, (inst+1) * INST_HEIGHT);
+            p.line(key*scale + start, inst * c.INST_HEIGHT, key*scale + start, (inst+1) * c.INST_HEIGHT);
         });
 
         // draw debug
 
         if (DEBUG) {
-            let DEBUG_START = INST_HEIGHT*instruments.length;
-            let lineY = (line) => DEBUG_TEXT*line + DEBUG_START + DEBUG_TEXT;
+            let DEBUG_START = c.INST_HEIGHT*instruments.length;
+            let lineY = (line) => c.DEBUG_TEXT*line + DEBUG_START + c.DEBUG_TEXT;
 
-            p.stroke(200, 240, 200);
-            p.textSize(DEBUG_TEXT);
+            p.stroke(primary); //200, 240, 200);
+            p.textSize(c.DEBUG_TEXT);
             p.textAlign(p.LEFT, p.TOP);
             let lines = (checkSelect(selected)) ?
                 [`selected: ${instruments[selected.inst].measures[selected.meas].timesig} beats - ${instruments[selected.inst].measures[selected.meas].ms.toFixed(1)} ms`] :
@@ -476,7 +439,7 @@ export default function measure(p) {
 
             lines.push(`location: ${cursor_loc}`);
             lines.push(debug_message || '');
-            lines.forEach((line, i) => p.text(line, DEBUG_TEXT, lineY(i)));
+            lines.forEach((line, i) => p.text(line, c.DEBUG_TEXT, lineY(i)));
 
             p.textAlign(p.CENTER, p.CENTER);
 
@@ -511,7 +474,7 @@ export default function measure(p) {
 
         // draw cursor
         p.stroke(240);
-        p.line(p.mouseX, 0, p.mouseX, INST_HEIGHT*instruments.length);
+        p.line(p.mouseX, 0, p.mouseX, c.INST_HEIGHT*instruments.length);
 
 
 
@@ -535,7 +498,7 @@ export default function measure(p) {
                 API.play(isPlaying, null);
             };
             let tracking_vis = tracking*scale+start;
-            p.line(tracking_vis, 0, tracking_vis, INST_HEIGHT*2);
+            p.line(tracking_vis, 0, tracking_vis, c.INST_HEIGHT*2);
         };
         document.body.style.cursor = cursor;
                 
@@ -579,7 +542,7 @@ export default function measure(p) {
     };
 
     p.mouseWheel = function(event) {
-        let change = 1.0-event.delta/SCROLL_SENSITIVITY;
+        let change = 1.0-event.delta/c.SCc.ROLL_SENSITIVITY;
         scale = scale*change;
         start = p.mouseX - change*(p.mouseX - start);
         API.newScaling(scale);
@@ -680,7 +643,7 @@ export default function measure(p) {
 
         let measure = instruments[selected.inst].measures[selected.meas];
 
-        if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
+        if (Math.abs(dragged) < c.DRAG_THRESHOLD_X) {
             measure.temp_beats = [];
             measure.temp_ticks = [];
             delete measure.temp_start;
@@ -715,14 +678,14 @@ export default function measure(p) {
             // determine whether start or end are closer
             // negative numbers signify conflicts
             if (Math.abs(crowding.start[1]) < Math.abs(crowding.end[1])) {
-                if (crowding.start[1] - SNAP_THRESHOLD < 0) {
+                if (crowding.start[1] - c.SNAP_THRESHOLD < 0) {
                     measure.temp_offset = crowding.start[0];
                     measure.temp_ticks = measure.ticks.slice(0);
                     measure.temp_beats = measure.beats.slice(0);
                     return;
                 }
             } else {
-                if (crowding.end[1] - SNAP_THRESHOLD < 0) {
+                if (crowding.end[1] - c.SNAP_THRESHOLD < 0) {
                     measure.temp_offset = crowding.end[0] - measure.ms;
                     measure.temp_ticks = measure.ticks.slice(0);
                     measure.temp_beats = measure.beats.slice(0);
@@ -753,8 +716,8 @@ export default function measure(p) {
         var slope = measure.end - measure.start;
         var temp_start = measure.temp_start || measure.start;
 
-        let perc = Math.abs(slope) < FLAT_THRESHOLD ?
-            ((dir === 1) ? -FLAT_THRESHOLD : FLAT_THRESHOLD) :
+        let perc = Math.abs(slope) < c.FLAT_THRESHOLD ?
+            ((dir === 1) ? -c.FLAT_THRESHOLD : c.FLAT_THRESHOLD) :
             grabbed/Math.abs(slope);
 
         // divide this by scale? depending on zoom?
@@ -800,7 +763,7 @@ export default function measure(p) {
                 lock = sum*C1;
             return sum + sigma(temp_start, C1)(i);
         }, 0);
-        if (Math.abs(ms - measure.ms) < DRAG_THRESHOLD_X) {
+        if (Math.abs(ms - measure.ms) < c.DRAG_THRESHOLD_X) {
             measure.temp_offset = measure.offset;
             measure.temp_start = measure.start;
             slope = measure.end - measure.start;
@@ -835,17 +798,17 @@ export default function measure(p) {
         let diff_null = !!(locks & (1 << 2));
 
         var nudge = (gap, alpha, depth) => {
-            if (depth > 99 || Math.abs(gap) < NUDGE_THRESHOLD)
+            if (depth > 99 || Math.abs(gap) < c.NUDGETHRESHOLD)
                 return diff;
 
             // if END is locked
             if (diff_null) {
-                measure.temp_start *= (gap > NUDGE_THRESHOLD) ?
+                measure.temp_start *= (gap > c.NUDGETHRESHOLD) ?
                     (1 + alpha) : (1 - alpha);
                 diff = measure.end - measure.temp_start;
             // else change alpha multiplier based on start or slope lock
             } else
-                diff *= (gap > NUDGE_THRESHOLD) ?
+                diff *= (gap > c.NUDGETHRESHOLD) ?
                     (1 + alpha*delta) : (1 - alpha*delta);
             
             let new_C = C(diff);
@@ -864,7 +827,7 @@ export default function measure(p) {
         };
 
 
-        if (Math.abs(gap) < SNAP_THRESHOLD) {
+        if (Math.abs(gap) < c.SNAP_THRESHOLD) {
             // if initial snap, update measure.temp_start 
             // for the last time and nudge.
             if (!snapped) {
@@ -927,7 +890,7 @@ export default function measure(p) {
         if (p.mouseY < 0 || p.mouseY > p.height)
             return;
         // handle threshold
-        if (Math.abs(dragged) < DRAG_THRESHOLD_X) {
+        if (Math.abs(dragged) < c.DRAG_THRESHOLD_X) {
             if (checkSelect(selected)) {
                 instruments[selected.inst].measures[selected.meas].temp_ticks = [];
             };
