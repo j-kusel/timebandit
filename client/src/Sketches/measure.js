@@ -11,7 +11,7 @@ const WINDOW_PERCENTAGE = 0.80;
 
 const DRAG_THRESHOLD_X = 10;
 const FLAT_THRESHOLD = 10;
-const NUDGE_THRESHOLD = 1;
+const NUDGE_THRESHOLD = 0.5;
 const SNAP_THRESHOLD = 50;
 const INST_HEIGHT = 100;
 const SCROLL_SENSITIVITY = 100.0;
@@ -693,7 +693,6 @@ export default function measure(p) {
         if (!('gaps' in measure))
             measure.gaps = calcGaps(instruments[selected.inst].ordered, selected.meas);
 
-        console.log(measure.gaps);
         if (drag_mode === 'measure') {
             let position = measure.offset + dragged/scale;
             let close = snap_eval(position, measure.beats);
@@ -824,6 +823,7 @@ export default function measure(p) {
             return;
 
         let snap_to = closest(loc, selected.inst, snap_div).target;
+        debug_message = snap_to;
         let gap = loc - snap_to;
         let diff = slope;
 
@@ -835,7 +835,15 @@ export default function measure(p) {
             diff *= (gap > NUDGE_THRESHOLD) ?
                 (1 + alpha) : (1 - alpha);
             let new_C = C(diff);
-            let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
+            let locked = 0;
+            let lock_target = beat_lock[0] * CONSTANTS.PPQ_tempo;
+            let ms = new_C * tick_array.reduce((sum, _, i) => {
+                if (i === lock_target)
+                    locked = sum*new_C;
+                return sum + sigma(measure.temp_start, new_C)(i);
+            }, 0);
+            if (locked)
+                measure.temp_offset = measure.offset + measure.beats[beat_lock[0]] - locked;
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
             alpha = monitor(gap, new_gap, alpha);
             return nudgeS(new_gap, alpha, depth + 1);
@@ -848,7 +856,15 @@ export default function measure(p) {
                 (1 + alpha) : (1 - alpha);
             diff = measure.end - measure.temp_start;
             let new_C = C(diff);
-            let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
+            let locked = 0;
+            let lock_target = beat_lock[0] * CONSTANTS.PPQ_tempo;
+            let ms = new_C * tick_array.reduce((sum, _, i) => {
+                if (i === lock_target)
+                    locked = sum*new_C;
+                return sum + sigma(measure.temp_start, new_C)(i);
+            }, 0);
+            if (locked)
+                measure.temp_offset = measure.offset + measure.beats[beat_lock[0]] - locked;
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
             alpha = monitor(gap, new_gap, alpha);
             return nudgeE(new_gap, alpha, depth + 1);
@@ -861,17 +877,27 @@ export default function measure(p) {
                 (1 + alpha*0.5) : (1 - alpha*0.5);
             // slope (diff) doesn't change.
             let new_C = C(diff);
-            let ms = new_C * tick_array.reduce((sum, _, i) => sum + sigma(measure.temp_start, new_C)(i), 0);
+            let locked = 0;
+            let lock_target = beat_lock[0] * CONSTANTS.PPQ_tempo;
+            let ms = new_C * tick_array.reduce((sum, _, i) => {
+                if (i === lock_target)
+                    locked = sum*new_C;
+                return sum + sigma(measure.temp_start, new_C)(i);
+            }, 0);
+            if (locked)
+                measure.temp_offset = measure.offset + measure.beats[beat_lock[0]] - locked;
             let new_gap = ms + (measure.temp_offset || measure.offset) - snap_to;
             alpha = monitor(gap, new_gap, alpha);
             return nudgeSE(new_gap, alpha, depth + 1);
         };
+
 
         if (Math.abs(gap) < SNAP_THRESHOLD) {
             // if initial snap, update measure.temp_start 
             // for the last time and nudge.
             if (!snapped) {
                 measure.temp_start = temp_start;
+
                 // check what's locked to determine nudge algo
                 let nudge = (locks & (1 << 1)) ?
                     nudgeS :
