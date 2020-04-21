@@ -31,4 +31,15 @@ var InstName = styled.h3`
     color: ${primary};
 `;
 
-export { Playback, Panel, Pane, AudioButton, InstName };
+var Upload = styled.button`
+    background-color: ${secondary};
+    color: ${primary};
+    text-align: center;    
+    width: 100%;
+    padding: 0px;
+`;
+
+
+    
+
+export { Upload, Playback, Panel, Pane, AudioButton, InstName };

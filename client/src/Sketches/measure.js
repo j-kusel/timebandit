@@ -542,7 +542,7 @@ export default function measure(p) {
     };
 
     p.mouseWheel = function(event) {
-        let change = 1.0-event.delta/c.SCc.ROLL_SENSITIVITY;
+        let change = 1.0-event.delta/c.SCROLL_SENSITIVITY;
         scale = scale*change;
         start = p.mouseX - change*(p.mouseX - start);
         API.newScaling(scale);

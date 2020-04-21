@@ -10,7 +10,8 @@ import audio from './Audio/index';
 
 import { MeasureCalc, order_by_key } from './Util/index';
 import UI from './Components/Canvas';
-import { Playback, Panel, Pane, AudioButton, InstName } from './Components/Styled';
+import { Upload, Playback, Panel, Pane, AudioButton, InstName } from './Components/Styled';
+import { WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
 
@@ -19,10 +20,11 @@ const DEBUG = true;
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 
-
+var RawCol = styled(Col)`
+    padding: 0px;
+`;
 
 // later do custom PPQs
-
 var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>);
 
 
@@ -128,6 +130,10 @@ class App extends Component {
       this.kill = this.kill.bind(this);
       this.save = this.save.bind(this);
       this.load = this.load.bind(this);
+      this.upload = this.upload.bind(this);
+      this.reset = this.reset.bind(this);
+      this.handleNew = this.handleNew.bind(this);
+      this.handleOpen = this.handleOpen.bind(this);
       this.inputs = {};
 
 
@@ -231,8 +237,6 @@ class App extends Component {
   };
 
   handleLock(val, e) {
-
-      console.log(val);
       this.setState(oldState => ({ locks: val }));
   };
 
@@ -394,6 +398,33 @@ class App extends Component {
       document.body.removeChild(downloadLink);
   };
 
+  upload(e) {
+      if (this.state.instruments.length > 1
+          || Object.keys(this.state.instruments[0].measures).length)
+          this.setState({ warningOpen: true })
+      else
+          document.getElementById('dummyLoad').click();
+  }
+
+  handleNew(e) {
+      this.setState({ instruments:
+          [{
+              name: 'default',
+              measures: {}
+          }],
+          warningNew: false,
+      });
+  }
+
+  handleOpen(e) {
+      document.getElementById('dummyLoad').click();
+      this.setState({ warningOpen: false });
+  }
+
+  reset(e) {
+      this.setState({ warningNew: true });
+  }
+
   load(e) {
       var reader = new FileReader();
       reader.onload = (e) =>
@@ -465,18 +496,16 @@ class App extends Component {
     //tempo_ppqs.forEach((p) => console.log(p));
       //
 
+    let modalButtons = ['Close', 'Save changes'].map((name, ind) => (<Button key={ind}>{name}</Button>));
+
 
 
     return (
       <div className="App">
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
-        <button onClick={this.save}>save</button>
-        <button onClick={() => this.play(true, 0)}>play</button>
-        <button onClick={() => this.play(false, 0)}>kill</button>
         <button onClick={this.midi}>midi</button>
-        <button onClick={audio.init}>unmute</button>
         <form>
-            <input type="file" name="file" onChange={this.load}/>
+            <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
         </form>
         <form onSubmit={this.handleInst} className="inst-form">
             <label>new instrument</label>
@@ -492,33 +521,51 @@ class App extends Component {
             {measure_inputs}
             <button type="submit" disabled={this.state.selected.inst === -1}>create</button>
         </form>
-        <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
-            { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
-                <ToggleButton key={button} value={index + 1}>{button}</ToggleButton>) }
-        </ToggleButtonGroup>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <p id="location">Cursor location: {cursor}</p>
-        <Dropdown onSelect={this.handlePPQ}>
-          <Dropdown.Toggle>
-            PPQ: {this.state.PPQ}
-          </Dropdown.Toggle>
-          <Dropdown.Menu>
-            <Dropdown.Item eventKey={256}>256</Dropdown.Item>
-            <Dropdown.Item eventKey={96}>96</Dropdown.Item>
-            <Dropdown.Item eventKey={24}>24</Dropdown.Item>
-          </Dropdown.Menu>
-        </Dropdown>
-        <Dropdown onSelect={this.handleTempoPPQ}>
-          <Dropdown.Toggle>
-            Tempo PPQ: {this.state.PPQ_tempo} ({this.state.PPQ_desc})
-          </Dropdown.Toggle>
-          <Dropdown.Menu>
-            {tempo_ppqs}
-          </Dropdown.Menu>
-        </Dropdown>
         <Playback status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
         <p id="tracking">{timeToChrono(this.state.tracking*1000)}</p>
         <Container>
+          <Row>
+            <RawCol xs={1}>
+                <Upload onClick={this.reset}>new</Upload>
+            </RawCol>
+            <RawCol xs={1}>
+                <Upload onClick={this.upload}>open</Upload>
+            </RawCol>
+            <RawCol xs={1}>
+                <Upload onClick={this.save}>save</Upload>
+            </RawCol>
+            <RawCol xs={3}>
+                <Dropdown onSelect={this.handleTempoPPQ}>
+                  <Dropdown.Toggle>
+                    Tempo PPQ: {this.state.PPQ_tempo} ({this.state.PPQ_desc})
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    {tempo_ppqs}
+                  </Dropdown.Menu>
+                </Dropdown>
+            </RawCol>
+
+            <RawCol xs={2}>
+                <Dropdown onSelect={this.handlePPQ}>
+                  <Dropdown.Toggle>
+                    PPQ: {this.state.PPQ}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    <Dropdown.Item eventKey={256}>256</Dropdown.Item>
+                    <Dropdown.Item eventKey={96}>96</Dropdown.Item>
+                    <Dropdown.Item eventKey={24}>24</Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+            </RawCol>
+            <RawCol xs={2}>
+                <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
+                    { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
+                        <ToggleButton key={button} value={index + 1}>{button}</ToggleButton>) }
+                </ToggleButtonGroup>
+            </RawCol>
+          </Row>
           <Row>
             <Panel>{panes}</Panel>
             <Col xs={10}>
@@ -526,6 +573,25 @@ class App extends Component {
             </Col>
           </Row>
         </Container>
+        <WarningModal
+          show={this.state.warningNew}
+          onHide={() => this.setState({ warningNew: false })}
+          body={<p>Close without saving?</p>}
+          footer={<div>
+            <Button onClick={this.save}>save</Button>
+            <Button onClick={this.handleNew}>new file</Button>
+          </div>}
+        />        
+        <WarningModal
+          show={this.state.warningOpen}
+          onHide={() => this.setState({ warningOpen: false })}
+          body={<p>Close without saving?</p>}
+          footer={<div>
+            <Button onClick={this.open}>save</Button>
+            <Button onClick={this.handleOpen}>open file...</Button>
+          </div>}
+        />        
+
       </div>
     );
   }
