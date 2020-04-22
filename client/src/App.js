@@ -10,7 +10,7 @@ import audio from './Audio/index';
 
 import { MeasureCalc, order_by_key } from './Util/index';
 import UI from './Components/Canvas';
-import { Upload, Playback, Panel, Pane, AudioButton, InstName } from './Components/Styled';
+import { Upload, Playback, Panel, Pane, AudioButton, InstName, TBToggle, TBDropdown } from './Components/Styled';
 import { WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -26,6 +26,12 @@ var RawCol = styled(Col)`
 
 // later do custom PPQs
 var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>);
+
+var TestP = styled.div`
+    .testp {
+        color: red;
+    }
+`;
 
 
 var timeToChrono = (time) => {
@@ -502,6 +508,7 @@ class App extends Component {
 
     return (
       <div className="App">
+        <TestP><p className="testp">should be red </p> </TestP>
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
         <button onClick={this.midi}>midi</button>
         <form>
@@ -548,21 +555,21 @@ class App extends Component {
             </RawCol>
 
             <RawCol xs={2}>
-                <Dropdown onSelect={this.handlePPQ}>
-                  <Dropdown.Toggle>
-                    PPQ: {this.state.PPQ}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Item eventKey={256}>256</Dropdown.Item>
-                    <Dropdown.Item eventKey={96}>96</Dropdown.Item>
-                    <Dropdown.Item eventKey={24}>24</Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
+                <TBDropdown
+                    style={{ 'background-color': 'red' }}
+                    onSelect={this.handlePPQ}
+                    toggle={'PPQ: ' + this.state.PPQ}
+                    menuItems={[
+                        { eventKey: 256, text: 256 },
+                        { eventKey: 96, text: 96 },
+                        { eventKey: 24, text: 24 },
+                    ]}
+                />
             </RawCol>
             <RawCol xs={2}>
                 <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
                     { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
-                        <ToggleButton key={button} value={index + 1}>{button}</ToggleButton>) }
+                        <TBToggle key={button} value={index + 1}>{button}</TBToggle>) }
                 </ToggleButtonGroup>
             </RawCol>
           </Row>
@@ -577,19 +584,20 @@ class App extends Component {
           show={this.state.warningNew}
           onHide={() => this.setState({ warningNew: false })}
           body={<p>Close without saving?</p>}
-          footer={<div>
-            <Button onClick={this.save}>save</Button>
-            <Button onClick={this.handleNew}>new file</Button>
-          </div>}
+          buttons={[
+              { onClick: this.save, text: 'save' },
+              { onClick: this.handleNew, text: 'new file' }
+          ]}
         />        
         <WarningModal
           show={this.state.warningOpen}
           onHide={() => this.setState({ warningOpen: false })}
           body={<p>Close without saving?</p>}
-          footer={<div>
-            <Button onClick={this.open}>save</Button>
-            <Button onClick={this.handleOpen}>open file...</Button>
-          </div>}
+          buttons={[
+              { onClick: this.open, text: 'save' },
+              { onClick: this.handleOpen, text: 'open file...' }
+          ]}
+
         />        
 
       </div>

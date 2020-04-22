@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Col, ToggleButton } from 'react-bootstrap';
+import { Col, ToggleButton, Dropdown } from 'react-bootstrap';
 
 import { TRACK_HEIGHT, primary, secondary } from '../config/CONFIG.json';
 
@@ -31,7 +31,7 @@ var InstName = styled.h3`
     color: ${primary};
 `;
 
-var Upload = styled.button`
+var TBButton = styled.button`
     background-color: ${secondary};
     color: ${primary};
     text-align: center;    
@@ -39,7 +39,61 @@ var Upload = styled.button`
     padding: 0px;
 `;
 
+var Upload = styled(TBButton)``;
 
-    
+var TBToggle = styled(ToggleButton)`
+    padding: 5px 6px;
+    border: none;
+    border-radius: 0px;
+    background-color: ${secondary};
+    text-align: center;    
+    width: 100%;
+`;
 
-export { Upload, Playback, Panel, Pane, AudioButton, InstName };
+var TBddtoggle = styled(Dropdown.Toggle)`
+    &.btn-primary {
+        background-color: red;
+        transition-property: none;
+    };
+    &.btn-primary:focus {
+        background-color: red;
+        transition-property: none;
+    };
+    &.btn-primary:hover {
+        background-color: red;
+        transition-property: none;
+    };
+    &.btn-primary:active {
+        background-color: red;
+        transition-property: none;
+    };
+`;
+
+var TBDropdown = styled(props => (
+    <Dropdown 
+ onSelect={props.onSelect}>
+      <TBddtoggle>
+        {props.toggle}  
+      </TBddtoggle>
+      <Dropdown.Menu>
+        { props.menuItems.map(drop => (<Dropdown.Item eventKey={drop.eventKey}>{drop.text}</Dropdown.Item>)) }
+      </Dropdown.Menu>
+    </Dropdown>
+))`
+    &.toggle-dropdown {
+        background-color: red;
+    }
+    color: red;
+    padding: 5px 6px;
+    border: none;
+    border-radius: 0px;
+    background-color: ${secondary};
+    text-align: center;    
+    width: 100%;
+`;
+
+
+
+
+
+export { Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, TBToggle, TBDropdown };
