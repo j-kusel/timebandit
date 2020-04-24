@@ -11,7 +11,7 @@ import audio from './Audio/index';
 import { MeasureCalc, order_by_key } from './Util/index';
 import UI from './Components/Canvas';
 import { Upload, Playback, Panel, Pane, AudioButton, InstName, TBToggle, TBDropdown } from './Components/Styled';
-import { WarningModal } from './Components/Modals';
+import { SettingsModal, WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
 
@@ -21,17 +21,10 @@ const DEBUG = true;
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 
 var RawCol = styled(Col)`
-    padding: 0px;
+    padding: 2px;
 `;
 
 // later do custom PPQs
-var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>);
-
-var TestP = styled.div`
-    .testp {
-        color: red;
-    }
-`;
 
 
 var timeToChrono = (time) => {
@@ -138,6 +131,7 @@ class App extends Component {
       this.load = this.load.bind(this);
       this.upload = this.upload.bind(this);
       this.reset = this.reset.bind(this);
+      this.settings = this.settings.bind(this);
       this.handleNew = this.handleNew.bind(this);
       this.handleOpen = this.handleOpen.bind(this);
       this.inputs = {};
@@ -259,17 +253,21 @@ class App extends Component {
   };
 
   handleTempoPPQ(eventKey) {
+      document.activeElement.blur();
       let new_PPQ = PPQ_OPTIONS[eventKey];
       this.setState(oldState => new_PPQ);
   };
 
-  handlePPQ(eventKey) {
-    tempo_ppqs = PPQ_OPTIONS.reduce((acc, ppq, ind) => {
+  handlePPQ(eventKey, e) {
+    document.activeElement.blur();
+
+    // DEPRECATED, GET THIS WORKING AGAIN
+    let tempo_ppqs = PPQ_OPTIONS.reduce((acc, ppq, ind) => {
         console.log(ppq.PPQ_tempo);
         console.log(eventKey % ppq.PPQ_tempo);
         return (eventKey % ppq.PPQ_tempo) ?
             acc :
-            [...acc, <Dropdown.Item key={ind} eventKey={ind}>{ppq.PPQ_tempo} ({ppq.PPQ_desc})</Dropdown.Item>]},
+            [...acc, { eventKey: ind, text: `${ppq.PPQ_tempo} (${ppq.PPQ_desc})`} ]},
         []);
     this.setState(oldState => ({ PPQ: eventKey }));
   };
@@ -376,6 +374,7 @@ class App extends Component {
               , [])])
           , cursor);
       };
+      document.activeElement.blur();
       this.setState(oldState => ({ isPlaying }));
   }
 
@@ -429,6 +428,10 @@ class App extends Component {
 
   reset(e) {
       this.setState({ warningNew: true });
+  }
+
+  settings(e) {
+      this.setState(oldState => ({ settingsOpen: !oldState.settingsOpen }));
   }
 
   load(e) {
@@ -497,20 +500,18 @@ class App extends Component {
                 <AudioButton value="solo">solo</AudioButton>
             </ToggleButtonGroup>
         </Pane>
-    ));
+    )).concat(<Pane className="pane align-middle" key={this.state.instruments.length}><span>&#x2795;</span></Pane>);
 
     //tempo_ppqs.forEach((p) => console.log(p));
       //
 
-    let modalButtons = ['Close', 'Save changes'].map((name, ind) => (<Button key={ind}>{name}</Button>));
+    let modalButtons = ['Close', 'Save changes'].map((name, ind) => (<Upload key={ind}>{name}</Upload>));
 
 
 
     return (
-      <div className="App">
-        <TestP><p className="testp">should be red </p> </TestP>
+      <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
         { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
-        <button onClick={this.midi}>midi</button>
         <form>
             <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
         </form>
@@ -530,10 +531,12 @@ class App extends Component {
         </form>
         <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
         <p id="location">Cursor location: {cursor}</p>
-        <Playback status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
         <p id="tracking">{timeToChrono(this.state.tracking*1000)}</p>
-        <Container>
+        <Container style={{ margin: '0px' }}>
           <Row>
+            <RawCol xs={1}>
+                <Upload onClick={this.settings}>settings</Upload>
+            </RawCol>
             <RawCol xs={1}>
                 <Upload onClick={this.reset}>new</Upload>
             </RawCol>
@@ -543,39 +546,30 @@ class App extends Component {
             <RawCol xs={1}>
                 <Upload onClick={this.save}>save</Upload>
             </RawCol>
+            <RawCol xs={1}>
+                <Upload onClick={this.midi}>export</Upload>
+            </RawCol>
             <RawCol xs={3}>
-                <Dropdown onSelect={this.handleTempoPPQ}>
-                  <Dropdown.Toggle>
-                    Tempo PPQ: {this.state.PPQ_tempo} ({this.state.PPQ_desc})
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {tempo_ppqs}
-                  </Dropdown.Menu>
-                </Dropdown>
             </RawCol>
 
             <RawCol xs={2}>
-                <TBDropdown
-                    style={{ 'background-color': 'red' }}
-                    onSelect={this.handlePPQ}
-                    toggle={'PPQ: ' + this.state.PPQ}
-                    menuItems={[
-                        { eventKey: 256, text: 256 },
-                        { eventKey: 96, text: 96 },
-                        { eventKey: 24, text: 24 },
-                    ]}
-                />
             </RawCol>
-            <RawCol xs={2}>
+            <RawCol className="justify-content-end" xs={4}>
                 <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
                     { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
-                        <TBToggle key={button} value={index + 1}>{button}</TBToggle>) }
+                        <TBToggle className="shadow-none" key={button} value={index + 1}>{button}</TBToggle>) }
                 </ToggleButtonGroup>
             </RawCol>
+
           </Row>
           <Row>
-            <Panel>{panes}</Panel>
-            <Col xs={10}>
+            <Panel>
+                <div className="buffer" style={{ height: CONFIG.PLAYBACK_HEIGHT + 'px' }}>
+                    <Playback status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
+                </div>
+                {panes}
+            </Panel>
+            <Col style={{ padding: '0px' }} xs={10}>
               <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={CONSTANTS}/>
             </Col>
           </Row>
@@ -599,6 +593,17 @@ class App extends Component {
           ]}
 
         />        
+        <SettingsModal
+            show={this.state.settingsOpen}
+            onHideCallback={this.settings}
+            onTempoSelect={this.handleTempoPPQ}
+            onPPQSelect={this.handlePPQ}
+            settings={({
+                PPQ_tempo: this.state.PPQ_tempo,
+                PPQ_desc: this.state.PPQ_desc,
+                PPQ: this.state.PPQ,
+            })}
+        />
 
       </div>
     );

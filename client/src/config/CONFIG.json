@@ -1,6 +1,9 @@
 {
-    "primary": "#FAE4E8",
-    "secondary": "#301C0F",
+    "aux_primary": "#FAE4E8",
+    "aux_secondary": "#301C0F",
+    "secondary": "#F2EED8",
+    "primary": "#0D0D0D",
+    "primary_shadow": "#9D8D8D",
 
 
     "DEBUG_HEIGHT": 200,
@@ -26,6 +29,7 @@
         [1024, "finale"]
     ],
     "TRACK_HEIGHT": 100, 
+    "PLAYBACK_HEIGHT": 25,
     "DELTA_THRESHOLD": 5, 
     "PPQ_default": 48
 }

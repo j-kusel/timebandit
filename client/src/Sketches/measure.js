@@ -161,7 +161,7 @@ export default function measure(p) {
                 [...acc, ind] : acc, []);
 
     p.setup = function () {
-        p.createCanvas(scope, c.INST_HEIGHT + c.DEBUG_HEIGHT);
+        p.createCanvas(scope, c.PLAYBACK_HEIGHT + c.INST_HEIGHT + c.DEBUG_HEIGHT);
         p.background(0);
     };
 
@@ -218,13 +218,12 @@ export default function measure(p) {
                 }) , {});
             snaps.push(add_snaps);
         });
-        console.log(snaps);
 
         // add downbeat snaps
         let all_meas = instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {});
         range = calcRange(all_meas);
         
-        p.resizeCanvas(p.width, c.INST_HEIGHT*instruments.length + c.DEBUG_HEIGHT);
+        p.resizeCanvas(p.width, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length + c.DEBUG_HEIGHT);
 
     }
 
@@ -241,8 +240,8 @@ export default function measure(p) {
             let position = (tick) => ((measure.offset + tick)*scale + start);
             return (p.mouseX > position(0) 
                 && p.mouseX < position(measure.ms)
-                && p.mouseY >= inst*c.INST_HEIGHT
-                && p.mouseY < (inst + 1)*c.INST_HEIGHT 
+                && p.mouseY >= inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
+                && p.mouseY < (inst + 1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
                 && true);
         };
 
@@ -252,6 +251,10 @@ export default function measure(p) {
             nums[0] - 1 : 0;
 
         
+        p.stroke(secondary);
+        p.fill(secondary);
+        p.rect(0, 0, p.width, c.PLAYBACK_HEIGHT);
+
         // check and draw selection
         if (checkSelect(selected)) {
             let select = instruments[selected.inst].measures[selected.meas];
@@ -263,12 +266,12 @@ export default function measure(p) {
             p.fill(240, 255, 240); 
 
             // check this later?
-            p.rect(select.offset * scale + start, selected.inst*c.INST_HEIGHT, select.ms * scale, c.INST_HEIGHT);
+            p.rect(select.offset * scale + start, selected.inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT, select.ms * scale, c.INST_HEIGHT + c.PLAYBACK_HEIGHT);
         };
 
 
         instruments.forEach((inst, i_ind) => {
-            let yloc = i_ind*c.INST_HEIGHT;
+            let yloc = i_ind*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
             p.stroke(255, 0, 0);
             p.fill(255, 255, 255);
 
@@ -402,8 +405,8 @@ export default function measure(p) {
             if (snapped_inst) {
                 p.stroke(200, 240, 200);
                 let x = snapped_inst.target * scale + start;
-                p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*c.INST_HEIGHT,
-                    x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*c.INST_HEIGHT);
+                p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT,
+                    x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT);
             };
 
         });
@@ -412,13 +415,13 @@ export default function measure(p) {
         p.stroke(100, 255, 100);
         Object.keys(snaps[snap_div]).forEach(key => {
             let inst = snaps[snap_div][key][0].inst;
-            p.line(key*scale + start, inst * c.INST_HEIGHT, key*scale + start, (inst+1) * c.INST_HEIGHT);
+            p.line(key*scale + start, inst * c.INST_HEIGHT + c.PLAYBACK_HEIGHT, key*scale + start, (inst+1) * c.INST_HEIGHT + c.PLAYBACK_HEIGHT);
         });
 
         // draw debug
 
         if (DEBUG) {
-            let DEBUG_START = c.INST_HEIGHT*instruments.length;
+            let DEBUG_START = c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT;
             let lineY = (line) => c.DEBUG_TEXT*line + DEBUG_START + c.DEBUG_TEXT;
 
             p.stroke(primary); //200, 240, 200);
@@ -474,7 +477,7 @@ export default function measure(p) {
 
         // draw cursor
         p.stroke(240);
-        p.line(p.mouseX, 0, p.mouseX, c.INST_HEIGHT*instruments.length);
+        p.line(p.mouseX, c.PLAYBACK_HEIGHT, p.mouseX, c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT);
 
 
 
@@ -498,7 +501,7 @@ export default function measure(p) {
                 API.play(isPlaying, null);
             };
             let tracking_vis = tracking*scale+start;
-            p.line(tracking_vis, 0, tracking_vis, c.INST_HEIGHT*2);
+            p.line(tracking_vis, c.PLAYBACK_HEIGHT, tracking_vis, c.INST_HEIGHT*2 + c.PLAYBACK_HEIGHT);
         };
         document.body.style.cursor = cursor;
                 
