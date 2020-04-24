@@ -555,6 +555,7 @@ export default function measure(p) {
 
         // return if outside canvas
         if (p.mouseX === Infinity 
+            || p.mouseX < 0
             || p.mouseY === Infinity 
             || p.mouseY < 0
             || p.mouseY > p.height) {

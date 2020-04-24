@@ -210,6 +210,7 @@ class App extends Component {
               oldState.instruments.length :
               selected;
           oldState.instruments.splice(loc + 1, 0, newInst);
+          oldState.newInst = false;
           return oldState;
       });
   }
@@ -500,8 +501,21 @@ class App extends Component {
                 <AudioButton value="solo">solo</AudioButton>
             </ToggleButtonGroup>
         </Pane>
-    )).concat(<Pane className="pane align-middle" key={this.state.instruments.length}><span>&#x2795;</span></Pane>);
-
+    )).concat(this.state.newInst ? 
+        (<form onSubmit={this.handleInst} className="inst-form">
+            <label>new instrument</label>
+            <input
+                type="text"
+                name="instName"
+                onChange={this.handleInput}
+            ></input>
+            <Button type="submit">new inst</Button>
+        </form>) :
+        (<Pane className="pane align-middle" key={this.state.instruments.length}>
+            <Button onClick={() => this.setState({ newInst: true })}>&#x2795;</Button>
+        </Pane>)
+    );
+        
     //tempo_ppqs.forEach((p) => console.log(p));
       //
 
@@ -511,27 +525,19 @@ class App extends Component {
 
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
-        { this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> }
+        {/*{ this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> } */}
         <form>
             <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
-        </form>
-        <form onSubmit={this.handleInst} className="inst-form">
-            <label>new instrument</label>
-            <input
-                type="text"
-                name="instName"
-                onChange={this.handleInput}
-            ></input>
-            <Button type="submit">new inst</Button>
         </form>
         <form onSubmit={this.handleMeasure} className="measure-form">
             <label>start tempo</label>
             {measure_inputs}
             <button type="submit" disabled={this.state.selected.inst === -1}>create</button>
         </form>
-        <p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>
-        <p id="location">Cursor location: {cursor}</p>
-        <p id="tracking">{timeToChrono(this.state.tracking*1000)}</p>
+        {/* MOVE THESE INTO CANVAS APP OR PLAYBACK BAR */}
+        {/*<p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>*/}
+        {/*<p id="location">Cursor location: {cursor}</p>*/}
+        {/*<p id="tracking">{timeToChrono(this.state.tracking*1000)}</p>*/}
         <Container style={{ margin: '0px' }}>
           <Row>
             <RawCol xs={1}>
