@@ -161,7 +161,8 @@ export default function measure(p) {
                 [...acc, ind] : acc, []);
 
     p.setup = function () {
-        p.createCanvas(scope, c.PLAYBACK_HEIGHT + c.INST_HEIGHT + c.DEBUG_HEIGHT);
+        //p.createCanvas(scope, c.PLAYBACK_HEIGHT + c.INST_HEIGHT + c.DEBUG_HEIGHT);
+        p.createCanvas(c.WIDTH, c.HEIGHT);
         p.background(0);
     };
 

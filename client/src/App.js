@@ -489,19 +489,21 @@ class App extends Component {
             name={name}
             onChange={this.handleInput}
         ></input>
-    );
+   );
 
 
-    let panes = this.state.instruments.map((inst, ind) => (
-        <Pane className="pane" key={ind}>
-            <ToggleButtonGroup name={"playback"+ind} onChange={(val, e) => this.handleMuting(val, e, ind)} type="checkbox">
-                <InstName>{inst.name}</InstName>
+    let panes = this.state.instruments.map((inst, ind) => {
+        let top = ind*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT;
+        return (<Pane className="pane" key={ind} x={CONFIG.PANES_WIDTH} y={top}>
+            <ToggleButtonGroup name={"playback"+ind} style={{ position: 'fixed', left: '0px', right: '0px' }} onChange={(val, e) => this.handleMuting(val, e, ind)} type="checkbox">
+        {/*<InstName>{inst.name}</InstName>
                 <hr></hr>
-                <AudioButton value="mute">mute</AudioButton>
-                <AudioButton value="solo">solo</AudioButton>
+                */}
+                <AudioButton x={0} y={0} value="mute">mute</AudioButton>
+                <AudioButton x={-CONFIG.PANES_WIDTH + 1} y={CONFIG.INST_HEIGHT/3} value="solo">solo</AudioButton>
             </ToggleButtonGroup>
         </Pane>
-    )).concat(this.state.newInst ? 
+    )}).concat(this.state.newInst ? 
         (<form onSubmit={this.handleInst} className="inst-form">
             <label>new instrument</label>
             <input
@@ -526,19 +528,19 @@ class App extends Component {
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
         {/*{ this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> } */}
-        <form>
-            <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
-        </form>
-        <form onSubmit={this.handleMeasure} className="measure-form">
-            <label>start tempo</label>
-            {measure_inputs}
-            <button type="submit" disabled={this.state.selected.inst === -1}>create</button>
-        </form>
         {/* MOVE THESE INTO CANVAS APP OR PLAYBACK BAR */}
         {/*<p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>*/}
         {/*<p id="location">Cursor location: {cursor}</p>*/}
         {/*<p id="tracking">{timeToChrono(this.state.tracking*1000)}</p>*/}
-        <Container style={{ margin: '0px' }}>
+
+        <Playback X={600} Y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
+        <Container style={{ margin: '0px', 'paddingLeft': CONFIG.PANES_WIDTH + 'px' }}>
+
+          <Panel>
+              {panes}
+          </Panel>
+
+          <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={CONSTANTS}/>
           <Row>
             <RawCol xs={1}>
                 <Upload onClick={this.settings}>settings</Upload>
@@ -568,18 +570,17 @@ class App extends Component {
             </RawCol>
 
           </Row>
-          <Row>
-            <Panel>
-                <div className="buffer" style={{ height: CONFIG.PLAYBACK_HEIGHT + 'px' }}>
-                    <Playback status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
-                </div>
-                {panes}
-            </Panel>
-            <Col style={{ padding: '0px' }} xs={10}>
-              <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={CONSTANTS}/>
-            </Col>
-          </Row>
         </Container>
+
+        <form>
+            <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
+        </form>
+        <form onSubmit={this.handleMeasure} className="measure-form">
+            <label>start tempo</label>
+            {measure_inputs}
+            <button type="submit" disabled={this.state.selected.inst === -1}>create</button>
+        </form>
+
         <WarningModal
           show={this.state.warningNew}
           onHide={() => this.setState({ warningNew: false })}

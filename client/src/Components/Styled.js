@@ -2,7 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { Col, ToggleButton, Dropdown } from 'react-bootstrap';
 
-import { PLAYBACK_HEIGHT, TRACK_HEIGHT, primary, primary_shadow, secondary } from '../config/CONFIG.json';
+import { PANES_WIDTH, PLAYBACK_HEIGHT, TRACK_HEIGHT, primary, primary_shadow, secondary } from '../config/CONFIG.json';
 
 var button_mixin = `
     @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@500&display=swap');
@@ -22,8 +22,12 @@ var transition_mixin = ['transition', '-webkit-transition', '-moz-transition', '
     .reduce((acc, t) => `${acc}${t}: ${timing};\n`, '');
 
 var Playback = styled.button`
-    width: 100%;
-    height: ${PLAYBACK_HEIGHT};
+    width: 50px;
+    z-index: 50;
+    height: ${PLAYBACK_HEIGHT + 'px'};
+    position: absolute;
+    left: ${props => props.X + 'px'}
+    top: ${props => props.Y + 'px'}
     padding-top: 0px;
     padding-bottom: 0px;
 `;
@@ -36,14 +40,32 @@ var Panel = styled(({ className, children }) => (<Col className={className} xs={
 `;
 
 var Pane = styled.div`
+    position: fixed;
+    width: ${PANES_WIDTH}px;
+    
+    left: ${props => props.x}px;
+    top: ${props => props.y}px;
     height: ${TRACK_HEIGHT}px;
     border: none;
+    z-index: 50;
 `;
 
 var AudioButton = styled(ToggleButton)`
-    display: inline;
-    border: 1px solid black;
-    border-radius: 2px;
+    position: fixed;
+    &.btn-group.btn {
+        position: fixed;
+    }
+    margin: 0px;
+    left: ${props => props.x}px;
+    top: ${props => props.y}px;
+    width: ${PANES_WIDTH}px;
+    &:hover {
+        width: ${PANES_WIDTH + 20}px;
+    }
+    padding: 0px;
+    height: ${TRACK_HEIGHT/3}px;
+    border: none;
+    border-radius: 0px;
     background-color: #FFFFCC;
 `;
 

@@ -37,6 +37,7 @@ class UI extends Component {
         var P5Container = styled.div`
             div {
                 padding-left: ${paddingLeft}px;
+                z-index: -100;
             }
         `;
 

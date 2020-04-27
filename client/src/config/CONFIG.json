@@ -5,9 +5,12 @@
     "primary": "#0D0D0D",
     "primary_shadow": "#9D8D8D",
 
+    "WIDTH": "1200",
+    "HEIGHT": "800",
 
     "DEBUG_HEIGHT": 200,
     "DEBUG_TEXT": 12,
+    "PANES_WIDTH": 10,
     "WINDOW_PERCENTAGE": 0.80,
     "DRAG_THRESHOLD_X": 10,
     "FLAT_THRESHOLD": 10,
