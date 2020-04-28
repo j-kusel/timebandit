@@ -2,7 +2,8 @@ import React from 'react';
 import styled from 'styled-components';
 import { Dropdown } from 'react-bootstrap';
 
-import { CANVAS_PADDING, LOG_HEIGHT, REHEARSAL_HEIGHT, META_HEIGHT, TOOLBAR_WIDTH, PANES_WIDTH, PLAYBACK_HEIGHT, TRACK_HEIGHT, primary, primary_shadow, secondary } from '../config/CONFIG.json';
+import { primary, primary_shadow, secondary } from '../config/CONFIG.json';
+import c from '../config/CONFIG.json';
 
 var font_mixin = `
     @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@500&display=swap');
@@ -28,7 +29,7 @@ var transition_mixin = ['transition', '-webkit-transition', '-moz-transition', '
 var Playback = styled.button`
     width: 50px;
     z-index: 50;
-    height: ${PLAYBACK_HEIGHT + 'px'};
+    height: ${c.PLAYBACK_HEIGHT + 'px'};
     position: absolute;
     left: ${props => props.x + 'px'}
     top: ${props => props.y + 'px'}
@@ -47,7 +48,7 @@ var Panel = styled.div`
 
 var Pane = styled.div`
     position: absolute;
-    width: ${PANES_WIDTH}px;
+    width: ${c.PANES_WIDTH}px;
     left: ${props => props.x}px;
     top: ${props => props.y}px;
     height: ${props => props.height}px;
@@ -58,21 +59,21 @@ var Pane = styled.div`
 var toolbar = styled(Pane)`
     padding: 10px;
     background-color: ${secondary};
-    width: ${TOOLBAR_WIDTH}px;
+    width: ${c.TOOLBAR_WIDTH}px;
     border: black solid 1px;
     color: red;
 `;
 
 var Metadata = styled(toolbar)`
-    height: ${META_HEIGHT}px;
+    height: ${c.META_HEIGHT}px;
 `;
 
 var Rehearsal = styled(toolbar)`
-    height: ${REHEARSAL_HEIGHT}px;
+    height: ${c.REHEARSAL_HEIGHT}px;
 `;
 
 var Log = styled(toolbar)`
-    height: ${LOG_HEIGHT}px;
+    height: ${c.LOG_HEIGHT}px;
 `;
 
 var Footer = styled.div`
@@ -80,7 +81,7 @@ var Footer = styled.div`
     .flavor {
         font-size: 48pt;
     }
-    padding-left: ${CANVAS_PADDING}px;
+    padding-left: ${c.CANVAS_PADDING}px;
 `;
 
 var AudioButton = styled.button`
@@ -91,12 +92,12 @@ var AudioButton = styled.button`
     margin: 0px;
     left: ${props => props.x}px;
     top: ${props => props.y}px;
-    width: ${PANES_WIDTH}px;
+    width: ${c.PANES_WIDTH}px;
     &:hover {
-        width: ${PANES_WIDTH + 20}px;
+        width: ${c.PANES_WIDTH + 20}px;
     }
     padding: 0px;
-    height: ${TRACK_HEIGHT/3}px;
+    height: ${c.TRACK_HEIGHT/3}px;
     border: none;
     border-radius: 0px;
     background-color: #FFFFCC;
@@ -105,11 +106,55 @@ var AudioButton = styled.button`
 var Ext = styled.a`
     text-decoration: none;
     margin: 5px;
-    img {
-        width: 16px;
-    }
     color: red;
     display: inline-block;
+`;
+
+let form_mixin = [
+    font_mixin,
+    `border: none;
+    border-bottom: solid 1px ${secondary};
+    width: 48px;
+    padding: 0px;
+    margin: 4px;
+    font-size: 8pt;
+
+    &:focus {
+        shadow-box: none;
+        border: none;
+        border-bottom: solid 1px ${secondary};
+    }
+
+`].join('\n');
+
+var Insert = styled.div`
+    position: absolute;
+    bottom: ${c.FOOTER_HEIGHT + c.TRACKING_HEIGHT}px;
+    left: ${props => props.left}px;
+    z-index: 50;
+
+    button {
+        ${button_mixin}
+        ${form_mixin}
+        width: 18px;
+    }
+`;
+
+const Link = ({ className, children }) => (
+      <a className={className}>
+        {children}
+      </a>
+);
+
+const StyledLink = styled(Link)`
+  color: red;
+    font-weight: bold;
+    `;
+
+const FormInput = styled.input`
+    ${form_mixin}
+    color: ${secondary};
+    background-color: ${primary};
 `;
 
 var InstName = styled.h3`
@@ -241,4 +286,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, TBToggle, TBDropdown };
+export { Link, StyledLink, FormInput, Insert, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, TBToggle, TBDropdown };

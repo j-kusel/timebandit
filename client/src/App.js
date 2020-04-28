@@ -11,7 +11,7 @@ import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
 
 import { MeasureCalc, order_by_key } from './Util/index';
 import UI from './Components/Canvas';
-import { Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, AudioButton, InstName, TBToggle, TBDropdown } from './Components/Styled';
+import { FormInput, Insert, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, AudioButton, InstName, TBToggle, TBDropdown } from './Components/Styled';
 import { SettingsModal, WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -67,10 +67,12 @@ class App extends Component {
           isPlaying: false,
           tracking: 0,
           locks: [],
+          mode: 0,
           PPQ: CONFIG.PPQ_default
       }
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
+      ['start', 'end', 'beats', 'offset'].forEach(n => this.state[n] = '');
 
       // subscribe to audio updates
       audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
@@ -193,7 +195,6 @@ class App extends Component {
       };
 
       var play = (cursor) => {
-
           this.play(!this.state.isPlaying, cursor ? cursor : 0);
       };
 
@@ -202,7 +203,9 @@ class App extends Component {
           locator: audio.locator
       });
 
-      return { get, select, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking };
+      var updateMode = (mode) => this.setState({ mode });
+
+      return { get, select, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking, updateMode };
   }
 
   handleInst(e) {
@@ -259,8 +262,10 @@ class App extends Component {
               audio.mute(i, (i === ind) ? false : true));
   };
 
+  // filter all non-numbers
   handleInput(e) {
-      this.setState({ [e.target.name]: e.target.value });
+      if (e.target.value === '' || /^[0-9\b]+$/.test(e.target.value))
+          this.setState({ [e.target.name]: e.target.value });
   };
 
   handleTempoPPQ(eventKey) {
@@ -495,13 +500,15 @@ class App extends Component {
     var cursor = timeToChrono(this.state.cursor);
     
     let measure_inputs = ['start', 'end', 'beats', 'offset'].map((name) => 
-        <input
+        <FormInput
             type="text"
             key={name}
+            value={this.state[name]}
             placeholder={name}
             name={name}
             onChange={this.handleInput}
-        ></input>
+        />
+            
    );
 
 
@@ -552,6 +559,7 @@ class App extends Component {
         { data }
         <p id="sizing">View: {(this.state.sizing/1000).toFixed(2)}"</p>
       </Metadata>);
+
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
         <Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
@@ -572,6 +580,16 @@ class App extends Component {
           <Log x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.LOG_HEIGHT - CONFIG.TRACKING_HEIGHT}>
             log
           </Log>
+
+          {/* modes */}
+            { this.state.mode === 1 ? 
+                <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
+                    <form onSubmit={this.handleMeasure} className="measure-form">
+                        {measure_inputs}
+                        <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                    </form>
+                </Insert>
+            : null }
 
 
           {/* footer */}
@@ -596,11 +614,6 @@ class App extends Component {
 
         <form>
             <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
-        </form>
-        <form onSubmit={this.handleMeasure} className="measure-form">
-            <label>start tempo</label>
-            {measure_inputs}
-            <button type="submit" disabled={this.state.selected.inst === -1}>create</button>
         </form>
 
         <WarningModal

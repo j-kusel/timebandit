@@ -7,15 +7,16 @@ var start = 0;
 var range = [0, 100];
 var span = [Infinity, -Infinity];
 
-const DEBUG = false;
+const DEBUG = true;
 
-const [MOD, SHIFT, CTRL, ALT, SPACE, DEL] = [17, 16, 91, 18, 32, 46];
-const [KeyC, KeyV, KeyZ] = [67, 86, 90];
+const [MOD, SHIFT, CTRL, ALT, SPACE, DEL, ESC] = [17, 16, 91, 18, 32, 46, 27];
+const [KeyC, KeyI, KeyV, KeyZ] = [67, 73, 86, 90];
 const NUM = []
 for (let i=48; i < 58; i++)
     NUM.push(i);
 
-
+// modes: ESC, INS, EDIT
+var mode = 0;
 
 // CAN THIS BE CACHED?
 var calcGaps = (measures, id) => {
@@ -254,6 +255,7 @@ export default function measure(p) {
         p.fill(255);
         p.rect(0, 0, p.width, p.height);
        
+        /*
         // DRAW TOP BAR
         p.stroke(secondary);
         p.fill(secondary);
@@ -532,9 +534,40 @@ export default function measure(p) {
         p.textAlign(p.RIGHT, p.BOTTOM);
         let _span = span.map(s => s.toFixed(2)); // format decimal places
         p.text(`${_span[0]} - ${_span[1]}, ${_span[1]-_span[0]}ms`, p.width - c.TRACKING_PADDING.X - c.TOOLBAR_WIDTH, p.height - c.TRACKING_PADDING.Y);
+        */
+        
+        if (mode === 1) {
+            let frac = (p.width - c.TOOLBAR_WIDTH) / 3.0;
+            let xloc = frac;
+            p.stroke(primary);
+            p.fill(primary);
+            p.rect(frac, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT, c.INSERT_WIDTH, c.INSERT_HEIGHT);
+        };
+
+        if (DEBUG) {
+            p.textAlign(p.RIGHT, p.TOP);
+            p.textSize(18);
+            p.stroke(secondary);
+            p.fill(secondary);
+
+            p.text(Math.round(p.frameRate()), p.width - 10, 5);
+        }
     }
 
     p.keyPressed = function(e) {
+        
+        if (p.keyCode === ESC) {
+            mode = 0;
+            API.updateMode(mode);
+            return;
+        };
+        if (p.keyCode === KeyI) {
+            mode = 1;
+            API.updateMode(mode);
+            return;
+        };
+
+
         if (p.keyCode === DEL
             && checkSelect(selected)
         ) {

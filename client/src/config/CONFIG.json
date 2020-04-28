@@ -37,6 +37,8 @@
     },
     "CANVAS_PADDING": 20,
 
+    "INSERT_HEIGHT": 100,
+    "INSERT_WIDTH": 250,
     "FOOTER_HEIGHT": 100,
 
     "PPQ_OPTIONS": [
