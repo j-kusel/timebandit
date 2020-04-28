@@ -1,16 +1,20 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Col, ToggleButton, Dropdown } from 'react-bootstrap';
+import { Dropdown } from 'react-bootstrap';
 
-import { PANES_WIDTH, PLAYBACK_HEIGHT, TRACK_HEIGHT, primary, primary_shadow, secondary } from '../config/CONFIG.json';
+import { CANVAS_PADDING, LOG_HEIGHT, REHEARSAL_HEIGHT, META_HEIGHT, TOOLBAR_WIDTH, PANES_WIDTH, PLAYBACK_HEIGHT, TRACK_HEIGHT, primary, primary_shadow, secondary } from '../config/CONFIG.json';
+
+var font_mixin = `
+    @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@500&display=swap');
+    font-family: 'Work Sans', sans-serif;
+`;
 
 var button_mixin = `
-    @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@500&display=swap');
+    ${font_mixin}
     background-color: ${secondary};
     border: none;
     box-shadow: none;
     color: ${primary};
-    font-family: 'Work Sans', sans-serif;
     text-align: center;    
     &:hover {
         text-shadow: 1px 1px 5px ${primary_shadow};
@@ -26,13 +30,15 @@ var Playback = styled.button`
     z-index: 50;
     height: ${PLAYBACK_HEIGHT + 'px'};
     position: absolute;
-    left: ${props => props.X + 'px'}
-    top: ${props => props.Y + 'px'}
+    left: ${props => props.x + 'px'}
+    top: ${props => props.y + 'px'}
     padding-top: 0px;
     padding-bottom: 0px;
 `;
 
-var Panel = styled(({ className, children }) => (<Col className={className} xs={2}>{children}</Col>))`
+
+var Panel = styled.div`
+    position: absolute;
     background-color: ${secondary};
     text-align: center;    
     width: 100%;
@@ -40,18 +46,45 @@ var Panel = styled(({ className, children }) => (<Col className={className} xs={
 `;
 
 var Pane = styled.div`
-    position: fixed;
+    position: absolute;
     width: ${PANES_WIDTH}px;
-    
     left: ${props => props.x}px;
     top: ${props => props.y}px;
-    height: ${TRACK_HEIGHT}px;
+    height: ${props => props.height}px;
     border: none;
     z-index: 50;
 `;
 
-var AudioButton = styled(ToggleButton)`
-    position: fixed;
+var toolbar = styled(Pane)`
+    padding: 10px;
+    background-color: ${secondary};
+    width: ${TOOLBAR_WIDTH}px;
+    border: black solid 1px;
+    color: red;
+`;
+
+var Metadata = styled(toolbar)`
+    height: ${META_HEIGHT}px;
+`;
+
+var Rehearsal = styled(toolbar)`
+    height: ${REHEARSAL_HEIGHT}px;
+`;
+
+var Log = styled(toolbar)`
+    height: ${LOG_HEIGHT}px;
+`;
+
+var Footer = styled.div`
+    ${font_mixin}
+    .flavor {
+        font-size: 48pt;
+    }
+    padding-left: ${CANVAS_PADDING}px;
+`;
+
+var AudioButton = styled.button`
+    position: absolute;
     &.btn-group.btn {
         position: fixed;
     }
@@ -67,6 +100,16 @@ var AudioButton = styled(ToggleButton)`
     border: none;
     border-radius: 0px;
     background-color: #FFFFCC;
+`;
+
+var Ext = styled.a`
+    text-decoration: none;
+    margin: 5px;
+    img {
+        width: 16px;
+    }
+    color: red;
+    display: inline-block;
 `;
 
 var InstName = styled.h3`
@@ -93,7 +136,7 @@ var Upload = styled(TBButton)`
 let transitions = (apply) => ['-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
     .reduce((acc, t) => `${acc}${t}-property: ${apply};\n`, '');
 
-var TBToggle = styled(ToggleButton)`
+var TBToggle = styled.button`
     ${transitions('none')}
     &.btn {
         padding-top: 0.5rem;
@@ -139,7 +182,7 @@ var TBToggle = styled(ToggleButton)`
 `;
 
 
-var TBddtoggle = styled(Dropdown.Toggle)`
+var TBddtoggle = styled.div`
     height: 40px;
     &.dropdown-toggle {
         ${button_mixin}
@@ -198,4 +241,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, TBToggle, TBDropdown };
+export { Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, TBToggle, TBDropdown };

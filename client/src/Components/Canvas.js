@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import styled from 'styled-components';
 import P5Wrapper from 'react-p5-wrapper';
 import measure from '../Sketches/measure';
+import c from '../config/CONFIG.json';
 
 class UI extends Component {
 
@@ -36,7 +37,7 @@ class UI extends Component {
 
         var P5Container = styled.div`
             div {
-                padding-left: ${paddingLeft}px;
+                padding-left: ${c.CANVAS_PADDING}px;
                 z-index: -100;
             }
         `;

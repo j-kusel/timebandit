@@ -5,8 +5,9 @@ import { primary, secondary } from '../config/CONFIG.json';
 var scale = 1.0;
 var start = 0;
 var range = [0, 100];
+var span = [Infinity, -Infinity];
 
-const DEBUG = true;
+const DEBUG = false;
 
 const [MOD, SHIFT, CTRL, ALT, SPACE, DEL] = [17, 16, 91, 18, 32, 46];
 const [KeyC, KeyV, KeyZ] = [67, 86, 90];
@@ -14,20 +15,6 @@ const NUM = []
 for (let i=48; i < 58; i++)
     NUM.push(i);
 
-var calcRange = (measures) => {
-    let tempo = [];
-    let span = [];
-    Object.keys(measures).forEach((key) => {
-        tempo.push(measures[key].start);
-        tempo.push(measures[key].end);
-        span.push(measures[key].offset);
-        span.push(measures[key].offset + measures[key].ms);
-    });
-    return {
-        tempo: [Math.min(...tempo), Math.max(...tempo)],
-        span: [Math.min(...span), Math.max(...span)],
-    };
-};
 
 
 // CAN THIS BE CACHED?
@@ -162,14 +149,21 @@ export default function measure(p) {
 
     p.setup = function () {
         //p.createCanvas(scope, c.PLAYBACK_HEIGHT + c.INST_HEIGHT + c.DEBUG_HEIGHT);
-        p.createCanvas(c.WIDTH, c.HEIGHT);
+        console.log(p.windowHeight);
+        p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
         p.background(0);
     };
 
+    p.windowResized = function () {
+        p.resizeCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
+    }
+
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
+
         instruments = props.instruments;
         ({ API, CONSTANTS } = props);
-        
+
+
 
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
@@ -197,7 +191,14 @@ export default function measure(p) {
         */
         
         // REFACTOR ORDERING INTO NUM ITERATIONS LATER
-        instruments.forEach((inst) => inst.ordered = order_by_key(inst.measures, 'offset'));
+        instruments.forEach((inst) => {
+            inst.ordered = order_by_key(inst.measures, 'offset');
+            let last = inst.ordered[inst.ordered.length - 1];
+            span = [
+                Math.min(span[0], inst.ordered[0].offset),
+                Math.max(span[1], last.offset + last.ms)
+            ];
+        });
 
         NUM.slice(1).forEach((num, n_ind) => {
             add_snaps = {};
@@ -221,10 +222,8 @@ export default function measure(p) {
         });
 
         // add downbeat snaps
-        let all_meas = instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {});
-        range = calcRange(all_meas);
+        range = CONSTANTS.range;
         
-        p.resizeCanvas(p.width, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length + c.DEBUG_HEIGHT);
 
     }
 
@@ -251,10 +250,20 @@ export default function measure(p) {
         snap_div = (nums.length) ?
             nums[0] - 1 : 0;
 
-        
+        p.stroke(255);
+        p.fill(255);
+        p.rect(0, 0, p.width, p.height);
+       
+        // DRAW TOP BAR
         p.stroke(secondary);
         p.fill(secondary);
         p.rect(0, 0, p.width, c.PLAYBACK_HEIGHT);
+
+        // DRAW BOTTOM BAR
+        p.stroke(secondary);
+        p.fill(secondary);
+        p.rect(0, p.height - c.TRACKING_HEIGHT, p.width, c.TRACKING_HEIGHT);
+
 
         // check and draw selection
         if (checkSelect(selected)) {
@@ -421,6 +430,16 @@ export default function measure(p) {
 
         // draw debug
 
+        let mouse = (p.mouseX - start)/scale;
+        let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
+        cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
+            parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
+            .join(':');
+        cursor_loc += '.' + parseInt(Math.abs(mouse % 1000), 10).toString().padStart(3, "0");
+        if (mouse < 0.0)
+           cursor_loc = '-' + cursor_loc;
+
+        let TRACKING = { x: c.TRACKING_PADDING.X, y: p.height - c.TRACKING_HEIGHT + c.TRACKING_PADDING.Y };
         if (DEBUG) {
             let DEBUG_START = c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT;
             let lineY = (line) => c.DEBUG_TEXT*line + DEBUG_START + c.DEBUG_TEXT;
@@ -432,16 +451,9 @@ export default function measure(p) {
                 [`selected: ${instruments[selected.inst].measures[selected.meas].timesig} beats - ${instruments[selected.inst].measures[selected.meas].ms.toFixed(1)} ms`] :
                 [''];
 
-            let mouse = (p.mouseX - start)/scale;
-            let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
-            cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
-                parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
-                .join(':');
-            cursor_loc += '.' + parseInt(Math.abs(mouse % 1000), 10).toString().padStart(3, "0");
-            if (mouse < 0.0)
-               cursor_loc = '-' + cursor_loc;
 
             lines.push(`location: ${cursor_loc}`);
+            lines.push(`${TRACKING.x} ${TRACKING.y}`);
             lines.push(debug_message || '');
             lines.forEach((line, i) => p.text(line, c.DEBUG_TEXT, lineY(i)));
 
@@ -476,6 +488,8 @@ export default function measure(p) {
 
         };
 
+
+
         // draw cursor
         p.stroke(240);
         p.line(p.mouseX, c.PLAYBACK_HEIGHT, p.mouseX, c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT);
@@ -488,7 +502,6 @@ export default function measure(p) {
         p.fill(0);
         p.textAlign(p.LEFT, p.TOP);
         p.textSize(12);
-        p.text(`${isPlaying}, ${Math.round(start)}`, 0, 0);
 
         
         if (isPlaying) {
@@ -506,6 +519,19 @@ export default function measure(p) {
         };
         document.body.style.cursor = cursor;
                 
+        p.fill(primary);
+        p.stroke(primary);
+
+        // LOCATION
+        // left    
+        p.text(`location: ${
+            isPlaying ?
+            API.exposeTracking().locator() : cursor_loc
+        }`, TRACKING.x, TRACKING.y);
+        // right
+        p.textAlign(p.RIGHT, p.BOTTOM);
+        let _span = span.map(s => s.toFixed(2)); // format decimal places
+        p.text(`${_span[0]} - ${_span[1]}, ${_span[1]-_span[0]}ms`, p.width - c.TRACKING_PADDING.X - c.TOOLBAR_WIDTH, p.height - c.TRACKING_PADDING.Y);
     }
 
     p.keyPressed = function(e) {
@@ -517,15 +543,8 @@ export default function measure(p) {
         };
 
         if (p.keyCode === SPACE) {
-            let location = (p.mouseX-start)/scale;
-            /*tracking_start = {
-                time: API.exposeTracking().currentTime*1000.0,
-                location
-            };
-            API.play(!isPlaying, location);
-            return true;
-            */
-            API.play(location);
+            API.play((p.mouseX-start)/scale);
+            return;
         }
 
         // CTRL/MOD functions
@@ -546,10 +565,12 @@ export default function measure(p) {
     };
 
     p.mouseWheel = function(event) {
-        let change = 1.0-event.delta/c.SCROLL_SENSITIVITY;
-        scale = scale*change;
-        start = p.mouseX - change*(p.mouseX - start);
-        API.newScaling(scale);
+        if (p.keyIsDown(CTRL)) {
+            let change = 1.0-event.delta/c.SCROLL_SENSITIVITY;
+            scale = scale*change;
+            start = p.mouseX - change*(p.mouseX - start);
+            API.newScaling(scale);
+        };
     };
 
     p.mousePressed = function(e) {
@@ -569,6 +590,8 @@ export default function measure(p) {
         dragged = 0;
         var change = -1;
         let inst = Math.floor(p.mouseY*0.01);
+        if (inst >= instruments.length)
+            return;
         let meas = instruments[inst].measures;
 
         Object.keys(meas).forEach((key) => {
@@ -618,6 +641,13 @@ export default function measure(p) {
     }
 
     p.mouseDragged = function(event) {
+
+        if (selected.inst === -1
+            || selected.inst >= instruments.length
+            || selected.meas === -1
+            || !(selected.meas in instruments[selected.inst].measures)
+        )
+            return;
 
         var closest = (position, inst, div) =>
             Object.keys(snaps[div]).reduce((acc, key, ind, keys) => {

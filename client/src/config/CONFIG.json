@@ -23,6 +23,22 @@
     "TEMPO_PADDING": 5,
     "TEMPO_PT": 8,
 
+    "TOOLBAR_WIDTH": 200,
+    "META_HEIGHT": 200,
+    "REHEARSAL_HEIGHT": 150,
+
+    "LOG_HEIGHT": 300,
+    "LOG_WIDTH": 200,
+
+    "TRACKING_HEIGHT": 20,
+    "TRACKING_PADDING": {
+        "X": 20,
+        "Y": 5
+    },
+    "CANVAS_PADDING": 20,
+
+    "FOOTER_HEIGHT": 100,
+
     "PPQ_OPTIONS": [
         [24, "default"],
         [4, "ableton live"],

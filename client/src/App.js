@@ -1,16 +1,17 @@
 import React, { Component } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Button, Dropdown } from 'react-bootstrap';
-import { Container, Row, Col } from 'react-bootstrap';
-import { ToggleButtonGroup, ToggleButton } from 'react-bootstrap';
 import styled from 'styled-components';
 import uuidv4 from 'uuid/v4';
 import midi from './Audio/midi';
 import audio from './Audio/index';
 
+// logos
+import github from './static/GitHub-Mark-32px.png';
+import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
+
 import { MeasureCalc, order_by_key } from './Util/index';
 import UI from './Components/Canvas';
-import { Upload, Playback, Panel, Pane, AudioButton, InstName, TBToggle, TBDropdown } from './Components/Styled';
+import { Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, AudioButton, InstName, TBToggle, TBDropdown } from './Components/Styled';
 import { SettingsModal, WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -19,13 +20,22 @@ const DEBUG = true;
 
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
-
-var RawCol = styled(Col)`
-    padding: 2px;
-`;
-
 // later do custom PPQs
 
+var calcRange = (measures) => {
+    let tempo = [];
+    let span = [];
+    Object.keys(measures).forEach((key) => {
+        tempo.push(measures[key].start);
+        tempo.push(measures[key].end);
+        span.push(measures[key].offset);
+        span.push(measures[key].offset + measures[key].ms);
+    });
+    return {
+        tempo: [Math.min(...tempo), Math.max(...tempo)],
+        span: [Math.min(...span), Math.max(...span)],
+    };
+};
 
 var timeToChrono = (time) => {
     let chrono = [parseInt(Math.abs(time / 3600000), 10)];
@@ -471,7 +481,10 @@ class App extends Component {
   render() {
     let CONSTANTS = {
       PPQ: this.state.PPQ,
-      PPQ_tempo: this.state.PPQ_tempo
+      PPQ_tempo: this.state.PPQ_tempo,
+      range: calcRange(
+          this.state.instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {})
+      )
     };
 
     var newInstruments = this.state.instruments.map((inst) => ({ 
@@ -492,16 +505,12 @@ class App extends Component {
    );
 
 
+    let pad = CONFIG.CANVAS_PADDING;
     let panes = this.state.instruments.map((inst, ind) => {
         let top = ind*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT;
-        return (<Pane className="pane" key={ind} x={CONFIG.PANES_WIDTH} y={top}>
-            <ToggleButtonGroup name={"playback"+ind} style={{ position: 'fixed', left: '0px', right: '0px' }} onChange={(val, e) => this.handleMuting(val, e, ind)} type="checkbox">
-        {/*<InstName>{inst.name}</InstName>
-                <hr></hr>
-                */}
-                <AudioButton x={0} y={0} value="mute">mute</AudioButton>
-                <AudioButton x={-CONFIG.PANES_WIDTH + 1} y={CONFIG.INST_HEIGHT/3} value="solo">solo</AudioButton>
-            </ToggleButtonGroup>
+        return (<Pane className="pane" key={ind} x={pad} y={top} height={CONFIG.TRACK_HEIGHT}>
+            <AudioButton x={0} y={0} onClick={(val, e) => this.handleMuting(val, e, ind)} value="true">mute</AudioButton>
+            <AudioButton x={0} y={CONFIG.INST_HEIGHT/3} onChange={(val, e) => this.handleMuting(val, e, ind)} value="false">solo</AudioButton>
         </Pane>
     )}).concat(this.state.newInst ? 
         (<form onSubmit={this.handleInst} className="inst-form">
@@ -511,10 +520,10 @@ class App extends Component {
                 name="instName"
                 onChange={this.handleInput}
             ></input>
-            <Button type="submit">new inst</Button>
+            <button type="submit">new inst</button>
         </form>) :
-        (<Pane className="pane align-middle" key={this.state.instruments.length}>
-            <Button onClick={() => this.setState({ newInst: true })}>&#x2795;</Button>
+        (<Pane className="pane align-middle" x={pad} y={this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT} key={this.state.instruments.length}>
+            <button onClick={() => this.setState({ newInst: true })}>&#x2795;</button>
         </Pane>)
     );
         
@@ -523,54 +532,67 @@ class App extends Component {
 
     let modalButtons = ['Close', 'Save changes'].map((name, ind) => (<Upload key={ind}>{name}</Upload>));
 
+    let selected = this.state.selected;
 
+    let inst = selected.inst > -1 ?
+        this.state.instruments[selected.inst] :
+        {};
 
+    let meas = selected.meas !== -1 ?
+        inst.measures[selected.meas] :
+        {};
+
+    let data = [];
+    if (selected.inst > -1)
+        data.push(<span>{ inst.name }</span>);
+    if (selected.meas !== -1)
+        data.push(<span> : {meas.start} - {meas.end} / {meas.timesig}</span>);
+      
+    let metadata = (<Metadata x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.META_HEIGHT - CONFIG.LOG_HEIGHT}>
+        { data }
+        <p id="sizing">View: {(this.state.sizing/1000).toFixed(2)}"</p>
+      </Metadata>);
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
-        {/*{ this.state.selected && <p>inst: { this.state.selected.inst } measure: {this.state.selected.meas} </p> } */}
-        {/* MOVE THESE INTO CANVAS APP OR PLAYBACK BAR */}
-        {/*<p id="sizing">Viewport time: {(this.state.sizing/1000).toFixed(2)} seconds</p>*/}
-        {/*<p id="location">Cursor location: {cursor}</p>*/}
-        {/*<p id="tracking">{timeToChrono(this.state.tracking*1000)}</p>*/}
+        <Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
+        <div style={{ margin: '0px'}}>
 
-        <Playback X={600} Y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
-        <Container style={{ margin: '0px', 'paddingLeft': CONFIG.PANES_WIDTH + 'px' }}>
-
+          {/* left midi controls */}
           <Panel>
               {panes}
           </Panel>
-
+          
           <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={CONSTANTS}/>
-          <Row>
-            <RawCol xs={1}>
-                <Upload onClick={this.settings}>settings</Upload>
-            </RawCol>
-            <RawCol xs={1}>
-                <Upload onClick={this.reset}>new</Upload>
-            </RawCol>
-            <RawCol xs={1}>
-                <Upload onClick={this.upload}>open</Upload>
-            </RawCol>
-            <RawCol xs={1}>
-                <Upload onClick={this.save}>save</Upload>
-            </RawCol>
-            <RawCol xs={1}>
-                <Upload onClick={this.midi}>export</Upload>
-            </RawCol>
-            <RawCol xs={3}>
-            </RawCol>
 
-            <RawCol xs={2}>
-            </RawCol>
-            <RawCol className="justify-content-end" xs={4}>
-                <ToggleButtonGroup type="checkbox" onChange={this.handleLock} className="mb-2">
-                    { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
-                        <TBToggle className="shadow-none" key={button} value={index + 1}>{button}</TBToggle>) }
-                </ToggleButtonGroup>
-            </RawCol>
+          {/* right toolbar controls */}
+          <Rehearsal x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={CONFIG.PLAYBACK_HEIGHT}>
+            rehearsal
+          </Rehearsal>
+          { metadata }
+          <Log x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.LOG_HEIGHT - CONFIG.TRACKING_HEIGHT}>
+            log
+          </Log>
 
-          </Row>
-        </Container>
+
+          {/* footer */}
+          <Footer>
+            <h1 className="flavor" style={{ display: 'inline-block' }}>BANDIT</h1>
+            <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
+        
+            <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
+          </Footer>
+          <div>
+            <Upload onClick={this.settings}>settings</Upload>
+            <Upload onClick={this.reset}>new</Upload>
+            <Upload onClick={this.upload}>open</Upload>
+            <Upload onClick={this.save}>save</Upload>
+            <Upload onClick={this.midi}>export</Upload>
+            <div type="checkbox" onChange={this.handleLock} className="mb-2">
+                { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
+                    <TBToggle className="shadow-none" key={button} value={index + 1}>{button}</TBToggle>) }
+            </div>
+          </div>
+        </div>
 
         <form>
             <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
