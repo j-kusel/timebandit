@@ -81,7 +81,7 @@ var Footer = styled.div`
     .flavor {
         font-size: 48pt;
     }
-    padding-left: ${c.CANVAS_PADDING}px;
+    padding-left: ${c.FOOTER_PADDING}px;
 `;
 
 var AudioButton = styled.button`
@@ -167,12 +167,12 @@ var TBButton = styled.button`
     &:hover {
         ${transition_mixin}
     }
-    width: 100%;
     padding: 0px;
 `;
 
 var Upload = styled(TBButton)`
     height: 40px;
+    padding-left: 10px;
     &:focus {
         outline: none;
     }

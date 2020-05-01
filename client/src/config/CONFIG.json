@@ -45,6 +45,7 @@
     "PREVIEW_HEIGHT": 20,
 
     "FOOTER_HEIGHT": 100,
+    "FOOTER_PADDING": 20,
 
     "PPQ_OPTIONS": [
         [24, "default"],

@@ -675,24 +675,25 @@ class App extends Component {
 
 
           {/* footer */}
-          <Footer>
+          <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px` }}>
             <h1 className="flavor" style={{ display: 'inline-block' }}>BANDIT</h1>
             <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
         
             <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
+            <div style={{ position: 'relative', float: 'right', top: '32px' }}>
+                <Upload onClick={this.settings}>settings</Upload>
+                <Upload onClick={this.reset}>new</Upload>
+                <Upload onClick={this.upload}>open</Upload>
+                <Upload onClick={this.save}>save</Upload>
+                <Upload onClick={this.midi}>export</Upload>
+            </div>
+
           </Footer>
-          <div>
-            <Upload onClick={this.settings}>settings</Upload>
-            <Upload onClick={this.reset}>new</Upload>
-            <Upload onClick={this.upload}>open</Upload>
-            <Upload onClick={this.save}>save</Upload>
-            <Upload onClick={this.midi}>export</Upload>
+        </div>
             <div type="checkbox" onChange={this.handleLock} className="mb-2">
                 { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
                     <TBToggle className="shadow-none" key={button} value={index + 1}>{button}</TBToggle>) }
             </div>
-          </div>
-        </div>
 
         <form autoComplete="off">
             <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />

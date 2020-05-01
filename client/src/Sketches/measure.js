@@ -296,8 +296,14 @@ export default function measure(p) {
         };
 
 
+        // push below playback bar
+        p.push();
+        p.translate(c.PANES_WIDTH, c.PLAYBACK_HEIGHT);
         instruments.forEach((inst, i_ind) => {
-            let yloc = i_ind*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
+            var yloc = i_ind*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
+            // push into instrument channel
+            p.push();
+            p.translate(0, yloc - c.PLAYBACK_HEIGHT);
             p.stroke(255, 0, 0);
             p.fill(255, 255, 255);
 
@@ -305,7 +311,7 @@ export default function measure(p) {
             if (selected.meas === -1 && selected.inst === i_ind)
                 p.fill(230);
 
-            p.rect(0, yloc, p.width-1, yloc+99);
+            p.rect(0, 0, p.width-1, 99);
 
             Object.keys(inst.measures).forEach(key => {
 
@@ -315,17 +321,21 @@ export default function measure(p) {
                 var beats = 'beats';
                 var offset = 'offset';
 
-                let position = (tick) => (((measure[offset] || measure.offset) + tick)*scale + start);
-                let origin = position(measure.beats[0]);
+                let position = (tick) => (tick*scale + start);
+                let origin = (measure[offset] || measure.offset)*scale + start;
+                
+                // push into first beat
+                p.push();
+                p.translate(origin, 0);
 
                 // draw origin
                 p.stroke(0, 255, 0);
-                p.line(origin, yloc, origin, yloc + c.INST_HEIGHT);
+                p.line(0, 0, 0, c.INST_HEIGHT);
 
                 // handle selection
                 if (key === selected.meas) {
                     p.fill(0, 255, 0, 20);
-                    p.rect(origin, yloc, measure.ms*scale, c.INST_HEIGHT);
+                    p.rect(0, 0, measure.ms*scale, c.INST_HEIGHT);
                 }
 
                 // check for temporary display
@@ -338,25 +348,28 @@ export default function measure(p) {
                 // draw ticks
                 p.stroke(240);
                 measure[ticks].forEach((tick) => {
-                    let loc = position(tick);
+                    let loc = tick*scale;
                     if (loc > p.width)
                         return
-                    p.line(loc, yloc, loc, yloc + c.INST_HEIGHT);
+                    p.line(loc, 0, loc, c.INST_HEIGHT);
                 });
 
                 // draw timesig
+                p.push();
+                p.translate(c.TIMESIG_PADDING, c.TIMESIG_PADDING);
                 p.fill(100);
                 p.textSize(c.INST_HEIGHT*0.5);
                 p.textFont('Helvetica');
                 p.textAlign(p.LEFT, p.TOP);
-                let siglocX = position(0) + c.TIMESIG_PADDING;
-                p.text(measure.timesig, siglocX, yloc + c.TIMESIG_PADDING);
+                let siglocX = position(0);
+                p.text(measure.timesig, 0, 0);
                 p.textAlign(p.LEFT, p.BOTTOM);
-                p.text('4', siglocX, yloc + c.INST_HEIGHT - c.TIMESIG_PADDING);
+                p.text('4', 0, c.INST_HEIGHT - c.TIMESIG_PADDING);
+                p.pop();
 
                 // draw beats
                 measure[beats].forEach((beat, index) => {
-                    let coord = position(beat);
+                    let coord = beat*scale;
                     let color = [255, 0, 0];
                     let alpha;
                     if (key in locked && (locked[key].beats & (1 << index)))
@@ -392,21 +405,21 @@ export default function measure(p) {
                     };
 
                     p.stroke(...color, alpha);
-                    p.line(coord, yloc, coord, yloc + c.INST_HEIGHT);
+                    p.line(coord, 0, coord, c.INST_HEIGHT);
                 });
 
                 // draw tempo graph
                 p.stroke(240, 200, 200);
                 let scaleY = (input) => c.INST_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*c.INST_HEIGHT;
-                let ystart = yloc + scaleY(measure.start);
-                let yend = yloc + scaleY(measure.end);
-                p.line(position(0), ystart, position(measure.beats.slice(-1)[0]), yend);
+                let ystart = scaleY(measure.start);
+                let yend = scaleY(measure.end);
+                p.line(0, ystart, measure.ms*scale, yend);
 
                 // draw tempo markings
                 p.fill(100);
                 p.textSize(c.TEMPO_PT);
                 let tempo_loc = { x: position(0) + c.TEMPO_PADDING };
-                if (ystart > yloc + c.TEMPO_PT + c.TEMPO_PADDING) {
+                if (ystart > c.TEMPO_PT + c.TEMPO_PADDING) {
                     p.textAlign(p.LEFT, p.BOTTOM);
                     tempo_loc.y = ystart - c.TEMPO_PADDING;
                 } else {
@@ -416,7 +429,7 @@ export default function measure(p) {
                 p.text(measure.start.toFixed(2), tempo_loc.x, tempo_loc.y);
 
                 tempo_loc = { x: position(measure.ms) - c.TEMPO_PADDING };
-                if (yend > yloc + c.TEMPO_PT + c.TEMPO_PADDING) {
+                if (yend > c.TEMPO_PT + c.TEMPO_PADDING) {
                     p.textAlign(p.RIGHT, p.BOTTOM);
                     tempo_loc.y = yend - c.TEMPO_PADDING;
                 } else {
@@ -425,23 +438,29 @@ export default function measure(p) {
                 };
                 p.text(measure.end.toFixed(2), tempo_loc.x, tempo_loc.y);
 
+                // return from measure translate
+                p.pop();
+
             });
 
             // draw snap
             if (snapped_inst) {
                 p.stroke(200, 240, 200);
                 let x = snapped_inst.target * scale + start;
-                p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT,
-                    x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT);
+                p.line(x, Math.min(snapped_inst.origin, snapped_inst.inst)*c.INST_HEIGHT,
+                    x, (Math.max(snapped_inst.origin, snapped_inst.inst) + 1)*c.INST_HEIGHT);
             };
 
+            p.pop();
         });
 
         // draw snaps
         p.stroke(100, 255, 100);
         Object.keys(snaps[snap_div]).forEach(key => {
             let inst = snaps[snap_div][key][0].inst;
-            p.line(key*scale + start, inst * c.INST_HEIGHT + c.PLAYBACK_HEIGHT, key*scale + start, (inst+1) * c.INST_HEIGHT + c.PLAYBACK_HEIGHT);
+            let xloc = key*scale + start;
+            let yloc = inst * c.INST_HEIGHT;
+            p.line(xloc, yloc, xloc, yloc + c.INST_HEIGHT);
         });
 
         // draw debug
@@ -455,10 +474,10 @@ export default function measure(p) {
         if (mouse < 0.0)
            cursor_loc = '-' + cursor_loc;
 
-        let TRACKING = { x: c.TRACKING_PADDING.X, y: p.height - c.TRACKING_HEIGHT + c.TRACKING_PADDING.Y };
         if (DEBUG) {
-            let DEBUG_START = c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT;
-            
+            p.push();
+            p.translate(0, instruments.length*c.INST_HEIGHT);
+
             p.stroke(primary); //200, 240, 200);
             p.textSize(c.DEBUG_TEXT);
             p.textAlign(p.LEFT, p.TOP);
@@ -466,9 +485,7 @@ export default function measure(p) {
                 [`selected: ${instruments[selected.inst].measures[selected.meas].timesig} beats - ${instruments[selected.inst].measures[selected.meas].ms.toFixed(1)} ms`] :
                 [''];
 
-
             lines.push(`location: ${cursor_loc}`);
-            lines.push(`${TRACKING.x} ${TRACKING.y}`);
             lines.push(debug_message || '');
             blockText(lines, { x: 0, y: c.DEBUG_TEXT }, c.DEBUG_TEXT);
 
@@ -476,6 +493,9 @@ export default function measure(p) {
 
 
             let lineY = (line) => c.DEBUG_TEXT*line + c.DEBUG_HEIGHT;
+
+            p.push();
+            p.translate(0, lineY(lines.length) + 5);
             p.fill(240);
             p.textSize(8);
             let keys = [
@@ -488,20 +508,23 @@ export default function measure(p) {
             ].forEach((key, ind) => {
                 if (p.keyIsDown(key.code))
                     p.fill(120);
-                p.rect(5 + ind*25, lineY(lines.length) + 5, 20, 15);
+                p.rect(5 + ind*25, 0, 20, 15);
                 p.fill(240);
-                p.text(key.name, 15 + ind*25, lineY(lines.length) + 12);
+                p.text(key.name, 15 + ind*25, 7);
             });
 
+            p.push();
+            p.translate(0, 20);
             let nums = NUM.map((num, ind) => {
                 if (p.keyIsDown(num))
                     p.fill(120);
-                p.rect(5 + ind*25, lineY(lines.length) + 25, 20, 15);
+                p.rect(5 + ind*25, 0, 20, 15);
                 p.fill(240);
-                p.text(ind, 15 + ind*25, lineY(lines.length) + 32);
-
+                p.text(ind, 15 + ind*25, 7);
             });
-
+            p.pop();
+            p.pop();
+            p.pop();
         };
 
 
@@ -509,31 +532,30 @@ export default function measure(p) {
         // draw cursor / insertMeas
         p.stroke(200);
         p.fill(240);
-        p.line(p.mouseX, c.PLAYBACK_HEIGHT, p.mouseX, c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT);
+        let t_mouseX = p.mouseX - c.PANES_WIDTH;
+        let t_mouseY = p.mouseY - c.PLAYBACK_HEIGHT;
+        p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
         let draw_beats = beat => {
             let x = ('inst' in insertMeas) ? 
                 (insertMeas.temp_offset + beat) * scale :
-                p.mouseX + beat*scale;
+                t_mouseX + beat*scale;
             let y = ('inst' in insertMeas) ?
-                c.PLAYBACK_HEIGHT + insertMeas.inst * c.INST_HEIGHT :
-                c.PLAYBACK_HEIGHT + Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT))*c.INST_HEIGHT;
+                insertMeas.inst * c.INST_HEIGHT :
+                Math.floor(0.01*t_mouseY)*c.INST_HEIGHT;
             p.line(x, y, x, y + c.INST_HEIGHT);
         };
 
         if (API.pollSelecting()) {
-            debug_message = 'selecting';
-            p.rect(p.mouseX, c.PLAYBACK_HEIGHT + Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT))*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+            debug_message = `${t_mouseX} ${t_mouseY}`;
+            p.rect(t_mouseX, Math.floor(0.01*t_mouseY)*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
             p.stroke(255, 0, 0);
-            if ('beats' in insertMeas) {
-                debug_message = insertMeas.beats.reduce((a, b) => `${a} ${b}`, '');
+            if ('beats' in insertMeas)
                 insertMeas.beats.forEach(draw_beats);
-            }
         } else if ('temp_offset' in insertMeas) {
-            p.rect(insertMeas.temp_offset*scale + start, c.PLAYBACK_HEIGHT + Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT))*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+            p.rect(insertMeas.temp_offset*scale + start, Math.floor(0.01*t_mouseY)*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
             p.stroke(255, 0, 0);
             insertMeas.beats.forEach(draw_beats);
         };
-
 
 
         isPlaying = API.get('isPlaying');
@@ -558,50 +580,71 @@ export default function measure(p) {
         };
         document.body.style.cursor = cursor;
                 
+
+        p.pop();
         p.fill(primary);
         p.stroke(primary);
 
+        
+
         // LOCATION
         // left    
+        p.push();
+        p.translate(0, p.height - c.TRACKING_HEIGHT);
+        p.textAlign(p.LEFT, p.TOP);
+        p.textSize(12);
         p.text(`location: ${
             isPlaying ?
             API.exposeTracking().locator() : cursor_loc
-        }`, TRACKING.x, TRACKING.y);
+        }`, c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
         // right
-        p.textAlign(p.RIGHT, p.BOTTOM);
+        p.textAlign(p.RIGHT, p.TOP);
         let _span = span.map(s => s.toFixed(2)); // format decimal places
-        p.text(`${_span[0]} - ${_span[1]}, ${_span[1]-_span[0]}ms`, p.width - c.TRACKING_PADDING.X - c.TOOLBAR_WIDTH, p.height - c.TRACKING_PADDING.Y);
+        p.text(`${_span[0]} - ${_span[1]}, ${_span[1]-_span[0]}ms`, p.width - c.TOOLBAR_WIDTH - c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
+        p.pop();
         
         if (mode === 1) {
-            let frac = (p.width - c.TOOLBAR_WIDTH) / 3.0;
-            let xloc = frac;
-            let yloc = p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT;
+            p.push();
+            p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT);
+
 
             p.stroke(primary);
             p.fill(primary);
-            p.rect(frac, yloc, c.INSERT_WIDTH, c.INSERT_HEIGHT);
+            p.rect(0, 0, c.INSERT_WIDTH, c.INSERT_HEIGHT);
             if ('beats' in insertMeas) {
                 p.stroke(secondary);
                 p.fill(secondary);
                 // draw beats
                 let x;
+                
+                // push into padding
+                p.push();
+                p.translate(c.INSERT_PADDING, c.INSERT_PADDING);
+                let last = c.INSERT_WIDTH - c.INSERT_PADDING*2;
                 insertMeas.beats.forEach((beat) => {
-                    x = xloc + c.INSERT_PADDING + (beat/insertMeas.ms)*(c.INSERT_WIDTH - c.INSERT_PADDING*2);
-                    p.line(x, yloc + c.INSERT_PADDING, x, yloc + c.INSERT_PADDING + c.PREVIEW_HEIGHT);
+                    x = (beat/insertMeas.ms)*last;
+                    p.line(x, 0, x, c.PREVIEW_HEIGHT);
                 });
                 // draw tempo
                 let scaleY = (input) => c.PREVIEW_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*c.PREVIEW_HEIGHT;
-                let ystart = yloc + scaleY(insertMeas.start);
-                let yend = yloc + scaleY(insertMeas.end);
-                p.line(xloc + c.INSERT_PADDING, ystart, xloc + c.INSERT_WIDTH - c.INSERT_PADDING, yend);
+                let ystart = scaleY(insertMeas.start);
+                let yend = scaleY(insertMeas.end);
+                p.line(0, ystart, last, yend);
 
+                // push into metadata
+                p.push();
+                p.translate(0, c.PREVIEW_HEIGHT + c.INSERT_PADDING);
                 p.textAlign(p.LEFT, p.TOP);
                 let lines = [
                     `${insertMeas.start} - ${insertMeas.end} / ${insertMeas.timesig}`,
                     `${insertMeas.ms.toFixed(2)}ms`
                 ];
-                blockText(lines, { x: xloc+c.INSERT_PADDING, y: yloc + c.INSERT_PADDING*2 + c.PREVIEW_HEIGHT }, 6); 
+                blockText(lines, { x: 0, y: 0 }, 6); 
+                p.pop();
+
+                p.pop();
             }
+            p.pop();
         };
 
         if (DEBUG) {
@@ -612,6 +655,8 @@ export default function measure(p) {
 
             p.text(Math.round(p.frameRate()), p.width - 10, 5);
         }
+
+        //p.pop();
     }
 
     p.keyPressed = function(e) {
