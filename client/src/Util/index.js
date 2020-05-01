@@ -1,8 +1,10 @@
 var MeasureCalc = (features, options) => {
+    console.log(features, options);
     let start, end, timesig;
     let PPQ, PPQ_tempo;
     ({ start, end, timesig } = features);
     ({ PPQ, PPQ_tempo } = options);
+    console.log(typeof(start));
     var ms;
     var beats = [];
     var ticks = [];

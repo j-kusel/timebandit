@@ -80,6 +80,7 @@ function scheduler(start, target, beats) {
 };
 
 var playback = (isPlaying, score, tracking) => {
+    tracking = tracking || 0;
     if (isPlaying) {
         locator = {
             origin: tracking/1000.0,

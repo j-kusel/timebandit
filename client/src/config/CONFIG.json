@@ -5,8 +5,10 @@
     "primary": "#0D0D0D",
     "primary_shadow": "#9D8D8D",
 
-    "WIDTH": "1200",
-    "HEIGHT": "800",
+    "WIDTH": 1200,
+    "HEIGHT": 800,
+
+    "FONT_DEFAULT_SIZE": 12,
 
     "DEBUG_HEIGHT": 200,
     "DEBUG_TEXT": 12,
@@ -38,7 +40,10 @@
     "CANVAS_PADDING": 20,
 
     "INSERT_HEIGHT": 100,
+    "INSERT_PADDING": 4,
     "INSERT_WIDTH": 250,
+    "PREVIEW_HEIGHT": 20,
+
     "FOOTER_HEIGHT": 100,
 
     "PPQ_OPTIONS": [

@@ -8,6 +8,7 @@ var range = [0, 100];
 var span = [Infinity, -Infinity];
 
 const DEBUG = true;
+const SLOW = true;
 
 const [MOD, SHIFT, CTRL, ALT, SPACE, DEL, ESC] = [17, 16, 91, 18, 32, 46, 27];
 const [KeyC, KeyI, KeyV, KeyZ] = [67, 73, 86, 90];
@@ -17,6 +18,7 @@ for (let i=48; i < 58; i++)
 
 // modes: ESC, INS, EDIT
 var mode = 0;
+
 
 // CAN THIS BE CACHED?
 var calcGaps = (measures, id) => {
@@ -35,6 +37,9 @@ var calcGaps = (measures, id) => {
     }, [])
         .concat([[ last.offset + last.ms, Infinity ]]);
 };
+
+
+
 
 
 var checkSelect = (selected) => selected.inst > -1 && selected.meas !== -1;
@@ -116,12 +121,14 @@ export default function measure(p) {
         location: 0
     };
     var isPlaying = false;
+    
 
     var debug_message;
 
     var copied;
 
     var instruments = [];
+    var insertMeas = {};
     var cursor = 'default';
 
     var beat_rollover = (beat, index) => {
@@ -148,9 +155,14 @@ export default function measure(p) {
             p.keyIsDown(num) ? 
                 [...acc, ind] : acc, []);
 
+    var blockText = (lines, coords, fontSize)  => {
+        let font = fontSize || c.FONT_DEFAULT_SIZE;
+        let lineY = (y) => font*y + coords.y;
+        lines.forEach((line, i) => p.text(line, coords.x, lineY(i)));
+    };
+
     p.setup = function () {
         //p.createCanvas(scope, c.PLAYBACK_HEIGHT + c.INST_HEIGHT + c.DEBUG_HEIGHT);
-        console.log(p.windowHeight);
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
         p.background(0);
     };
@@ -162,6 +174,7 @@ export default function measure(p) {
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
 
         instruments = props.instruments;
+        insertMeas = props.insertMeas;
         ({ API, CONSTANTS } = props);
 
 
@@ -229,6 +242,8 @@ export default function measure(p) {
     }
 
     p.draw = function () {
+        if (SLOW)
+            p.frameRate(2);
 
         // reset rollover cursor
         cursor = 'default';
@@ -255,7 +270,6 @@ export default function measure(p) {
         p.fill(255);
         p.rect(0, 0, p.width, p.height);
        
-        /*
         // DRAW TOP BAR
         p.stroke(secondary);
         p.fill(secondary);
@@ -444,8 +458,7 @@ export default function measure(p) {
         let TRACKING = { x: c.TRACKING_PADDING.X, y: p.height - c.TRACKING_HEIGHT + c.TRACKING_PADDING.Y };
         if (DEBUG) {
             let DEBUG_START = c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT;
-            let lineY = (line) => c.DEBUG_TEXT*line + DEBUG_START + c.DEBUG_TEXT;
-
+            
             p.stroke(primary); //200, 240, 200);
             p.textSize(c.DEBUG_TEXT);
             p.textAlign(p.LEFT, p.TOP);
@@ -457,11 +470,12 @@ export default function measure(p) {
             lines.push(`location: ${cursor_loc}`);
             lines.push(`${TRACKING.x} ${TRACKING.y}`);
             lines.push(debug_message || '');
-            lines.forEach((line, i) => p.text(line, c.DEBUG_TEXT, lineY(i)));
+            blockText(lines, { x: 0, y: c.DEBUG_TEXT }, c.DEBUG_TEXT);
 
             p.textAlign(p.CENTER, p.CENTER);
 
 
+            let lineY = (line) => c.DEBUG_TEXT*line + c.DEBUG_HEIGHT;
             p.fill(240);
             p.textSize(8);
             let keys = [
@@ -492,9 +506,33 @@ export default function measure(p) {
 
 
 
-        // draw cursor
-        p.stroke(240);
+        // draw cursor / insertMeas
+        p.stroke(200);
+        p.fill(240);
         p.line(p.mouseX, c.PLAYBACK_HEIGHT, p.mouseX, c.INST_HEIGHT*instruments.length + c.PLAYBACK_HEIGHT);
+        let draw_beats = beat => {
+            let x = ('inst' in insertMeas) ? 
+                (insertMeas.temp_offset + beat) * scale :
+                p.mouseX + beat*scale;
+            let y = ('inst' in insertMeas) ?
+                c.PLAYBACK_HEIGHT + insertMeas.inst * c.INST_HEIGHT :
+                c.PLAYBACK_HEIGHT + Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT))*c.INST_HEIGHT;
+            p.line(x, y, x, y + c.INST_HEIGHT);
+        };
+
+        if (API.pollSelecting()) {
+            debug_message = 'selecting';
+            p.rect(p.mouseX, c.PLAYBACK_HEIGHT + Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT))*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+            p.stroke(255, 0, 0);
+            if ('beats' in insertMeas) {
+                debug_message = insertMeas.beats.reduce((a, b) => `${a} ${b}`, '');
+                insertMeas.beats.forEach(draw_beats);
+            }
+        } else if ('temp_offset' in insertMeas) {
+            p.rect(insertMeas.temp_offset*scale + start, c.PLAYBACK_HEIGHT + Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT))*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+            p.stroke(255, 0, 0);
+            insertMeas.beats.forEach(draw_beats);
+        };
 
 
 
@@ -508,11 +546,10 @@ export default function measure(p) {
         
         if (isPlaying) {
             debug_message = tracking_start.time;
-            let time = tracking_start.time || API.exposeTracking().currentTime;
+            //let time = tracking_start.time || API.exposeTracking().currentTime;
             let tracking = API.exposeTracking().locator();
             // check for final measure here;
             if (tracking > range.span[1] + 1000) {
-                console.log('EXPIRED', isPlaying);
                 isPlaying = false;
                 API.play(isPlaying, null);
             };
@@ -534,14 +571,37 @@ export default function measure(p) {
         p.textAlign(p.RIGHT, p.BOTTOM);
         let _span = span.map(s => s.toFixed(2)); // format decimal places
         p.text(`${_span[0]} - ${_span[1]}, ${_span[1]-_span[0]}ms`, p.width - c.TRACKING_PADDING.X - c.TOOLBAR_WIDTH, p.height - c.TRACKING_PADDING.Y);
-        */
         
         if (mode === 1) {
             let frac = (p.width - c.TOOLBAR_WIDTH) / 3.0;
             let xloc = frac;
+            let yloc = p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT;
+
             p.stroke(primary);
             p.fill(primary);
-            p.rect(frac, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT, c.INSERT_WIDTH, c.INSERT_HEIGHT);
+            p.rect(frac, yloc, c.INSERT_WIDTH, c.INSERT_HEIGHT);
+            if ('beats' in insertMeas) {
+                p.stroke(secondary);
+                p.fill(secondary);
+                // draw beats
+                let x;
+                insertMeas.beats.forEach((beat) => {
+                    x = xloc + c.INSERT_PADDING + (beat/insertMeas.ms)*(c.INSERT_WIDTH - c.INSERT_PADDING*2);
+                    p.line(x, yloc + c.INSERT_PADDING, x, yloc + c.INSERT_PADDING + c.PREVIEW_HEIGHT);
+                });
+                // draw tempo
+                let scaleY = (input) => c.PREVIEW_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*c.PREVIEW_HEIGHT;
+                let ystart = yloc + scaleY(insertMeas.start);
+                let yend = yloc + scaleY(insertMeas.end);
+                p.line(xloc + c.INSERT_PADDING, ystart, xloc + c.INSERT_WIDTH - c.INSERT_PADDING, yend);
+
+                p.textAlign(p.LEFT, p.TOP);
+                let lines = [
+                    `${insertMeas.start} - ${insertMeas.end} / ${insertMeas.timesig}`,
+                    `${insertMeas.ms.toFixed(2)}ms`
+                ];
+                blockText(lines, { x: xloc+c.INSERT_PADDING, y: yloc + c.INSERT_PADDING*2 + c.PREVIEW_HEIGHT }, 6); 
+            }
         };
 
         if (DEBUG) {
@@ -561,12 +621,12 @@ export default function measure(p) {
             API.updateMode(mode);
             return;
         };
+
         if (p.keyCode === KeyI) {
             mode = 1;
             API.updateMode(mode);
             return;
         };
-
 
         if (p.keyCode === DEL
             && checkSelect(selected)
@@ -576,7 +636,9 @@ export default function measure(p) {
         };
 
         if (p.keyCode === SPACE) {
-            API.play((p.mouseX-start)/scale);
+            (mode === 1) ?
+                API.preview((p.mouseX-start)/scale) :
+                API.play((p.mouseX-start)/scale);
             return;
         }
 
@@ -618,13 +680,20 @@ export default function measure(p) {
             return;
         };
 
+        let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)*0.01);
+        if (inst >= instruments.length)
+            return;
+
+        if (API.pollSelecting()) {
+            insertMeas.temp_offset = API.confirmSelecting(inst);
+            insertMeas.inst = inst;
+            return;
+        }
+
         outside_origin = false;
 
         dragged = 0;
         var change = -1;
-        let inst = Math.floor(p.mouseY*0.01);
-        if (inst >= instruments.length)
-            return;
         let meas = instruments[inst].measures;
 
         Object.keys(meas).forEach((key) => {

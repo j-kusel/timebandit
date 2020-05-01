@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import styled from 'styled-components';
 import uuidv4 from 'uuid/v4';
 import midi from './Audio/midi';
 import audio from './Audio/index';
@@ -58,6 +57,11 @@ class App extends Component {
           instruments: [],
           sizing: 600.0,
           cursor: 0.0,
+          start: '',
+          end: '',
+          timesig: '',
+          offset: '',
+          temp_offset: '',
           scroll: 0,
           time: 0,
           selected: {
@@ -65,6 +69,9 @@ class App extends Component {
               meas: -1
           },
           isPlaying: false,
+          isPreviewing: false,
+          previewMeasure: {},
+          insertMeas: {},
           tracking: 0,
           locks: [],
           mode: 0,
@@ -72,7 +79,6 @@ class App extends Component {
       }
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
-      ['start', 'end', 'beats', 'offset'].forEach(n => this.state[n] = '');
 
       // subscribe to audio updates
       audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
@@ -134,10 +140,12 @@ class App extends Component {
       this.handleInst = this.handleInst.bind(this);
       this.handleLock = this.handleLock.bind(this);
       this.handleInput = this.handleInput.bind(this);
+      this.handleOffset = this.handleOffset.bind(this);
       this.handlePPQ = this.handlePPQ.bind(this);
       this.handleTempoPPQ = this.handleTempoPPQ.bind(this);
       this.midi = this.midi.bind(this);
       this.play = this.play.bind(this);
+      this.preview = this.preview.bind(this);
       this.kill = this.kill.bind(this);
       this.save = this.save.bind(this);
       this.load = this.load.bind(this);
@@ -175,7 +183,6 @@ class App extends Component {
 
       var deleteMeasure = (selected) => self.setState(oldState => {
           delete oldState.instruments[selected.inst].measures[selected.meas];
-          console.log(oldState.instruments[selected.inst].measures);
           return ({ instruments: oldState.instruments });
       });
 
@@ -198,14 +205,25 @@ class App extends Component {
           this.play(!this.state.isPlaying, cursor ? cursor : 0);
       };
 
+      var preview = (cursor) => {
+          console.log(!this.state.isPreviewing);
+          this.preview(!this.state.isPreviewing);
+      };
+
       var exposeTracking = () => ({
           context: audio.context,
           locator: audio.locator
       });
-
+              
       var updateMode = (mode) => this.setState({ mode });
 
-      return { get, select, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, exposeTracking, updateMode };
+      var pollSelecting = () => (!!this.state.temp_offset);
+      var confirmSelecting = (inst) => {
+          this.setState({ offset: this.state.cursor, temp_offset: false });
+          return this.state.cursor;
+      };
+
+      return { pollSelecting, confirmSelecting, get, select, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode };
   }
 
   handleInst(e) {
@@ -236,7 +254,7 @@ class App extends Component {
       let newMeasure = {
           start: parseInt(this.state.start, 10),
           end: parseInt(this.state.end, 10),
-          timesig: parseInt(this.state.beats, 10),
+          timesig: parseInt(this.state.timesig, 10),
           offset: parseInt(this.state.offset, 10)
       };
 
@@ -264,9 +282,37 @@ class App extends Component {
 
   // filter all non-numbers
   handleInput(e) {
-      if (e.target.value === '' || /^[0-9\b]+$/.test(e.target.value))
-          this.setState({ [e.target.name]: e.target.value });
+      if (e.target.value === '')
+          this.setState({ [e.target.name]: '' })
+      else if (/^[0-9\b]+$/.test(e.target.value)) {
+          let intVal = parseInt(e.target.value, 10);
+          let newMeas = {
+              start: this.state.start,
+              end: this.state.end,
+              timesig: this.state.timesig,
+              offset: this.state.offset || 0
+          };
+          Object.assign(newMeas, { [e.target.name]: intVal });
+
+          let insertMeas = (['start', 'end', 'timesig'].reduce((acc, i) => acc && newMeas[i], true)) ?
+              MeasureCalc(
+                  newMeas, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
+              ) :
+              {};
+
+          this.setState({
+              [e.target.name]: intVal,
+              insertMeas
+          });
+      };
   };
+
+  handleOffset(focus, e) {
+    this.setState({ temp_offset: focus });
+  }
+
+      
+
 
   handleTempoPPQ(eventKey) {
       document.activeElement.blur();
@@ -383,8 +429,7 @@ class App extends Component {
       if (!isPlaying)
           audio.kill()
       else {
-          audio.play(isPlaying, 
-              this.state.instruments.map((inst, ind) =>
+          audio.play(isPlaying, this.state.instruments.map((inst, ind) =>
               [ind, Object.keys(inst.measures).reduce((m_acc, meas) => 
                   [ ...m_acc, ...inst.measures[meas].beats.map((beat) => beat + inst.measures[meas].offset) ]
               , [])])
@@ -392,6 +437,33 @@ class App extends Component {
       };
       document.activeElement.blur();
       this.setState(oldState => ({ isPlaying }));
+  }
+
+  preview(isPreviewing) {
+      if (this.state.previewTimeout)
+          clearTimeout(this.state.previewTimeout);
+      let kill = () => {
+          audio.kill();
+          this.setState({ isPreviewing: false });
+      };
+
+      if (!isPreviewing)
+          kill()
+      else {
+          let previewMeasure = MeasureCalc({ 
+              start: this.state.start,
+              end: this.state.end,
+              timesig: this.state.timesig,
+              offset: 0
+            }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+
+          this.setState(oldState => ({ 
+              previewMeasure, 
+              isPreviewing,
+              previewTimeout: setTimeout(kill, previewMeasure.ms)
+          }));
+          audio.play(isPreviewing, [[0 /*this.selected.inst*/, previewMeasure.beats]]);
+      }
   }
 
   kill() {
@@ -499,7 +571,7 @@ class App extends Component {
 
     var cursor = timeToChrono(this.state.cursor);
     
-    let measure_inputs = ['start', 'end', 'beats', 'offset'].map((name) => 
+    let measure_inputs = ['start', 'end', 'timesig'].map((name) => 
         <FormInput
             type="text"
             key={name}
@@ -508,8 +580,7 @@ class App extends Component {
             name={name}
             onChange={this.handleInput}
         />
-            
-   );
+    );
 
 
     let pad = CONFIG.CANVAS_PADDING;
@@ -520,7 +591,7 @@ class App extends Component {
             <AudioButton x={0} y={CONFIG.INST_HEIGHT/3} onChange={(val, e) => this.handleMuting(val, e, ind)} value="false">solo</AudioButton>
         </Pane>
     )}).concat(this.state.newInst ? 
-        (<form onSubmit={this.handleInst} className="inst-form">
+        (<form onSubmit={this.handleInst} className="inst-form" autoComplete="off">
             <label>new instrument</label>
             <input
                 type="text"
@@ -570,7 +641,7 @@ class App extends Component {
               {panes}
           </Panel>
           
-          <UI locks={this.state.locks} instruments={newInstruments} API={this.API} CONSTANTS={CONSTANTS}/>
+          <UI locks={this.state.locks} instruments={newInstruments} insertMeas={this.state.insertMeas} API={this.API} CONSTANTS={CONSTANTS}/>
 
           {/* right toolbar controls */}
           <Rehearsal x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={CONFIG.PLAYBACK_HEIGHT}>
@@ -584,8 +655,19 @@ class App extends Component {
           {/* modes */}
             { this.state.mode === 1 ? 
                 <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
-                    <form onSubmit={this.handleMeasure} className="measure-form">
+
+                    <form onSubmit={this.handleMeasure} className="measure-form" autoComplete="off">
                         {measure_inputs}
+                        <FormInput
+                            type="text"
+                            key="offset"
+                            value={this.state.offset}
+                            placeholder={this.state.offset || (this.state.temp_offset && this.state.cursor) || 'offset'}
+                            name="offset"
+                            onFocus={(e) => this.handleOffset(true, e)}
+                            onBlur={(e) => this.handleOffset(false, e)}
+                            onChange={this.handleInput}
+                        />
                         <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
                     </form>
                 </Insert>
@@ -612,7 +694,7 @@ class App extends Component {
           </div>
         </div>
 
-        <form>
+        <form autoComplete="off">
             <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />
         </form>
 

@@ -115,12 +115,12 @@ let form_mixin = [
     `border: none;
     border-bottom: solid 1px ${secondary};
     width: 48px;
-    padding: 0px;
+    padding: 2px;
     margin: 4px;
     font-size: 8pt;
 
     &:focus {
-        shadow-box: none;
+        outline: none;
         border: none;
         border-bottom: solid 1px ${secondary};
     }

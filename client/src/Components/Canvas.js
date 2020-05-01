@@ -8,6 +8,8 @@ class UI extends Component {
 
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
+        if (nextProps.insertMeas !== this.props.insertMeas)
+            return true;
         if (nextProps.locks.length !== this.props.locks.length)
             return true;
         if (nextProps.instruments.length !== this.props.instruments.length)
@@ -33,7 +35,6 @@ class UI extends Component {
     };
 
     render() {
-        var paddingLeft = 0;
 
         var P5Container = styled.div`
             div {
@@ -46,7 +47,7 @@ class UI extends Component {
         return (
             <div>
                 <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} insertMeas={this.props.insertMeas} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
                 </P5Container>
             </div>
         );

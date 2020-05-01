@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Dropdown, Row, Col, Modal } from 'react-bootstrap';
+import { Container, Row, Col, Modal } from 'react-bootstrap';
 import { TBButton, TBDropdown } from './Styled';
 import styled from 'styled-components';
 import { PPQ_OPTIONS } from '../config/CONFIG.json';
