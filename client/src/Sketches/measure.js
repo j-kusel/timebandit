@@ -8,15 +8,16 @@ var range = [0, 100];
 var span = [Infinity, -Infinity];
 
 const DEBUG = true;
-const SLOW = true;
+const SLOW = false;
 
 const [MOD, SHIFT, CTRL, ALT, SPACE, DEL, ESC] = [17, 16, 91, 18, 32, 46, 27];
-const [KeyC, KeyI, KeyV, KeyZ] = [67, 73, 86, 90];
+const [KeyC, KeyI, KeyV, KeyZ, KeyH, KeyJ, KeyK, KeyL] = [67, 73, 86, 90, 72, 74, 75, 76];
+const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
 const NUM = []
 for (let i=48; i < 58; i++)
     NUM.push(i);
 
-// modes: ESC, INS, EDIT
+// modes: ESC, INS, EDITOR
 var mode = 0;
 
 
@@ -151,9 +152,12 @@ export default function measure(p) {
             : (mods & (1 << keys)) !== 0;
 
     var num_check = () =>
-        NUM.reduce((acc, num, ind) =>
-            p.keyIsDown(num) ? 
-                [...acc, ind] : acc, []);
+        p.keyIsDown(SHIFT) ?
+            NUM.reduce((acc, num, ind) =>
+                p.keyIsDown(num) ? 
+                    [...acc, ind] : acc, []) :
+            [];
+    
 
     var blockText = (lines, coords, fontSize)  => {
         let font = fontSize || c.FONT_DEFAULT_SIZE;
@@ -164,7 +168,7 @@ export default function measure(p) {
     p.setup = function () {
         //p.createCanvas(scope, c.PLAYBACK_HEIGHT + c.INST_HEIGHT + c.DEBUG_HEIGHT);
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
-        p.background(0);
+        p.background(255);
     };
 
     p.windowResized = function () {
@@ -283,7 +287,7 @@ export default function measure(p) {
 
         // check and draw selection
         if (checkSelect(selected)) {
-            let select = instruments[selected.inst].measures[selected.meas];
+            let select = instruments[selected.inst].ordered[selected.ind];
             // change cursor
             if (mod_check([2], modifiers) && measureBounds(selected.inst, instruments[selected.inst].measures[selected.meas]))
                 cursor = 'ew-resize';
@@ -333,8 +337,8 @@ export default function measure(p) {
                 p.line(0, 0, 0, c.INST_HEIGHT);
 
                 // handle selection
-                if (key === selected.meas) {
-                    p.fill(0, 255, 0, 20);
+                if (checkSelect(selected) && selected.inst === i_ind && key === inst.ordered[selected.ind].id) {
+                    p.fill(0, 255, 0, 60);
                     p.rect(0, 0, measure.ms*scale, c.INST_HEIGHT);
                 }
 
@@ -545,16 +549,18 @@ export default function measure(p) {
             p.line(x, y, x, y + c.INST_HEIGHT);
         };
 
-        if (API.pollSelecting()) {
-            debug_message = `${t_mouseX} ${t_mouseY}`;
-            p.rect(t_mouseX, Math.floor(0.01*t_mouseY)*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
-            p.stroke(255, 0, 0);
-            if ('beats' in insertMeas)
+        if (mode === 1) {
+            if (API.pollSelecting()) {
+                debug_message = `${t_mouseX} ${t_mouseY}`;
+                p.rect(t_mouseX, Math.floor(0.01*t_mouseY)*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+                p.stroke(255, 0, 0);
+                if ('beats' in insertMeas)
+                    insertMeas.beats.forEach(draw_beats);
+            } else if ('temp_offset' in insertMeas) {
+                p.rect(insertMeas.temp_offset*scale + start, Math.floor(0.01*t_mouseY)*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+                p.stroke(255, 0, 0);
                 insertMeas.beats.forEach(draw_beats);
-        } else if ('temp_offset' in insertMeas) {
-            p.rect(insertMeas.temp_offset*scale + start, Math.floor(0.01*t_mouseY)*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
-            p.stroke(255, 0, 0);
-            insertMeas.beats.forEach(draw_beats);
+            };
         };
 
 
@@ -603,14 +609,35 @@ export default function measure(p) {
         p.text(`${_span[0]} - ${_span[1]}, ${_span[1]-_span[0]}ms`, p.width - c.TOOLBAR_WIDTH - c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
         p.pop();
         
+        // draw tabs
+        p.stroke(primary);
+        p.fill(primary);
+
+        p.push();
+        p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT);
+        p.rect(0, 0, c.EDITOR_WIDTH, c.TRACKING_HEIGHT);
+        p.textSize(8);
+        p.textAlign(p.LEFT, p.CENTER);
+        p.stroke(secondary);
+        p.fill(secondary);
+
+        p.line(0, 0, 0, c.TRACKING_HEIGHT);
+        p.line(c.INSERT_WIDTH, 0, c.INSERT_WIDTH, c.TRACKING_HEIGHT);
+        p.translate(c.INSERT_PADDING, 0);
+        p.text('- INSERT', 0, c.TRACKING_HEIGHT/2);
+        p.text('- EDITOR', c.INSERT_WIDTH, c.TRACKING_HEIGHT/2);
+        p.pop();
+
+        p.push();
+        p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT);
+        debug_message = mode;
         if (mode === 1) {
             p.push();
-            p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT);
+            p.rect(0, 0, c.EDITOR_WIDTH, c.INSERT_HEIGHT);
 
+            p.stroke(secondary);
+            p.line(c.INSERT_WIDTH, c.EDITOR_HEIGHT, c.EDITOR_WIDTH, c.EDITOR_HEIGHT); 
 
-            p.stroke(primary);
-            p.fill(primary);
-            p.rect(0, 0, c.INSERT_WIDTH, c.INSERT_HEIGHT);
             if ('beats' in insertMeas) {
                 p.stroke(secondary);
                 p.fill(secondary);
@@ -620,7 +647,7 @@ export default function measure(p) {
                 // push into padding
                 p.push();
                 p.translate(c.INSERT_PADDING, c.INSERT_PADDING);
-                let last = c.INSERT_WIDTH - c.INSERT_PADDING*2;
+                let last = c.EDITOR_WIDTH - c.INSERT_PADDING*2;
                 insertMeas.beats.forEach((beat) => {
                     x = (beat/insertMeas.ms)*last;
                     p.line(x, 0, x, c.PREVIEW_HEIGHT);
@@ -641,11 +668,22 @@ export default function measure(p) {
                 ];
                 blockText(lines, { x: 0, y: 0 }, 6); 
                 p.pop();
-
                 p.pop();
             }
             p.pop();
         };
+
+        if (mode === 2) {
+            p.rect(0, 0, c.EDITOR_WIDTH, c.EDITOR_HEIGHT);
+            p.stroke(secondary);
+            p.line(0, c.EDITOR_HEIGHT, c.INSERT_WIDTH, c.EDITOR_HEIGHT); 
+            if (checkSelect(selected)) {
+            }
+
+
+        }
+        p.pop();
+
 
         if (DEBUG) {
             p.textAlign(p.RIGHT, p.TOP);
@@ -657,10 +695,60 @@ export default function measure(p) {
         }
 
         //p.pop();
+        debug_message = selected.ind;
     }
 
     p.keyPressed = function(e) {
-        
+
+        // DIRECTIONAL KEYS
+        if (p.keyCode === KeyH || p.keyCode === LEFT) {
+            if (checkSelect(selected))
+                selected.ind = Math.max(selected.ind - 1, 0);
+
+            console.log(selected.ind);
+            return;
+        };
+        if (p.keyCode === KeyJ || p.keyCode === DOWN) {
+            if (checkSelect(selected)) {
+                if (selected.inst >= instruments.length - 1) {
+                    selected.inst = instruments.length - 1;
+                    return;
+                };
+                let ind = selected.ind;
+                let max_length = instruments[selected.inst + 1].ordered.length - 1;
+                if (selected.ind > max_length)
+                    ind = max_length;
+                selected = {
+                    inst: Math.min(selected.inst + 1, instruments.length - 1),
+                    meas: instruments[selected.inst + 1].ordered[ind].id,
+                    ind
+                };
+                console.log(selected);
+            };
+            return;
+        };
+        if (p.keyCode === KeyK || p.keyCode === UP) {
+            if (checkSelect(selected))
+                if (selected.inst <= 0)
+                    return;
+                let ind = selected.ind;
+                let max_length = instruments[selected.inst - 1].ordered.length - 1;
+                if (selected.ind > max_length)
+                    ind = max_length;
+                selected = {
+                    inst: Math.max(selected.inst - 1, 0),
+                    meas: instruments[selected.inst -1].ordered[ind].id,
+                    ind
+                };
+            return;
+        };
+        if (p.keyCode === KeyL || p.keyCode === RIGHT) {
+            if (checkSelect(selected))
+                selected.ind = Math.min(selected.ind + 1, instruments[selected.inst].ordered.length - 1);
+            console.log(selected.ind);
+            return;
+        };
+
         if (p.keyCode === ESC) {
             mode = 0;
             API.updateMode(mode);
@@ -672,6 +760,13 @@ export default function measure(p) {
             API.updateMode(mode);
             return;
         };
+
+        if (p.keyCode === KeyV) {
+            mode = 2;
+            API.updateMode(mode);
+            return;
+        };
+
 
         if (p.keyCode === DEL
             && checkSelect(selected)
@@ -705,12 +800,14 @@ export default function measure(p) {
     };
 
     p.mouseWheel = function(event) {
+        event.preventDefault();
         if (p.keyIsDown(CTRL)) {
             let change = 1.0-event.delta/c.SCROLL_SENSITIVITY;
             scale = scale*change;
             start = p.mouseX - change*(p.mouseX - start);
             API.newScaling(scale);
         };
+        start -= event.deltaX;
     };
 
     p.mousePressed = function(e) {
@@ -753,6 +850,7 @@ export default function measure(p) {
         });
 
         selected = {inst, meas: change || -1};
+        selected.ind = instruments[inst].ordered.reduce((acc, m, ind) => selected.meas === m.id ? ind : acc, -1);
         API.displaySelected(selected);
 
         if (mod_check([1, 2], modifiers)) {

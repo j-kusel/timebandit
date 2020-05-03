@@ -127,6 +127,17 @@ let form_mixin = [
 
 `].join('\n');
 
+var TrackingBar = styled.div`
+    position: absolute;
+    height: ${c.TRACKING_HEIGHT}px;
+    width: ${c.EDITOR_WIDTH}px;
+    ${props => props.left ? `left: ${props.left}px;` : null}
+    ${props => props.right ? `right: ${props.right}px;` : null}
+    bottom: ${c.FOOTER_HEIGHT}px;
+    
+    z-index: 50;
+`;
+
 var Insert = styled.div`
     position: absolute;
     bottom: ${c.FOOTER_HEIGHT + c.TRACKING_HEIGHT}px;
@@ -138,6 +149,13 @@ var Insert = styled.div`
         ${form_mixin}
         width: 18px;
     }
+`;
+
+var Edit = styled.div`
+    position: absolute;
+    bottom: ${c.TRACKING_HEIGHT}px;
+    left: ${props => props.left}px;
+    z-index: 50;
 `;
 
 const Link = ({ className, children }) => (
@@ -181,49 +199,18 @@ var Upload = styled(TBButton)`
 let transitions = (apply) => ['-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
     .reduce((acc, t) => `${acc}${t}-property: ${apply};\n`, '');
 
-var TBToggle = styled.button`
+var Lock = styled.button`
+    width: ${c.TRACKING_HEIGHT}px;
+    height: ${c.TRACKING_HEIGHT}px;
     ${transitions('none')}
-    &.btn {
-        padding-top: 0.5rem;
-        border-radius: 0px;
-        height: 40px;
-    }
-
-    &.btn.btn-primary.dropdown-toggle {
-        border: none;
-        border-radius: 0px;
-    }
-
-    &.btn.btn-primary {
-        ${button_mixin}
-        ${transitions('none')}
-    };
-
-    &.btn.btn-primary.active {
-        ${button_mixin}
-        color: ${secondary};
-        background-color: ${primary};
-        ${transitions('none')}
-    };
-
-    &.btn.btn-primary:focus {
-        ${button_mixin}
-        ${transitions('none')}
-    };
-
-    &.btn.btn-primary:hover {
-        ${transitions('none')}
-    };
-
-    &.btn.btn-primary:active {
-        ${button_mixin}
-        color: ${secondary};
-        background-color: ${primary};
-        ${transitions('none')}
-    };
-
+    border: none;
+    border-left: 1px solid ${props => props.checked ? primary : secondary};
+    color: ${props => props.checked ? primary : secondary};
+    background-color: ${props => props.checked ? secondary : primary};
     text-align: center;    
-    width: 100%;
+    &:focus {
+        outline: none;
+    }
 `;
 
 
@@ -286,4 +273,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Link, StyledLink, FormInput, Insert, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, TBToggle, TBDropdown };
+export { Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

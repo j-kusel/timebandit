@@ -10,7 +10,7 @@ import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
 
 import { MeasureCalc, order_by_key } from './Util/index';
 import UI from './Components/Canvas';
-import { FormInput, Insert, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, AudioButton, InstName, TBToggle, TBDropdown } from './Components/Styled';
+import { FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, AudioButton, InstName, Lock, TBDropdown } from './Components/Styled';
 import { SettingsModal, WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -77,6 +77,8 @@ class App extends Component {
           mode: 0,
           PPQ: CONFIG.PPQ_default
       }
+
+      this.insertFocus = React.createRef();
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
 
@@ -215,7 +217,25 @@ class App extends Component {
           locator: audio.locator
       });
               
-      var updateMode = (mode) => this.setState({ mode });
+      var updateMode = (mode) => {
+          let newState = { mode };
+          if (mode === 1) {
+            this.setState(newState);
+            this.insertFocus.current.focus() 
+          } else {
+              newState.insertMeas = {};
+              if (mode === 2)
+                  {}
+              else {
+                  ['start', 'end', 'timesig', 'offset'].forEach(x => newState[x] = '');
+                  newState.temp_offset = false;
+              }
+              this.setState(newState);
+          };
+
+            
+          
+      };
 
       var pollSelecting = () => (!!this.state.temp_offset);
       var confirmSelecting = (inst) => {
@@ -269,7 +289,16 @@ class App extends Component {
   };
 
   handleLock(val, e) {
-      this.setState(oldState => ({ locks: val }));
+      let oldLock = this.state.locks.indexOf(val);
+      this.setState(oldState => {
+          let locks = oldState.locks;
+          if (oldLock >= 0)
+              locks.splice(oldLock, 1)
+          else
+              locks.push(val);
+          console.log(locks);
+          return ({ locks });
+      });
   };
 
   handleMuting(val, e, ind) {
@@ -571,16 +600,27 @@ class App extends Component {
 
     var cursor = timeToChrono(this.state.cursor);
     
-    let measure_inputs = ['start', 'end', 'timesig'].map((name) => 
+    let measure_inputs = [
         <FormInput
             type="text"
-            key={name}
-            value={this.state[name]}
-            placeholder={name}
-            name={name}
+            key="start"
+            value={this.state.start}
+            ref={this.insertFocus}
+            placeholder="start"
+            name="start"
             onChange={this.handleInput}
-        />
-    );
+        />, 
+        ...['end', 'timesig'].map((name) => 
+            <FormInput
+                type="text"
+                key={name}
+                value={this.state[name]}
+                placeholder={name}
+                name={name}
+                onChange={this.handleInput}
+            />
+        )
+    ];
 
 
     let pad = CONFIG.CANVAS_PADDING;
@@ -655,7 +695,6 @@ class App extends Component {
           {/* modes */}
             { this.state.mode === 1 ? 
                 <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
-
                     <form onSubmit={this.handleMeasure} className="measure-form" autoComplete="off">
                         {measure_inputs}
                         <FormInput
@@ -672,7 +711,40 @@ class App extends Component {
                     </form>
                 </Insert>
             : null }
+        <TrackingBar className="tracking" left={(window.innerWidth - CONFIG.CANVAS_PADDING*2 - CONFIG.TOOLBAR_WIDTH) / 3.0 + CONFIG.CANVAS_PADDING}>
+            <div style={{ float: 'right' }}>
+                { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
+                    <Lock 
+                        key={button}
+                        value={index + 1}
+                        onClick={(e) => this.handleLock(index + 1, e)}
+                        checked={this.state.locks.indexOf(index + 1) >= 0}
+                    >{button}</Lock>) }
+            </div>
+        </TrackingBar>
 
+        { this.state.mode === 2 ?
+            <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
+                <form onSubmit={this.handleMeasure} className="measure-form" autoComplete="off">
+                    {measure_inputs}
+                    <FormInput
+                        type="text"
+                        key="offset"
+                        value={this.state.offset}
+                        placeholder={this.state.offset || (this.state.temp_offset && this.state.cursor) || 'offset'}
+                        name="offset"
+                        onFocus={(e) => this.handleOffset(true, e)}
+                        onBlur={(e) => this.handleOffset(false, e)}
+                        onChange={this.handleInput}
+                    />
+                    <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                </form>
+            </Insert>
+
+        : null }
+
+                <Edit>
+                </Edit>
 
           {/* footer */}
           <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px` }}>
@@ -690,10 +762,6 @@ class App extends Component {
 
           </Footer>
         </div>
-            <div type="checkbox" onChange={this.handleLock} className="mb-2">
-                { ['start', 'end', 'direction', 'slope', 'length'].map((button, index) =>
-                    <TBToggle className="shadow-none" key={button} value={index + 1}>{button}</TBToggle>) }
-            </div>
 
         <form autoComplete="off">
             <input id="dummyLoad" type="file" name="file" onChange={this.load} hidden />

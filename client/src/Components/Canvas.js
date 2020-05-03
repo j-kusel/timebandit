@@ -4,6 +4,14 @@ import P5Wrapper from 'react-p5-wrapper';
 import measure from '../Sketches/measure';
 import c from '../config/CONFIG.json';
 
+var P5Container = styled.div`
+    div {
+        padding-left: ${c.CANVAS_PADDING}px;
+        z-index: -100;
+    }
+`;
+
+
 class UI extends Component {
 
     // NEVER UPDATE
@@ -35,15 +43,6 @@ class UI extends Component {
     };
 
     render() {
-
-        var P5Container = styled.div`
-            div {
-                padding-left: ${c.CANVAS_PADDING}px;
-                z-index: -100;
-            }
-        `;
-
-
         return (
             <div>
                 <P5Container>
