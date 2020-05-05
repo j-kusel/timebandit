@@ -16,6 +16,11 @@ class UI extends Component {
 
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
+
+        if (nextProps.mode !== this.props.mode)
+            return true;
+        if (nextProps.panels !== this.props.panels)
+            return true;
         if (nextProps.insertMeas !== this.props.insertMeas)
             return true;
         if (nextProps.locks.length !== this.props.locks.length)
@@ -46,7 +51,7 @@ class UI extends Component {
         return (
             <div>
                 <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} insertMeas={this.props.insertMeas} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} insertMeas={this.props.insertMeas} panels={this.props.panels} mode={this.props.mode} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
                 </P5Container>
             </div>
         );

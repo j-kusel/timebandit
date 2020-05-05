@@ -25,6 +25,9 @@ var button_mixin = `
 let timing = '0.3s';
 var transition_mixin = ['transition', '-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
     .reduce((acc, t) => `${acc}${t}: ${timing};\n`, '');
+var transition_mixin2 = (change) => ['transition', '-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
+    .reduce((acc, t) => `${acc}${t}: ${timing} ${change};\n`, '');
+
 
 var Playback = styled.button`
     width: 50px;
@@ -54,6 +57,34 @@ var Pane = styled.div`
     height: ${props => props.height}px;
     border: none;
     z-index: 50;
+
+    button {
+        color: ${primary};
+        background-color: initial;
+        border: 0;
+    }
+
+    .closed {
+        ${transition_mixin}
+        position: absolute;
+        left: 0px;
+    }
+
+    .opened {
+        ${transition_mixin}
+        position: absolute;
+        left: 75px;
+        transform: rotate(45deg);
+    }
+        
+        
+`;
+
+var NewInst = styled(Pane)`
+    width: initial;
+    background-color: none;
+    font-size: 10pt;
+    color: ${secondary};
 `;
 
 var toolbar = styled(Pane)`
@@ -165,9 +196,9 @@ const Link = ({ className, children }) => (
 );
 
 const StyledLink = styled(Link)`
-  color: red;
+    color: red;
     font-weight: bold;
-    `;
+`;
 
 const FormInput = styled.input`
     ${form_mixin}
@@ -273,4 +304,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

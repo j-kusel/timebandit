@@ -45,6 +45,19 @@ var order_by_key = (obj, key) => {
     return sort(Object.keys(obj).map(key => obj[key]));
 };
 
-export { MeasureCalc, order_by_key };
+var check_proximity_by_key = (obj, arr, key) => {
+    let gap = [-1, Infinity];
+    let last_gap = [-1, Infinity];
+    arr.some((candidate, ind) => {
+        gap = [ind, Math.abs(obj[key] - candidate[key])];
+        if (last_gap[1] < gap[1])
+            return true;
+        last_gap = [ind, gap[1]];
+    });
+    return last_gap[0];
+};
+        
+
+export { MeasureCalc, order_by_key, check_proximity_by_key };
 
 
