@@ -8,7 +8,7 @@ var range = [0, 100];
 var span = [Infinity, -Infinity];
 
 const DEBUG = true;
-const SLOW = true;
+const SLOW = false;
 
 const [MOD, SHIFT, CTRL, ALT, SPACE, DEL, ESC] = [17, 16, 91, 18, 32, 46, 27];
 const [KeyC, KeyI, KeyV, KeyZ, KeyH, KeyJ, KeyK, KeyL] = [67, 73, 86, 90, 72, 74, 75, 76];
@@ -289,10 +289,11 @@ export default function measure(p) {
         p.fill(secondary);
         p.rect(0, p.height - c.TRACKING_HEIGHT, p.width, c.TRACKING_HEIGHT);
 
+        let select;
 
         // check and draw selection
         if (checkSelect(selected)) {
-            let select = instruments[selected.inst].ordered[selected.ind];
+            select = instruments[selected.inst].ordered[selected.ind];
             // change cursor
             //
             // check this later?
@@ -557,6 +558,52 @@ export default function measure(p) {
         };
 
 
+        var scaleY = (input, scale) => scale - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*scale;
+
+        // draw editor frame
+        if (mode === 2) {
+            p.push();
+            let opac = p.color(primary);
+            opac.setAlpha(180);
+            p.stroke(opac);
+            p.fill(opac);
+            if (select) {
+                let x = select.offset * scale + start;
+                let y = selected.inst*c.INST_HEIGHT;
+                p.translate(x, y);
+
+                let ystart = scaleY(select.start, c.PREVIEW_HEIGHT);
+                let yend = scaleY(select.end, c.PREVIEW_HEIGHT);
+                let t_X = p.mouseX - c.PANES_WIDTH;
+                if (t_X > x - 5 &&
+                    t_X < x + 5 &&
+                    p.mouseY > (y + c.PLAYBACK_HEIGHT + ystart - 5) &&
+                    p.mouseY < (y + c.PLAYBACK_HEIGHT + ystart + 5) 
+                ) {
+                    p.ellipse(0, 0, 10, 10); 
+                    cursor = 'pointer';
+                }
+
+
+                p.translate(0, c.INST_HEIGHT);
+                //p.translate(-c.PANES_WIDTH, -c.PANES_WIDTH / 3);
+                p.rect(0, 0, c.PANES_WIDTH*2 + select.ms*scale, c.PANES_WIDTH *2);
+
+                
+
+                p.stroke(secondary);
+                p.fill(secondary);
+                p.textSize(10);
+                p.textAlign(p.LEFT, p.CENTER);
+                p.text(`${select.start} -> ${select.end} / ${select.timesig}`, 5, c.PANES_WIDTH);
+
+
+
+            }
+                
+            p.pop();
+        }
+            
 
         // draw cursor / insertMeas
         p.stroke(200);
@@ -578,7 +625,6 @@ export default function measure(p) {
             let inst = Math.floor(0.01*t_mouseY);
             if (API.pollSelecting()) {
                 if (inst < instruments.length && inst >= 0) {
-                    debug_message = `${t_mouseX} ${t_mouseY}`;
                     p.rect(t_mouseX, inst*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
                     p.stroke(255, 0, 0);
                     if ('beats' in insertMeas)
@@ -601,7 +647,6 @@ export default function measure(p) {
 
         
         if (isPlaying) {
-            debug_message = tracking_start.time;
             //let time = tracking_start.time || API.exposeTracking().currentTime;
             let tracking = API.exposeTracking().locator();
             // check for final measure here;
@@ -661,7 +706,8 @@ export default function measure(p) {
 
         p.push();
         p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT);
-        debug_message = mode;
+
+
         if (mode === 1) {
             p.push();
             p.rect(0, 0, c.EDITOR_WIDTH, c.INSERT_HEIGHT);
@@ -683,9 +729,8 @@ export default function measure(p) {
                     p.line(x, 0, x, c.PREVIEW_HEIGHT);
                 });
                 // draw tempo
-                let scaleY = (input) => c.PREVIEW_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*c.PREVIEW_HEIGHT;
-                let ystart = scaleY(insertMeas.start);
-                let yend = scaleY(insertMeas.end);
+                let ystart = scaleY(insertMeas.start, c.PREVIEW_HEIGHT);
+                let yend = scaleY(insertMeas.end, c.PREVIEW_HEIGHT);
                 p.line(0, ystart, last, yend);
 
                 // push into metadata
@@ -719,9 +764,8 @@ export default function measure(p) {
                     p.line(x, 0, x, c.PREVIEW_HEIGHT);
                 });
                 // draw tempo
-                let scaleY = (input) => c.PREVIEW_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*c.PREVIEW_HEIGHT;
-                let ystart = scaleY(meas.start);
-                let yend = scaleY(meas.end);
+                let ystart = scaleY(meas.start, c.PREVIEW_HEIGHT);
+                let yend = scaleY(meas.end, c.PREVIEW_HEIGHT);
                 p.line(0, ystart, last, yend);
                 p.pop();
             }
@@ -744,9 +788,6 @@ export default function measure(p) {
             p.text(Math.round(p.frameRate()), p.width - 10, 5);
         }
 
-        //p.pop();
-        if ('temp_offset' in insertMeas)
-            debug_message = insertMeas.temp_offset;
     }
 
     p.keyPressed = function(e) {
