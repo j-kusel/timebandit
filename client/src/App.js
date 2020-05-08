@@ -692,8 +692,8 @@ class App extends Component {
         this.state.instruments[selected.inst] :
         {};
 
-    let meas = selected.meas !== -1 ?
-        inst.measures[selected.meas] :
+    let meas = 'meas' in selected ?
+        selected.meas :
         {};
 
     let data = [];
