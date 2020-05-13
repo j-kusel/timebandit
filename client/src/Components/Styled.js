@@ -184,8 +184,12 @@ var Insert = styled.div`
 
 var Edit = styled.div`
     position: absolute;
-    bottom: ${c.TRACKING_HEIGHT}px;
+    top: ${props => props.top}px;
     left: ${props => props.left}px;
+    input {
+        margin: 0px;
+        background-color: initial;
+    }
     z-index: 50;
 `;
 

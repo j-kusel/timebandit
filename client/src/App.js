@@ -60,19 +60,21 @@ class App extends Component {
           start: '',
           end: '',
           timesig: '',
+          edit_start: '',
+          edit_end: '',
+          edit_timesig: '',
           offset: '',
           instName: '',
           temp_offset: '',
-          scroll: 0,
+          scale: 1,
+          viewport: 0,
           time: 0,
-          selected: {
-              inst: -1,
-              meas: -1
-          },
+          selected: { },
           isPlaying: false,
           isPreviewing: false,
           previewMeasure: {},
           insertMeas: {},
+          editMeas: {},
           insertInst: -1,
           tracking: 0,
           locks: [],
@@ -147,6 +149,7 @@ class App extends Component {
       this.instClose = this.instClose.bind(this);
       this.handleLock = this.handleLock.bind(this);
       this.handleNumInput = this.handleNumInput.bind(this);
+      this.handleNumEdit = this.handleNumEdit.bind(this);
       this.handleNameInput = this.handleNameInput.bind(this);
       this.handleOffset = this.handleOffset.bind(this);
       this.handlePPQ = this.handlePPQ.bind(this);
@@ -172,8 +175,6 @@ class App extends Component {
   initAPI() {
       var self = this;
     
-      var select = (inst, meas) => self.setState(oldState => ({selected: {inst: inst, measure: meas}}));
-
       var get = (name) => {
           if (name === 'isPlaying')
             return self.state.isPlaying;
@@ -190,7 +191,7 @@ class App extends Component {
       };
 
       var deleteMeasure = (selected) => self.setState(oldState => {
-          delete oldState.instruments[selected.inst].measures[selected.meas];
+          delete oldState.instruments[selected.inst].measures[selected.meas.id];
           return ({ instruments: oldState.instruments });
       });
 
@@ -227,24 +228,20 @@ class App extends Component {
               this.instClose() :
               this.instOpen();
               
-      var updateMode = (mode) => {
+      var updateMode = (mode, options) => {
           let newState = { mode };
           if (mode === 1) {
             this.setState(newState);
             this.insertFocus.current.focus();
           } else {
               newState.insertMeas = {};
-              if (mode === 2)
-                  {}
+              if (mode === 2) {}
               else {
                   ['start', 'end', 'timesig', 'offset'].forEach(x => newState[x] = '');
                   newState.temp_offset = false;
               }
               this.setState(newState);
           };
-
-            
-          
       };
 
       var pollSelecting = () => (!!this.state.temp_offset);
@@ -253,7 +250,9 @@ class App extends Component {
           return this.state.cursor;
       };
 
-      return { toggleInst, pollSelecting, confirmSelecting, get, select, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode };
+      var reportWindow = (viewport, scale) => this.setState({ viewport, scale });
+
+      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow };
   }
 
   instOpen(e) {
@@ -289,7 +288,7 @@ class App extends Component {
       e.preventDefault();
       let inst = this.state.insertInst || this.state.selected.inst;
       
-      let selected = this.state.instruments[inst].measures[this.state.selected.meas];
+      let selected = this.state.selected.meas;
       let newMeasure = {
           start: parseInt(this.state.start, 10),
           end: parseInt(this.state.end, 10),
@@ -344,7 +343,7 @@ class App extends Component {
               start: this.state.start,
               end: this.state.end,
               timesig: this.state.timesig,
-              offset: this.state.offset ? this.state.offset : this.state.instruments[this.state.selected.inst].measures[this.state.selected.meas].ms
+              offset: this.state.offset ? this.state.offset : this.state.selected.meas.ms
           };
           Object.assign(newMeas, { [e.target.name]: intVal });
 
@@ -360,6 +359,34 @@ class App extends Component {
           });
       };
   };
+
+  handleNumEdit(e) {
+      if (e.target.value === '') {
+          //this.setState({ [e.target.name]: '' })
+      }
+      else if (/^[0-9\b]+$/.test(e.target.value)) { //&& e.target.value.length > 1) {
+          let intVal = parseInt(e.target.value, 10);
+          let newMeas = {
+              start: this.state.selected.meas.start,
+              end: this.state.selected.meas.end,
+              timesig: this.state.selected.meas.timesig,
+              offset: this.state.selected.meas.offset
+          };
+          Object.assign(newMeas, { [e.target.name]: intVal });
+
+          let editMeas = (['start', 'end', 'timesig'].reduce((acc, i) => acc && newMeas[i], true)) ?
+              MeasureCalc(
+                  newMeas, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
+              ) :
+              {};
+
+          this.setState({
+              ['edit_'.concat(e.target.name)]: intVal,
+              editMeas
+          });
+      };
+  }
+
 
   handleNameInput(e) {
       this.setState({ [e.target.name]: e.target.value })
@@ -653,6 +680,17 @@ class App extends Component {
         )
     ];
 
+    let edit_inputs = ['start', 'end', 'timesig'].map((name) => 
+        <FormInput
+            id={name}
+            type="text"
+            key={name}
+            value={this.state['edit_' + name] || ('meas' in this.state.selected ? this.state.selected.meas[name] : '')}
+            placeholder={name}
+            name={name}
+            onChange={this.handleNumEdit}
+        />
+    );
 
 
     let pad = CONFIG.CANVAS_PADDING;
@@ -699,7 +737,7 @@ class App extends Component {
     let data = [];
     if (selected.inst > -1)
         data.push(<span>{ inst.name }</span>);
-    if (selected.meas !== -1)
+    if (selected.meas)
         data.push(<span> : {meas.start} - {meas.end} / {meas.timesig}</span>);
       
     let metadata = (<Metadata x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.META_HEIGHT - CONFIG.LOG_HEIGHT}>
@@ -722,7 +760,16 @@ class App extends Component {
               </NewInst>
           </Panel>
           
-          <UI mode={this.state.mode} locks={this.state.locks} instruments={newInstruments} panels={this.state.newInst} insertMeas={this.state.insertMeas} API={this.API} CONSTANTS={CONSTANTS}/>
+          { (this.state.mode === 2 && 'meas' in this.state.selected) ?
+              <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset} top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}>
+                <form onSubmit={this.handleEdit} className="measure-form" autoComplete="off">
+                    { edit_inputs }
+                    <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                </form>
+              </Edit> : null
+          }
+
+          <UI mode={this.state.mode} locks={this.state.locks} instruments={newInstruments} panels={this.state.newInst} editMeas={this.state.editMeas} insertMeas={this.state.insertMeas} API={this.API} CONSTANTS={CONSTANTS}/>
 
           {/* right toolbar controls */}
           <Rehearsal x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={CONFIG.PLAYBACK_HEIGHT}>
@@ -766,26 +813,10 @@ class App extends Component {
 
         { this.state.mode === 2 ?
             <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
-                <form onSubmit={this.handleMeasure} className="measure-form" autoComplete="off">
-                    {measure_inputs}
-                    <FormInput
-                        type="text"
-                        key="offset"
-                        value={this.state.offset}
-                        placeholder={this.state.offset || (this.state.temp_offset && this.state.cursor) || 'offset'}
-                        name="offset"
-                        onFocus={(e) => this.handleOffset(true, e)}
-                        onBlur={(e) => this.handleOffset(false, e)}
-                        onChange={this.handleNumInput}
-                    />
-                    <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
-                </form>
             </Insert>
 
         : null }
 
-                <Edit>
-                </Edit>
 
           {/* footer */}
           <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px` }}>

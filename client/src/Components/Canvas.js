@@ -23,6 +23,8 @@ class UI extends Component {
             return true;
         if (nextProps.insertMeas !== this.props.insertMeas)
             return true;
+        if (nextProps.editMeas !== this.props.editMeas)
+            return true;
         if (nextProps.locks.length !== this.props.locks.length)
             return true;
         if (nextProps.instruments.length !== this.props.instruments.length)
@@ -51,7 +53,7 @@ class UI extends Component {
         return (
             <div>
                 <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} insertMeas={this.props.insertMeas} panels={this.props.panels} mode={this.props.mode} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} editMeas={this.props.editMeas} insertMeas={this.props.insertMeas} panels={this.props.panels} mode={this.props.mode} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
                 </P5Container>
             </div>
         );
