@@ -223,13 +223,22 @@ export default function measure(p) {
         mode = props.mode;
         ({ API, CONSTANTS } = props);
 
+        var beat_lock = ('meas' in selected && selected.meas.id in locked && locked[selected.meas.id].beats) ?
+            parse_bits(locked[selected.meas.id].beats) : [];
+
+
+        console.log(editMeas);
+
         // reset select on update
         if (selected.inst > -1 && 'meas' in selected)
             selected.meas = instruments[selected.inst].measures[selected.meas.id];
 
         if ('ms' in editMeas) {
             selected.meas.temp = editMeas;
-        }
+            if (beat_lock.length === 1)
+                selected.meas.offset += selected.meas.beats[beat_lock[0]] - editMeas.beats[beat_lock[0]];
+        } else if ('meas' in selected && 'temp' in selected.meas)
+            delete selected.meas.temp;
 
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
@@ -848,11 +857,13 @@ export default function measure(p) {
     }
 
     p.keyPressed = function(e) {
+        if (API.disableKeys())
+            return;
 
         if ('meas' in selected) {
 
             // DIRECTIONAL KEYS
-            if (p.keyCode === KeyJ || p.keyCode === DOWN) {
+            if (p.keyCode === KeyJ) { // || p.keyCode === DOWN) {
                 if (selected.inst >= instruments.length - 1)
                     return;
                 let ind = check_proximity_by_key(selected.meas, instruments[selected.inst + 1].ordered, 'offset');
@@ -862,10 +873,11 @@ export default function measure(p) {
                     meas: instruments[selected.inst + 1].ordered[ind],
                     ind
                 };
+                API.displaySelected(selected);
                 return;
             }
 
-            if (p.keyCode === KeyK || p.keyCode === UP) {
+            if (p.keyCode === KeyK) { // || p.keyCode === UP) {
                 if (selected.inst <= 0)
                     return;
                 let ind = check_proximity_by_key(selected.meas, instruments[selected.inst - 1].ordered, 'offset');
@@ -874,26 +886,32 @@ export default function measure(p) {
                     meas: instruments[selected.inst -1].ordered[ind],
                     ind
                 };
+                API.displaySelected(selected);
+
                 return;
             };
 
-            if (p.keyCode === KeyH || p.keyCode === LEFT) {
+            if (p.keyCode === KeyH) { // || p.keyCode === LEFT) {
                 let ind = Math.max(selected.ind - 1, 0);
                 selected = {
                     ind,
                     inst: selected.inst,
                     meas: instruments[selected.inst].ordered[ind]
                 };
+                API.displaySelected(selected);
+
                 return;
             };
 
-            if (p.keyCode === KeyL || p.keyCode === RIGHT) {
+            if (p.keyCode === KeyL) { // || p.keyCode === RIGHT) {
                 let ind =  Math.min(selected.ind + 1, instruments[selected.inst].ordered.length - 1);
                 selected = {
                     ind,
                     inst: selected.inst,
                     meas: instruments[selected.inst].ordered[ind]
                 };
+                API.displaySelected(selected);
+
                 return;
             };
         }

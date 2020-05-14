@@ -72,6 +72,7 @@ class App extends Component {
           selected: { },
           isPlaying: false,
           isPreviewing: false,
+          keysDisabled: false,
           previewMeasure: {},
           insertMeas: {},
           editMeas: {},
@@ -165,6 +166,7 @@ class App extends Component {
       this.settings = this.settings.bind(this);
       this.handleNew = this.handleNew.bind(this);
       this.handleOpen = this.handleOpen.bind(this);
+      this.confirmEdit = this.confirmEdit.bind(this);
       this.inputs = {};
 
 
@@ -195,7 +197,13 @@ class App extends Component {
           return ({ instruments: oldState.instruments });
       });
 
-      var displaySelected = (selected) => self.setState(oldState => ({ selected }));
+      var displaySelected = (selected) => 
+          self.setState(oldState => ({
+              selected,
+              edit_start: selected.meas.start,
+              edit_end: selected.meas.end,
+              edit_timesig: selected.meas.timesig
+          }));
 
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
@@ -252,7 +260,9 @@ class App extends Component {
 
       var reportWindow = (viewport, scale) => this.setState({ viewport, scale });
 
-      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow };
+      var disableKeys = () => this.state.keysDisabled;
+
+      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys };
   }
 
   instOpen(e) {
@@ -320,7 +330,6 @@ class App extends Component {
               locks.splice(oldLock, 1)
           else
               locks.push(val);
-          console.log(locks);
           return ({ locks });
       });
   };
@@ -362,30 +371,55 @@ class App extends Component {
 
   handleNumEdit(e) {
       if (e.target.value === '') {
-          //this.setState({ [e.target.name]: '' })
+          this.setState({ ['edit_'.concat(e.target.name)]: '' });
       }
-      else if (/^[0-9\b]+$/.test(e.target.value)) { //&& e.target.value.length > 1) {
+      else if (/^[0-9\b]+$/.test(e.target.value)) {
+
           let intVal = parseInt(e.target.value, 10);
-          let newMeas = {
-              start: this.state.selected.meas.start,
-              end: this.state.selected.meas.end,
-              timesig: this.state.selected.meas.timesig,
-              offset: this.state.selected.meas.offset
-          };
-          Object.assign(newMeas, { [e.target.name]: intVal });
-
-          let editMeas = (['start', 'end', 'timesig'].reduce((acc, i) => acc && newMeas[i], true)) ?
-              MeasureCalc(
-                  newMeas, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
-              ) :
-              {};
-
-          this.setState({
+          let newState = {
               ['edit_'.concat(e.target.name)]: intVal,
-              editMeas
-          });
+          };
+
+          let minLength = 2;
+          if (e.target.name === 'timesig')
+              minLength = 1;
+          if (e.target.value.length < minLength) {
+              // visual cue that minimum hasn't been reached
+              //newState.editMeas = {};
+          } else {
+              let newMeas = {
+                  start: this.state.edit_start || this.state.selected.meas.start,
+                  end: this.state.edit_end || this.state.selected.meas.end,
+                  timesig: this.state.edit_timesig || this.state.selected.meas.timesig,
+                  offset: this.state.edit_offset || this.state.selected.meas.offset
+              };
+
+              Object.assign(newMeas, { [e.target.name]: intVal });
+
+              newState.editMeas = (['start', 'end', 'timesig'].reduce((acc, i) => acc && newMeas[i], true)) ?
+                  MeasureCalc(
+                      newMeas, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
+                  ) :
+                  {};
+          }
+
+          this.setState(newState);
       };
   }
+
+  confirmEdit() {
+      this.setState(oldState => {
+          let instruments = oldState.instruments;
+          let id = oldState.selected.meas.id;
+          instruments[oldState.selected.inst].measures[id] = { ...oldState.editMeas, id };
+          
+          return {
+              instruments,
+              editMeas: {}
+          }
+      });
+  }
+
 
 
   handleNameInput(e) {
@@ -421,7 +455,6 @@ class App extends Component {
   };
 
   midi() {
-
       let tracks = this.state.instruments.map((inst, i_ind) => {
 
 
@@ -685,7 +718,7 @@ class App extends Component {
             id={name}
             type="text"
             key={name}
-            value={this.state['edit_' + name] || ('meas' in this.state.selected ? this.state.selected.meas[name] : '')}
+            value={this.state['edit_' + name]}
             placeholder={name}
             name={name}
             onChange={this.handleNumEdit}
@@ -761,10 +794,22 @@ class App extends Component {
           </Panel>
           
           { (this.state.mode === 2 && 'meas' in this.state.selected) ?
-              <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset} top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}>
+              <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset}
+                top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}
+                width={this.state.selected.meas.ms * this.state.scale}
+              >
                 <form onSubmit={this.handleEdit} className="measure-form" autoComplete="off">
                     { edit_inputs }
-                    <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                    <button type="button" onClick={this.confirmEdit} disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                    <div style={{ float: 'right' }}>
+                        { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
+                            <Lock 
+                                key={button}
+                                value={index + 1}
+                                onClick={(e) => this.handleLock(index + 1, e)}
+                                checked={this.state.locks.indexOf(index + 1) >= 0}
+                            >{button}</Lock>) }
+                    </div>
                 </form>
               </Edit> : null
           }
@@ -800,15 +845,6 @@ class App extends Component {
                 </Insert>
             : null }
         <TrackingBar className="tracking" left={(window.innerWidth - CONFIG.CANVAS_PADDING*2 - CONFIG.TOOLBAR_WIDTH) / 3.0 + CONFIG.CANVAS_PADDING}>
-            <div style={{ float: 'right' }}>
-                { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
-                    <Lock 
-                        key={button}
-                        value={index + 1}
-                        onClick={(e) => this.handleLock(index + 1, e)}
-                        checked={this.state.locks.indexOf(index + 1) >= 0}
-                    >{button}</Lock>) }
-            </div>
         </TrackingBar>
 
         { this.state.mode === 2 ?

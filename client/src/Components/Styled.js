@@ -186,6 +186,7 @@ var Edit = styled.div`
     position: absolute;
     top: ${props => props.top}px;
     left: ${props => props.left}px;
+    width: ${props => props.width}px;
     input {
         margin: 0px;
         background-color: initial;
