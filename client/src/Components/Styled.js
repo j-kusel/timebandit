@@ -236,8 +236,8 @@ let transitions = (apply) => ['-webkit-transition', '-moz-transition', '-ms-tran
     .reduce((acc, t) => `${acc}${t}-property: ${apply};\n`, '');
 
 var Lock = styled.button`
-    width: ${c.TRACKING_HEIGHT}px;
-    height: ${c.TRACKING_HEIGHT}px;
+    width: ${c.LOCK_HEIGHT}px;
+    height: ${c.LOCK_HEIGHT}px;
     ${transitions('none')}
     border: none;
     border-left: 1px solid ${props => props.checked ? primary : secondary};

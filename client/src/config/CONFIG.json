@@ -49,6 +49,8 @@
     "EDITOR_PADDING": 4,
     "EDITOR_WIDTH": 500,
 
+    "LOCK_HEIGHT":  20,
+
     "PREVIEW_HEIGHT": 20,
 
     "FOOTER_HEIGHT": 100,

@@ -407,7 +407,8 @@ class App extends Component {
       };
   }
 
-  confirmEdit() {
+  confirmEdit(e) {
+      e.preventDefault();
       this.setState(oldState => {
           let instruments = oldState.instruments;
           let id = oldState.selected.meas.id;
@@ -798,9 +799,9 @@ class App extends Component {
                 top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}
                 width={this.state.selected.meas.ms * this.state.scale}
               >
-                <form onSubmit={this.handleEdit} className="measure-form" autoComplete="off">
+                <form onSubmit={this.confirmEdit} className="measure-form" autoComplete="off">
                     { edit_inputs }
-                    <button type="button" onClick={this.confirmEdit} disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                    <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
                     <div style={{ float: 'right' }}>
                         { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
                             <Lock 

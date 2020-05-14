@@ -236,7 +236,7 @@ export default function measure(p) {
         if ('ms' in editMeas) {
             selected.meas.temp = editMeas;
             if (beat_lock.length === 1)
-                selected.meas.offset += selected.meas.beats[beat_lock[0]] - editMeas.beats[beat_lock[0]];
+                selected.meas.temp.offset = selected.meas.temp.offset + selected.meas.beats[beat_lock[0]] - editMeas.beats[beat_lock[0]];
         } else if ('meas' in selected && 'temp' in selected.meas)
             delete selected.meas.temp;
 
@@ -373,7 +373,7 @@ export default function measure(p) {
 
                 let temp = 'temp' in measure;
                 var [ticks, beats, offset, ms, s, e] = temp ?
-                    [measure.temp.ticks, measure.temp.beats, measure.temp.offset, measure.temp.beats.slice(-1)[0], measure.temp.start, measure.temp.end] :
+                    [measure.temp.ticks, measure.temp.beats, measure.temp.offset, measure.temp.beats.slice(-1)[0], measure.temp.start || measure.start, measure.temp.end || measure.end] :
                     [measure.ticks, measure.beats, measure.offset, measure.beats.slice(-1)[0], measure.start, measure.end];
 
                 let origin = (offset)*scale + viewport;
@@ -656,7 +656,7 @@ export default function measure(p) {
             Mouse.pop();
 
             p.translate(0, c.INST_HEIGHT);
-            p.rect(0, 0, c.PANES_WIDTH*2 + select.ms*scale, c.PANES_WIDTH *2);
+            p.rect(0, 0, c.PANES_WIDTH*2 + select.ms*scale, c.LOCK_HEIGHT);
 
             p.stroke(secondary);
             p.fill(secondary);
@@ -984,12 +984,13 @@ export default function measure(p) {
 
     p.mousePressed = function(e) {
 
-        // return if outside canvas
+        // return if outside canvas or over active menu
         if (p.mouseX === Infinity 
             || p.mouseX < 0
             || p.mouseY === Infinity 
             || p.mouseY < 0
-            || p.mouseY > p.height) {
+            || p.mouseY > p.height
+        ) {
             Mouse.outside_origin = true;
             return;
         } else
@@ -1001,10 +1002,25 @@ export default function measure(p) {
             return;
         };
 
-
-        let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)*0.01);
+        let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
         if (inst >= instruments.length || inst < 0)
             return;
+
+        // check for editor menus
+        if (mode === 2
+            && 'meas' in selected
+        ) {
+            let selStart = c.PANES_WIDTH + selected.meas.offset*scale + viewport;
+            let menuStart = inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
+            if (p.mouseY > menuStart
+                && p.mouseY < menuStart + c.LOCK_HEIGHT
+                && p.mouseX > selStart
+                && p.mouseX < selStart + selected.meas.ms*scale
+            ) {
+                Mouse.outside_origin = true;
+                return;
+            }
+        }
 
         if (API.pollSelecting()) {
             insertMeas.temp_offset = API.confirmSelecting(inst);
@@ -1016,11 +1032,30 @@ export default function measure(p) {
         var change = -1;
 
         let measures = instruments[inst].ordered;
+        for (let m=0; m<measures.length; m++) {
+            var left = measures[m].offset*scale + viewport + c.PANES_WIDTH;
+            var right = left + measures[m].ms*scale; 
+            if (p.mouseX > left
+                && p.mouseX < right
+                && p.mouseY > 0 
+                && p.mouseY < p.height
+            ) {
+                if (!('meas' in selected) || measures[m].id !== selected.meas.id) {
+                    selected = {
+                        inst,
+                        meas: measures[m],
+                        ind: m
+                    };
+                    API.displaySelected(selected);
+                    // always return if new selection
+                    return;
+                }
+                break;
+            } 
+        };
 
-        
-
+        let measure = selected.meas;
         if (mod_check([1, 2], modifiers)) {
-            let measure = selected.meas;
             measure.temp = initialize_temp(measure);
             Mouse.grabbed = Mouse.rollover.beat === measure.beats.length - 1 ?
                 60000.0/measure.beats.slice(-1)[0]
@@ -1050,28 +1085,12 @@ export default function measure(p) {
         };
 
         // if nothing is locked, just drag the measure
-        if (!('meas' in selected) || !(selected.meas.id in locked && locked[selected.meas.id].beats))
-            Mouse.drag.mode = 'measure';
+        // MIGHT BE REDUNDANT NOW
+        /*if (!('meas' in selected) || !(selected.meas.id in locked && locked[selected.meas.id].beats))
+            Mouse.drag.mode = 'measure';*/
 
 
-        selected = { inst };
-        for (let m=0; m<measures.length; m++) {
-            var left = measures[m].offset*scale + viewport + c.PANES_WIDTH;
-            var right = left + measures[m].ms*scale; 
-            if (p.mouseX > left
-                && p.mouseX < right
-                && p.mouseY > 0 
-                && p.mouseY < p.height
-            ) {
-                Object.assign(selected, {
-                    meas: measures[m],
-                    ind: m
-                });
-                break;
-            } 
-        };
 
-        API.displaySelected(selected);
     }
 
     p.mouseDragged = function(event) {
