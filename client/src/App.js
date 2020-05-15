@@ -200,6 +200,7 @@ class App extends Component {
       var displaySelected = (selected) => 
           self.setState(oldState => ({
               selected,
+              //editMeas: {},
               edit_start: selected.meas.start,
               edit_end: selected.meas.end,
               edit_timesig: selected.meas.timesig
@@ -243,10 +244,16 @@ class App extends Component {
             this.insertFocus.current.focus();
           } else {
               newState.insertMeas = {};
-              if (mode === 2) {}
+              if (mode === 2) {
+                //['start', 'end', 'timesig'].forEach(x => newState['edit_'.concat(x)] = this.selected.meas[x]);
+              }
               else {
-                  ['start', 'end', 'timesig', 'offset'].forEach(x => newState[x] = '');
+                  ['start', 'end', 'timesig', 'offset'].forEach(x => {
+                      newState[x] = '';
+                      newState['edit_'.concat(x)] = '';
+                  });
                   newState.temp_offset = false;
+                  newState.editMeas = {};
               }
               this.setState(newState);
           };
@@ -262,7 +269,13 @@ class App extends Component {
 
       var disableKeys = () => this.state.keysDisabled;
 
-      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys };
+      var updateEdit = (s, e, ts, off) => this.setState({
+          edit_start: s,
+          edit_end: e,
+          edit_timesig: ts,
+      });
+
+      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit };
   }
 
   instOpen(e) {

@@ -228,6 +228,7 @@ export default function measure(p) {
 
 
         console.log(editMeas);
+        console.log(selected);
 
         // reset select on update
         if (selected.inst > -1 && 'meas' in selected)
@@ -873,6 +874,7 @@ export default function measure(p) {
                     meas: instruments[selected.inst + 1].ordered[ind],
                     ind
                 };
+                editMeas = {};
                 API.displaySelected(selected);
                 return;
             }
@@ -886,6 +888,7 @@ export default function measure(p) {
                     meas: instruments[selected.inst -1].ordered[ind],
                     ind
                 };
+                editMeas = {};
                 API.displaySelected(selected);
 
                 return;
@@ -898,6 +901,8 @@ export default function measure(p) {
                     inst: selected.inst,
                     meas: instruments[selected.inst].ordered[ind]
                 };
+                
+                editMeas = {};
                 API.displaySelected(selected);
 
                 return;
@@ -910,6 +915,8 @@ export default function measure(p) {
                     inst: selected.inst,
                     meas: instruments[selected.inst].ordered[ind]
                 };
+
+                editMeas = {};
                 API.displaySelected(selected);
 
                 return;
@@ -934,6 +941,7 @@ export default function measure(p) {
 
         if (p.keyCode === KeyV) {
             mode = 2;
+            API.displaySelected(selected);
             API.updateMode(mode);
             return;
         };
@@ -1019,6 +1027,8 @@ export default function measure(p) {
             ) {
                 Mouse.outside_origin = true;
                 return;
+            } else {
+                editMeas = {};
             }
         }
 
@@ -1138,7 +1148,6 @@ export default function measure(p) {
                 new_beats.push(cumulative);
 
 
-                console.log(fresh_slope);
                 Object.assign(measure.temp, {
                     slope: fresh_slope,
                     end: measure.temp.start + fresh_slope*measure.timesig,
@@ -1153,7 +1162,7 @@ export default function measure(p) {
                 
             }
 
-            console.log(measure.temp);
+            API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
             return;
         }
 
