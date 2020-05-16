@@ -16,7 +16,7 @@ for (let i=0; i < 5; i++) {
     gains.push(gain);
 };
 
-var oscs = [440, 220, 110].map((freq, ind) => {
+/*var oscs = [440, 220, 110].map((freq, ind) => {
     let osc = aC.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, aC.currentTime);
@@ -26,6 +26,7 @@ var oscs = [440, 220, 110].map((freq, ind) => {
     osc.start();
     return osc;
 });
+*/
 
     
 gains.forEach(gain => gain.connect(aC.destination));
@@ -97,7 +98,7 @@ var playback = (isPlaying, score, tracking) => {
 
 
 // USE THIS IF INDEPENDENT SCHEDULERS AREN'T EFFECTIVE
-var compile = (score) => {
+/*var compile = (score) => {
     let pointers = score.map(() => 0);
     console.log(pointers);
     let ordered = [];
@@ -116,6 +117,7 @@ var compile = (score) => {
     };
     return ordered;
 };
+*/
 
 
 var audio = {

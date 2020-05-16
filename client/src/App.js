@@ -10,7 +10,7 @@ import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
 
 import { MeasureCalc, order_by_key } from './Util/index';
 import UI from './Components/Canvas';
-import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, AudioButton, InstName, Lock, TBDropdown } from './Components/Styled';
+import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
 import { SettingsModal, WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -200,7 +200,7 @@ class App extends Component {
       var displaySelected = (selected) => 
           self.setState(oldState => ({
               selected,
-              //editMeas: {},
+              editMeas: {},
               edit_start: selected.meas.start,
               edit_end: selected.meas.end,
               edit_timesig: selected.meas.timesig
@@ -239,6 +239,7 @@ class App extends Component {
               
       var updateMode = (mode, options) => {
           let newState = { mode };
+          console.log(mode);
           if (mode === 1) {
             this.setState(newState);
             this.insertFocus.current.focus();
@@ -703,7 +704,7 @@ class App extends Component {
         name: inst.name
     }));
 
-    var cursor = timeToChrono(this.state.cursor);
+    //var cursor = timeToChrono(this.state.cursor);
     
     let measure_inputs = [
         <FormInput
@@ -769,7 +770,7 @@ class App extends Component {
     //tempo_ppqs.forEach((p) => console.log(p));
       //
 
-    let modalButtons = ['Close', 'Save changes'].map((name, ind) => (<Upload key={ind}>{name}</Upload>));
+    //let modalButtons = ['Close', 'Save changes'].map((name, ind) => (<Upload key={ind}>{name}</Upload>));
 
     let selected = this.state.selected;
 
@@ -814,7 +815,7 @@ class App extends Component {
               >
                 <form onSubmit={this.confirmEdit} className="measure-form" autoComplete="off">
                     { edit_inputs }
-                    <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                    <Submit type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</Submit>
                     <div style={{ float: 'right' }}>
                         { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
                             <Lock 
@@ -831,13 +832,14 @@ class App extends Component {
           <UI mode={this.state.mode} locks={this.state.locks} instruments={newInstruments} panels={this.state.newInst} editMeas={this.state.editMeas} insertMeas={this.state.insertMeas} API={this.API} CONSTANTS={CONSTANTS}/>
 
           {/* right toolbar controls */}
-          <Rehearsal x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={CONFIG.PLAYBACK_HEIGHT}>
+        {/*<Rehearsal x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={CONFIG.PLAYBACK_HEIGHT}>
             rehearsal
           </Rehearsal>
-          { metadata }
-          <Log x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.LOG_HEIGHT - CONFIG.TRACKING_HEIGHT}>
+          */}
+          { /*metadata*/ }
+        {/*<Log x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.LOG_HEIGHT - CONFIG.TRACKING_HEIGHT}>
             log
-          </Log>
+          </Log>*/}
 
           {/* modes */}
             { this.state.mode === 1 ? 
@@ -871,9 +873,9 @@ class App extends Component {
           {/* footer */}
           <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px` }}>
             <h1 className="flavor" style={{ display: 'inline-block' }}>BANDIT</h1>
-            <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
+            <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" alt="Github link" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
         
-            <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
+            <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
             <div style={{ position: 'relative', float: 'right', top: '32px' }}>
                 <Upload onClick={this.settings}>settings</Upload>
                 <Upload onClick={this.reset}>new</Upload>

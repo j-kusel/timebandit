@@ -232,6 +232,14 @@ var Upload = styled(TBButton)`
     }
 `;
 
+var Submit = styled(TBButton)`
+    height: ${c.TRACKING_HEIGHT - 4}px;
+    margin: ${4}px;
+    &:focus {
+        outline: none;
+    }
+`;
+
 let transitions = (apply) => ['-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
     .reduce((acc, t) => `${acc}${t}-property: ${apply};\n`, '');
 
@@ -309,4 +317,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
