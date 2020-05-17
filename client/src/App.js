@@ -131,14 +131,15 @@ class App extends Component {
                       offset: 12000
                   }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[3] },
 
-                  [ids[4]]: { ...MeasureCalc({ 
+                  /*[ids[4]]: { ...MeasureCalc({ 
                       start: 144,
                       end: 72,
                       timesig: 7,
                       offset: 300
                   }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[4] },
+                  */
               }
-          }) : console.log(0);
+          }) : null;
 
       
       this.sizing = 600.0;
@@ -197,7 +198,7 @@ class App extends Component {
           return ({ instruments: oldState.instruments });
       });
 
-      var displaySelected = (selected) => 
+      var displaySelected = (selected) => {
           self.setState(oldState => ({
               selected,
               editMeas: {},
@@ -205,6 +206,7 @@ class App extends Component {
               edit_end: selected.meas.end,
               edit_timesig: selected.meas.timesig
           }));
+      };
 
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
@@ -239,7 +241,6 @@ class App extends Component {
               
       var updateMode = (mode, options) => {
           let newState = { mode };
-          console.log(mode);
           if (mode === 1) {
             this.setState(newState);
             this.insertFocus.current.focus();
@@ -338,8 +339,9 @@ class App extends Component {
 
   handleLock(val, e) {
       let oldLock = this.state.locks.indexOf(val);
+
       this.setState(oldState => {
-          let locks = oldState.locks;
+          let locks = [...oldState.locks];
           if (oldLock >= 0)
               locks.splice(oldLock, 1)
           else
@@ -699,6 +701,7 @@ class App extends Component {
       )
     };
 
+
     var newInstruments = this.state.instruments.map((inst) => ({ 
         measures: Object.assign({}, inst.measures), 
         name: inst.name
@@ -736,6 +739,7 @@ class App extends Component {
             value={this.state['edit_' + name]}
             placeholder={name}
             name={name}
+            style={{ float: 'left' }}
             onChange={this.handleNumEdit}
         />
     );
@@ -814,11 +818,14 @@ class App extends Component {
                 width={this.state.selected.meas.ms * this.state.scale}
               >
                 <form onSubmit={this.confirmEdit} className="measure-form" autoComplete="off">
-                    { edit_inputs }
-                    <Submit type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</Submit>
+                    <div style={{ maxWidth: '150px', float: 'left' }}>
+                        { edit_inputs }
+                        <Submit type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</Submit>
+                    </div>
                     <div style={{ float: 'right' }}>
                         { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
                             <Lock 
+                                type="button"
                                 key={button}
                                 value={index + 1}
                                 onClick={(e) => this.handleLock(index + 1, e)}

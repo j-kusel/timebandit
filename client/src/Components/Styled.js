@@ -188,7 +188,8 @@ var Edit = styled.div`
     left: ${props => props.left}px;
     width: ${props => props.width}px;
     input {
-        margin: 0px;
+        margin: 0px 6px;
+        width: 28px;
         background-color: initial;
     }
     z-index: 50;
@@ -207,6 +208,7 @@ const StyledLink = styled(Link)`
 
 const FormInput = styled.input`
     ${form_mixin}
+    padding: 2px 4px;
     color: ${secondary};
     background-color: ${primary};
 `;
@@ -233,8 +235,11 @@ var Upload = styled(TBButton)`
 `;
 
 var Submit = styled(TBButton)`
-    height: ${c.TRACKING_HEIGHT - 4}px;
-    margin: ${4}px;
+    
+    padding: 0px 4px;
+    font-size: 10px;
+    float: right;
+    margin: ${2}px;
     &:focus {
         outline: none;
     }
@@ -250,7 +255,7 @@ var Lock = styled.button`
     border: none;
     border-left: 1px solid ${props => props.checked ? primary : secondary};
     color: ${props => props.checked ? primary : secondary};
-    background-color: ${props => props.checked ? secondary : primary};
+    background-color: ${props => props.checked ? secondary : 'initial'};
     text-align: center;    
     &:focus {
         outline: none;

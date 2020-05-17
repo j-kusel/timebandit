@@ -217,7 +217,6 @@ export default function measure(p) {
     }
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
-
         instruments = props.instruments;
         insertMeas = props.insertMeas;
 
@@ -229,10 +228,6 @@ export default function measure(p) {
         var beat_lock = ('meas' in selected && selected.meas.id in locked && locked[selected.meas.id].beats) ?
             parse_bits(locked[selected.meas.id].beats) : [];
 
-
-        console.log(editMeas);
-        console.log(selected);
-
         // reset select on update
         if (selected.inst > -1 && 'meas' in selected)
             selected.meas = instruments[selected.inst].measures[selected.meas.id];
@@ -242,18 +237,13 @@ export default function measure(p) {
             if (beat_lock.length === 1)
                 selected.meas.temp.offset = selected.meas.temp.offset + selected.meas.beats[beat_lock[0]] - editMeas.beats[beat_lock[0]];
         } else if ('meas' in selected && 'temp' in selected.meas) {
-            console.log(selected.meas.temp);
-            console.log('deleting...');
             delete selected.meas.temp;
         }
 
-        if ('meas' in selected) {
-            console.log(selected.meas.temp);
-            console.log(instruments[selected.inst].measures[selected.meas.id].temp);
-        }
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
 
+        console.log(instruments[1].measures);
         // REFACTOR ORDERING INTO NUM ITERATIONS LATER
         instruments.forEach((inst) => {
             inst.ordered = order_by_key(inst.measures, 'offset');
@@ -378,6 +368,7 @@ export default function measure(p) {
                 var [ticks, beats, offset, ms, s, e] = temp ?
                     [measure.temp.ticks, measure.temp.beats, measure.temp.offset, measure.temp.beats.slice(-1)[0], measure.temp.start || measure.start, measure.temp.end || measure.end] :
                     [measure.ticks, measure.beats, measure.offset, measure.beats.slice(-1)[0], measure.start, measure.end];
+
 
                 let origin = (offset)*scale + viewport;
                 let final = ms * scale;
@@ -631,7 +622,7 @@ export default function measure(p) {
             if (Mouse.drag.mode === 'tempo' && 'temp' in select) {
                 p.ellipse(select.temp.beats[Mouse.drag.index]*scale, Mouse.loc.y, 10, 10); 
                 Mouse.cursor = 'ns-resize';
-            } else {
+            } else if (Mouse.drag.mode !== 'tick') {
                 for (let i=0; i < select.beats.length; i++) {
                     let xloc = select.beats[i]*scale;
                     let yloc = c.INST_HEIGHT - base - slope*i;
@@ -1012,8 +1003,6 @@ export default function measure(p) {
         };
 
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
-        if (inst >= instruments.length || inst < 0)
-            return;
 
         // check for editor menus
         if (mode === 2
@@ -1032,6 +1021,9 @@ export default function measure(p) {
                 editMeas = {};
             }
         }
+
+        if (inst >= instruments.length || inst < 0)
+            return;
 
         if (API.pollSelecting()) {
             insertMeas.temp_offset = API.confirmSelecting(inst);
@@ -1104,64 +1096,16 @@ export default function measure(p) {
 
     p.mouseDragged = function(event) {
 
+        if (Mouse.rollover.beat === 0
+            || Mouse.outside_origin
+            || selected.meas === -1)
+            return;
+
         if (!('meas' in selected))
             return;
 
         var beat_lock = (selected.meas.id in locked && locked[selected.meas.id].beats) ?
             parse_bits(locked[selected.meas.id].beats) : [];
-
-        if (Mouse.drag.mode === 'tempo') {
-            let measure = selected.meas;
-            if (!('temp' in measure))
-                measure.temp = initialize_temp(measure);
-            Mouse.drag.y += event.movementY;
-            let spread = range.tempo[1] - range.tempo[0];
-            let change = Mouse.drag.y / c.INST_HEIGHT * spread;
-            
-
-            let PPQ_mod = CONSTANTS.PPQ / CONSTANTS.PPQ_tempo;
-            if (beat_lock.length && beat_lock[0] !== Mouse.grabbed) {
-                let slope = (measure.end - measure.start)/measure.timesig;
-                let old_slope = slope*beat_lock[0];
-                let new_slope = slope*Mouse.grabbed - change;
-                let fresh_slope = (new_slope - old_slope) / (Mouse.grabbed - beat_lock[0]);
-                measure.temp.start = (new_slope + measure.start) - fresh_slope*Mouse.grabbed;
-                let inc = fresh_slope/CONSTANTS.PPQ;
-
-                let cumulative = 0.0;
-                let K = 60000.0 / CONSTANTS.PPQ;
-                let last = 0;
-
-                let new_beats = [];
-                let new_ticks = [];
-                measure.ticks.forEach((_, i) => {
-                    if (!(i%CONSTANTS.PPQ))
-                        new_beats.push(cumulative);
-                    new_ticks.push(cumulative);
-                    if (i%PPQ_mod === 0) 
-                        last = K / (measure.temp.start + inc*i);
-                    cumulative += last;
-                });
-                new_beats.push(cumulative);
-
-
-                Object.assign(measure.temp, {
-                    slope: fresh_slope,
-                    end: measure.temp.start + fresh_slope*measure.timesig,
-                    offset: ((beat_lock.length === 1) ?
-                        measure.offset + measure.beats[beat_lock[0]] - new_beats[beat_lock[0]] : 
-                        measure.offset),
-                    ticks: new_ticks,
-                    beats: new_beats,
-                });
-
-
-                
-            }
-
-            API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
-            return;
-        }
 
         var closest = (position, inst, div) =>
             Object.keys(snaps.divs[div]).reduce((acc, key, ind, keys) => {
@@ -1183,14 +1127,63 @@ export default function measure(p) {
                 return acc;
             }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
-        if (Mouse.rollover.beat === 0
-            || Mouse.outside_origin
-            || selected.meas === -1)
+        let measure = selected.meas;
+
+        if (Mouse.drag.mode === 'tempo') {
+            if (!('temp' in measure))
+                measure.temp = initialize_temp(measure);
+            Mouse.drag.y += event.movementY;
+            let spread = range.tempo[1] - range.tempo[0];
+            let change = Mouse.drag.y / c.INST_HEIGHT * spread;
+            
+
+            let PPQ_mod = CONSTANTS.PPQ / CONSTANTS.PPQ_tempo;
+            if (beat_lock.length && beat_lock[0] !== Mouse.grabbed) {
+                let slope = (measure.end - measure.start)/measure.timesig;
+                let old_slope = slope*beat_lock[0];
+                let new_slope = slope*Mouse.grabbed - change;
+                let fresh_slope = (new_slope - old_slope) / (Mouse.grabbed - beat_lock[0]);
+                let temp_start = (new_slope + measure.start) - fresh_slope*Mouse.grabbed;
+                let inc = fresh_slope/CONSTANTS.PPQ;
+
+                let cumulative = 0.0;
+                let K = 60000.0 / CONSTANTS.PPQ;
+                let last = 0;
+
+                let new_beats = [];
+                let new_ticks = [];
+                measure.ticks.forEach((_, i) => {
+                    if (!(i%CONSTANTS.PPQ))
+                        new_beats.push(cumulative);
+                    new_ticks.push(cumulative);
+                    if (i%PPQ_mod === 0) 
+                        last = K / (measure.temp.start + inc*i);
+                    cumulative += last;
+                });
+                new_beats.push(cumulative);
+
+
+
+
+                Object.assign(measure.temp, {
+                    slope: fresh_slope,
+                    start: temp_start,
+                    end: temp_start + fresh_slope*measure.timesig,
+                    offset: ((beat_lock.length === 1) ?
+                        measure.offset + measure.beats[beat_lock[0]] - new_beats[beat_lock[0]] : 
+                        measure.offset),
+                    ticks: new_ticks,
+                    beats: new_beats,
+                });
+            }
+
+            API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
             return;
+        }
+
       
         Mouse.drag.x += event.movementX;
 
-        let measure = selected.meas;
 
         if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X) {
             delete measure.temp;
@@ -1254,6 +1247,7 @@ export default function measure(p) {
             return;
         };
 
+        
 
         let beatscale = (-Mouse.drag.x*scale); // /p.width
 
@@ -1272,14 +1266,17 @@ export default function measure(p) {
         let amp_lock = beatscale/perc;
 
 
-        let ticks = (Mouse.rollover.beat) * CONSTANTS.PPQ_tempo;
+        let ticks = (selected.meas.timesig) * CONSTANTS.PPQ_tempo;
+//(Mouse.rollover.beat) * CONSTANTS.PPQ_tempo;
         let tick_array = Array.from({length: ticks}, (_, i) => i);
+        let grab_array = Array.from({length: Mouse.rollover.beat * CONSTANTS.PPQ_tempo}, (_, i) => i);
 
 
         // if START is locked
         // change slope, preserve start
         if (locks & (1 << 1)) {
             slope += amp_lock;
+            console.log(slope);
             temp_start = measure.start;
         }
 
@@ -1299,16 +1296,21 @@ export default function measure(p) {
         };
 
 
+
         let PPQ_mod = CONSTANTS.PPQ / CONSTANTS.PPQ_tempo;
         let C = (delta) => 60000.0 * (measure.beats.length - 1) / (delta);
         let sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
+        let rollover = Mouse.rollover.beat * CONSTANTS.PPQ_tempo;
 
         let C1 = C(slope);
 
         let lock = 0;
+        let grabbed;
         let ms = C1 * tick_array.reduce((sum, _, i) => {
             if (beat_lock.length && (i === beat_lock[0]*CONSTANTS.PPQ_tempo))
                 lock = sum*C1;
+            if (i === rollover)
+                grabbed = sum*C1;
             return sum + sigma(temp_start, C1)(i);
         }, 0);
 
@@ -1324,7 +1326,7 @@ export default function measure(p) {
         if (lock)
             temp_offset += measure.beats[beat_lock] - lock;
 
-        let loc = ms + temp_offset;
+        let loc = grabbed + temp_offset;
 
         // check for gap
         /*let crowding = measure.gaps
@@ -1335,8 +1337,41 @@ export default function measure(p) {
             return;
             */
 
+        let position = (measure.temp.offset || measure.offset);
+        // check for overlaps
+        let crowding = measure.gaps
+            .reduce((acc, gap) => {
+                // does it even fit in the gap?
+                if (gap[1] - gap[0] < measure.ms)
+                    return acc;
+                let start = [gap[0], position - gap[0]];
+                let end = [gap[1], gap[1] - (position + ms)];
+                if (Math.abs(start[1]) < Math.abs(acc.start[1]))
+                    acc.start = start;
+                if (Math.abs(end[1]) < Math.abs(acc.end[1]))
+                    acc.end = end;
+                return acc;
+            }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
+        console.log(crowding);
+
+        if (crowding.start[1] < 0 || crowding.end[1] < 0)
+            return;
+
         let snap_to = closest(loc, selected.inst, snaps.div_index).target;
         let gap = loc - snap_to;
+        debug_message = crowding.end[1];
+
+        if (crowding.start[1] < c.SNAP_THRESHOLD) {
+            rollover = 0;
+            snap_to = crowding.start[0];
+            gap = crowding.start[1];
+        } else if (crowding.end[1] < c.SNAP_THRESHOLD) {
+            rollover = (measure.beats.length - 1) * CONSTANTS.PPQ_tempo;
+            snap_to = crowding.end[0];
+            gap = crowding.end[1];
+        }
+
+
         let diff = slope;
 
         // LENGTH GRADIENT DESCENT
@@ -1349,7 +1384,6 @@ export default function measure(p) {
         var nudge = (gap, alpha, depth) => {
             if (depth > 99 || Math.abs(gap) < c.NUDGE_THRESHOLD)
                 return diff;
-
             // if END is locked
             if (diff_null) {
                 measure.temp.start *= (gap > c.NUDGE_THRESHOLD) ?
@@ -1362,15 +1396,21 @@ export default function measure(p) {
             
             let new_C = C(diff);
             let locked = 0;
+            let grabbed = -1;
             let lock_target = beat_lock[0] * CONSTANTS.PPQ_tempo;
             let ms = new_C * tick_array.reduce((sum, _, i) => {
                 if (i === lock_target)
                     locked = sum*new_C;
+                if (i === rollover) {
+                    grabbed = sum*new_C;
+                }
                 return sum + sigma(measure.temp.start, new_C)(i);
             }, 0);
             if (locked)
                 measure.temp.offset = measure.offset + measure.beats[beat_lock[0]] - locked;
-            let new_gap = ms + (measure.temp.offset || measure.offset) - snap_to;
+            // default snap target to end if nowhere else
+            grabbed = (grabbed < 0) ? ms : grabbed;
+            let new_gap = grabbed + (measure.temp.offset || measure.offset) - snap_to;
             alpha = monitor(gap, new_gap, alpha);
             return nudge(new_gap, alpha, depth + 1);
         };
@@ -1381,6 +1421,7 @@ export default function measure(p) {
             // for the last time and nudge.
             if (!temp_slope) {
                 measure.temp.start = temp_start;
+                console.log('START NUDGE');
                 temp_slope = nudge(gap, 0.001, 0);
             };
             slope = temp_slope;
@@ -1391,21 +1432,33 @@ export default function measure(p) {
 
                    
         // INVERT THIS DRAG AT SOME POINT?
-        let inc = slope/(measure.ticks.length);
+
+        var SNAP_THRESH = 2.0;
+        /*if ((locks & (1 << 3)) && slope * dir < SNAP_THRESH) {
+        */
 
         // if DIRECTION is locked
         if (locks & (1 << 3)) {
             // flat measure can't change direction
             if (!dir)
                 return;
-            inc = (dir === 1) ?
+            if (slope * dir < SNAP_THRESH) {
+                slope = 0;
+                if (locks & (1 << 2))
+                    measure.temp.start = measure.end;
+                else if (locks & (1 << 1))
+                    measure.temp.end = measure.start;
+            }
+            /*inc = (dir === 1) ?
                 Math.max(inc, 0) : inc;
             if (locks & (1 << 2))
                 measure.temp.start = (dir === 1) ?
                     Math.min(measure.temp.start, measure.end) :
                     Math.max(measure.temp.start, measure.end);
+                    */
         };
 
+        let inc = slope/(measure.ticks.length);
         let cumulative = 0.0;
         let K = 60000.0 / CONSTANTS.PPQ;
         let last = 0;
@@ -1423,6 +1476,7 @@ export default function measure(p) {
         new_beats.push(cumulative);
 
 
+        measure.temp.end = measure.temp.start + slope;
         measure.temp.slope = slope;
         measure.temp.offset = measure.offset;
         measure.temp.ms = cumulative;
@@ -1433,10 +1487,12 @@ export default function measure(p) {
         measure.temp.ticks = new_ticks;
         measure.temp.beats = new_beats;
 
-
     };
 
     p.mouseReleased = function(event) {
+        if (Mouse.outside_origin)
+            return;
+
         if (p.mouseY < 0 || p.mouseY > p.height)
             return;
         // handle threshold

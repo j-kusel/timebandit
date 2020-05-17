@@ -25,8 +25,9 @@ class UI extends Component {
             return true;
         if (nextProps.editMeas !== this.props.editMeas)
             return true;
-        if (nextProps.locks.length !== this.props.locks.length)
+        if (nextProps.locks.length !== this.props.locks.length) {
             return true;
+        }
         if (nextProps.instruments.length !== this.props.instruments.length)
             return true;
         if (nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ)
