@@ -157,7 +157,7 @@ export default function measure(p) {
         snapped_inst: {}
     };
     var nudge_cache = false;
-    var spread_nudge_cache = {};
+    var crowd_cache = false;
     var isPlaying = false;
     
 
@@ -1146,7 +1146,6 @@ export default function measure(p) {
                     acc);
             }, { target: -1, gap: Infinity, inst: -1 });
 
-        // DEPRECATED?
         var snap_eval = (position, candidates) =>
             candidates.reduce((acc, candidate, index) => {
                 let next = position + candidate;
@@ -1164,11 +1163,12 @@ export default function measure(p) {
             measure.gaps = calcGaps(instruments[selected.inst].ordered, selected.meas.id);
 
         let position = measure.offset + Mouse.drag.x/scale;
-        var crowding = (gaps, position, ms) =>
-            gaps
+        var crowding = (gaps, position, ms, options) => {
+            let strict = (options && 'strict' in options) ? options.strict : false;
+            return gaps
                 .reduce((acc, gap) => {
                     // does it even fit in the gap?
-                    if (gap[1] - gap[0] < ms)
+                    if (strict && gap[1] - gap[0] < ms)
                         return acc;
                     let start = [gap[0], position - gap[0]];
                     let end = [gap[1], gap[1] - (position + ms)];
@@ -1178,7 +1178,7 @@ export default function measure(p) {
                         acc.end = end;
                     return acc;
                 }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
-
+        }
 
         var PPQ_mod = CONSTANTS.PPQ / CONSTANTS.PPQ_tempo;
         var C = (delta) => 60000.0 * (measure.beats.length - 1) / (delta);
@@ -1186,13 +1186,10 @@ export default function measure(p) {
         var grab = Mouse.drag.grab * CONSTANTS.PPQ_tempo;
         var snapper = Mouse.drag.grab;
 
-//quickCalc(temp_start, slope, measure.beats.length - 1, beat_lock[0], snapper);
-
         var quickCalc = (start, slope, timesig, lock_target, _snapper) => {
             var C1 = (delta) => 60000.0 * (timesig) / (delta);
             var sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
 
-            //console.log({lock_target, _snapper});
             let new_C = C1(slope);
             let locked = 0;
             let snapped = -1;
@@ -1231,10 +1228,11 @@ export default function measure(p) {
 
             //let anchor_target = anchor * CONSTANTS.PPQ_tempo;
 
+            let ms;
             let nudge = (gap, alpha, depth) => {
                 if (depth > 99 || Math.abs(gap) < c.NUDGE_THRESHOLD)
                     // I DON'T THINK YOU NEED TO RETURN OFFSET HERE
-                    return { start, slope, offset };
+                    return { start, slope, offset, ms };
                 // if END is locked
                 if (diff_null) {
                     start *= (gap > c.NUDGE_THRESHOLD) ?
@@ -1249,7 +1247,8 @@ export default function measure(p) {
                     slope *= (gap > c.NUDGE_THRESHOLD) ?
                         (1 + alpha*delta) : (1 - alpha*delta);
 
-                let [ms, locked, snapped] = quickCalc(start, slope, measure.timesig, anchor, _snapper);
+                let locked, snapped;
+                [ms, locked, snapped] = quickCalc(start, slope, measure.timesig, anchor, _snapper);
                 if (locked)
                     offset = measure.offset + measure.beats[beat_lock[0]] - locked;
 
@@ -1272,43 +1271,16 @@ export default function measure(p) {
                 beat_lock[0] : 0;
             let pivot = (measure.end - measure.start)/measure.timesig * locked_beat;
             
-            /*let yNudgeF = (measure, snap, slope, _snapper, metalocks) => {
-                let start = measure.temp.start || measure.start;
-                let offset = measure.temp.offset || measure.offset;
-
-                let ms;
-                let yNudge = (gap, alpha, depth) => {
-                    if (depth > 99 || Math.abs(gap) < c.NUDGE_THRESHOLD)
-                        // I DON'T THINK YOU NEED TO RETURN OFFSET HERE
-                        return { start, slope, offset, ms };
-                    if (beat_lock.length) {
-                        slope *= (1 + alpha);
-                        start = measure.start - (slope/measure.timesig*locked_beat - pivot);
-                    } else
-                        start *= (1 + alpha);
-                    let locked, grabbed;
-                    [ms, locked, grabbed] = quickCalc(start, slope, measure.beats.length - 1, _snapper);
-                    if (locked)
-                        offset = measure.offset + measure.beats[locked_beat] - locked;
-                    let new_gap = offset - snap;
-                    alpha = monitor(gap, new_gap, alpha);
-                    return yNudge(new_gap, alpha, depth + 1);
-                };
-                return yNudge;
-            }
-            */
-
-
             if (locked_beat !== Mouse.grabbed) {
                 let slope = (measure.end - measure.start)/measure.timesig;
                 let new_slope = slope*Mouse.grabbed - change;
                 if (!beat_lock.length) {
                     let update = {
                         start: measure.start - change,
+                        end: measure.end - change,
                         offset: measure.offset,
-                        // IS THIS SLOPE RIGHT?
-                        //slope,
-                        end: measure.end - change
+                        beats: [],
+                        ticks: []
                     }
                     if (update.start < 10 || update.end < 10)
                         return;
@@ -1319,52 +1291,66 @@ export default function measure(p) {
                     let K = 60000.0 / CONSTANTS.PPQ;
                     let last = 0;
 
-                    let beats = [];
-                    let ticks = [];
 
                     measure.ticks.forEach((_, i) => {
                         if (!(i%CONSTANTS.PPQ))
-                            beats.push(cumulative);
-                        ticks.push(cumulative);
+                            update.beats.push(cumulative);
+                        update.ticks.push(cumulative);
                         if (i%PPQ_mod === 0) 
                             last = K / (update.start + inc*i);
                         cumulative += last;
                     });
-                    beats.push(cumulative);
-                    let crowd = crowding(measure.gaps, update.offset, cumulative);
-                    let new_start = update.start;
-                    let new_offset = update.offset;
-                    if (crowd.end[1] < c.SNAP_THRESHOLD) {
-                        if (!('right' in spread_nudge_cache)) {
+                    update.beats.push(cumulative);
+                    let start_lock = false;
+                    let end_lock = false;
 
-                            //var nudge_factory = (measure, oldSlope, target, _snapper, anchor, locks) => {
-                            let nudge = nudge_factory(measure, update.slope, crowd.end[0], measure.timesig, locked_beat, locks);
-                            spread_nudge_cache.right = nudge(crowd.end[1], 0.01, 0);
-                        }
-                        new_start += (spread_nudge_cache.right.start - update.start);
-                        new_offset += (crowd.end[0] - spread_nudge_cache.right.ms) - update.offset;
+                    if (!crowd_cache)
+                        crowd_cache = crowding(measure.gaps, measure.offset, cumulative, { strict: true });
+                    let crowd = crowd_cache;
 
-                        let new_beats = [];
-                        let new_ticks = [];
-                        measure.ticks.forEach((_, i) => {
-                            if (!(i%CONSTANTS.PPQ))
-                                new_beats.push(cumulative);
-                            new_ticks.push(cumulative);
-                            if (i%PPQ_mod === 0) 
-                                last = K / (update.start + inc*i);
-                            cumulative += last;
-                        });
-                        new_beats.push(cumulative);
+                    update.offset += (measure.ms - cumulative)/2; 
+                    let offset = update.offset;
+                    if (update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD)
+                        update.offset += crowd.end[0] - cumulative - offset;
+                    if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD)
+                        update.offset -= offset - crowd.start[0];
 
-                        if (crowd.start[1] < 0) {
-                            return;
-                        }
+                    end_lock = update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD;
+                    start_lock = update.offset < crowd.start[0] + c.SNAP_THRESHOLD;
 
-                        Object.assign(update, { start: new_start, offset: new_offset, beats: new_beats, ticks: new_ticks });
-                        //update.offset = crowd.end[0] - cumulative;
-                    } else 
-                        Object.assign(update, { beats, ticks, ms: cumulative });
+                    Object.assign(update, { cumulative });
 
+                    let new_end = update.end;
+                        
+                    if (cumulative > crowd.end[0] - crowd.start[0]) {
+                            update.offset = crowd.start[0];
+                            if (!nudge_cache) {
+                                measure.temp.offset = update.offset;
+                                let nudge = nudge_factory(measure, update.slope, crowd.end[0], measure.timesig, 0, 16);
+                                nudge_cache = nudge(crowd.end[0] - (crowd.start[0] + cumulative), 0.01, 0);
+                            }
+                            update.start = nudge_cache.start;
+                            update.end = nudge_cache.start + update.slope;
+                            update.beats = [];
+                            update.ticks = [];
+                            cumulative = 0;
+                            measure.ticks.forEach((_, i) => {
+                                if (!(i%CONSTANTS.PPQ))
+                                    update.beats.push(cumulative);
+                                update.ticks.push(cumulative);
+                                if (i%PPQ_mod === 0) 
+                                    last = K / (nudge_cache.start + inc*i);
+                                cumulative += last;
+                            });
+                            update.beats.push(cumulative);
+                            Object.assign(update, { cumulative });
+                    } else {
+                        nudge_cache = false;
+                        /*if (end_lock)
+                            measure.temp.offset = crowd.end[0] - cumulative;
+                            */
+                    }
+                        
                     Object.assign(measure.temp, update);
                     return;
                 }
@@ -1676,6 +1662,9 @@ export default function measure(p) {
             Mouse.drag.mode = '';
             return;
         }
+
+        nudge_cache = false;
+        crowd_cache = false;
 
         if (p.mouseY < 0 || p.mouseY > p.height) {
             Mouse.drag.mode = '';
