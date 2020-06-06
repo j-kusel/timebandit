@@ -251,7 +251,6 @@ export default function measure(p) {
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
 
-        console.log(instruments[1].measures);
         // REFACTOR ORDERING INTO NUM ITERATIONS LATER
         instruments.forEach((inst) => {
             inst.ordered = order_by_key(inst.measures, 'offset');
@@ -1165,16 +1164,28 @@ export default function measure(p) {
         let position = measure.offset + Mouse.drag.x/scale;
         var crowding = (gaps, position, ms, options) => {
             let strict = (options && 'strict' in options) ? options.strict : false;
+            let final = position + ms;
+            if (final <= gaps[0][1]) 
+                return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
+            let last_gap = gaps.slice(-1)[0];
+            if (position > last_gap[0])
+                return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
+                
             return gaps
                 .reduce((acc, gap) => {
                     // does it even fit in the gap?
-                    if (strict && gap[1] - gap[0] < ms)
+                    if (gap[1] - gap[0] < ms - (strict ? c.NUDGE_THRESHOLD*2 : 0))
                         return acc;
                     let start = [gap[0], position - gap[0]];
-                    let end = [gap[1], gap[1] - (position + ms)];
-                    if (Math.abs(start[1]) < Math.abs(acc.start[1]))
+                    let end = [gap[1], gap[1] - final];
+
+                    /*if (gap[0] === -Infinity && final <= gap[1])
+                        acc.start = [-Infinity, Infinity]
+                    else*/ if (Math.abs(start[1]) < Math.abs(acc.start[1]))
                         acc.start = start;
-                    if (Math.abs(end[1]) < Math.abs(acc.end[1]))
+                    /*if (gap[1] === Infinity && position >= gap[0])
+                        acc.end = [Infinity, Infinity]
+                    else*/ if (Math.abs(end[1]) < Math.abs(acc.end[1]))
                         acc.end = end;
                     return acc;
                 }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
@@ -1252,7 +1263,6 @@ export default function measure(p) {
                 if (locked)
                     offset = measure.offset + measure.beats[beat_lock[0]] - locked;
 
-                console.log({gap, start, slope, ms});
                 let new_gap = snapped + offset - target;
                 alpha = monitor(gap, new_gap, alpha);
                 return nudge(new_gap, alpha, depth + 1);
@@ -1285,6 +1295,10 @@ export default function measure(p) {
                     if (update.start < 10 || update.end < 10)
                         return;
 
+                    if (!crowd_cache)
+                        crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true });
+                    let crowd = crowd_cache;
+
                     update.slope = update.end - update.start;
                     let inc = (measure.end - measure.start)/measure.ticks.length;
                     let cumulative = 0.0;
@@ -1304,12 +1318,10 @@ export default function measure(p) {
                     let start_lock = false;
                     let end_lock = false;
 
-                    if (!crowd_cache)
-                        crowd_cache = crowding(measure.gaps, measure.offset, cumulative, { strict: true });
-                    let crowd = crowd_cache;
 
                     update.offset += (measure.ms - cumulative)/2; 
                     let offset = update.offset;
+                    console.log(crowd);
                     if (update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD)
                         update.offset += crowd.end[0] - cumulative - offset;
                     if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD)
@@ -1690,6 +1702,7 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'tempo') {
             API.updateMeasure(selected.inst, selected.meas.id, measure.temp.start, measure.temp.end, measure.beats.length - 1, measure.temp.offset);
+            console.log(measure.temp);
             delete selected.meas.temp;
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
