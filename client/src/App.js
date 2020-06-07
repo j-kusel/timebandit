@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import uuidv4 from 'uuid/v4';
 import midi from './Audio/midi';
-import audio from './Audio/index';
+import audio from './Audio/audio';
 
 // logos
 import github from './static/GitHub-Mark-32px.png';
@@ -14,8 +14,19 @@ import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehear
 import { SettingsModal, WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
+import socketIOClient from 'socket.io-client';
 
 const DEBUG = true;
+
+const socket = socketIOClient('http://localhost:3001');
+socket.on('hello', (data) => {
+    console.log(data);
+
+    socket.emit('frame', 0b00000001);
+    setInterval(() => {
+        socket.emit('loopback', Date.now());
+    }, 1000);
+});
 
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
@@ -90,6 +101,8 @@ class App extends Component {
 
       // subscribe to audio updates
       audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
+      // subscribe buzzer
+      //audio.subscribe((e) => 
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
 
