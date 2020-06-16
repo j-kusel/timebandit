@@ -3,7 +3,8 @@ const AudioContext = window.AudioContext || window.webkitAudioContext;
 const aC = new AudioContext();
 var locator = {};
 var subscriptions = [];
-
+var scheduler_hooks = [];
+var trigger_hooks = [];
 
 /*navigator.requestMIDIAccess()
     .then((midiAccess) => console.log(midiAccess.inputs));
@@ -41,6 +42,7 @@ var PARAMS = {
 var trigger = (osc, time, params) => {
     let ms = params.map(param => param/1000.0);
     let timing = aC.currentTime + time;
+    trigger_hooks.forEach(hook => setTimeout(hook(osc), time));
     gains[osc].gain.setValueAtTime(0.0, timing);
     gains[osc].gain.linearRampToValueAtTime(0.7, timing + ms[0]);
     gains[osc].gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1]);
@@ -67,6 +69,8 @@ function scheduler(start, target, beats) {
     if (done)
         return;
     let scheduled = [];
+    
+    scheduler_hooks.forEach(hook => hook(target, candidates));
     while (candidates.length) {
          scheduled.push(trigger(target, candidates.pop() - aC.currentTime, PARAMS.adsr));
     };
@@ -129,6 +133,8 @@ var audio = {
         PARAMS[param] = val;
     },
     subscribe: (func) => subscriptions.push(func),
+    triggerHook: (func) => trigger_hooks.push(func),
+    schedulerHook: (func) => scheduler_hooks.push(func),
     context: aC,
     locator: () => (aC.currentTime - locator.start + locator.origin)*1000.0
 }

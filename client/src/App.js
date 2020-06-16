@@ -20,12 +20,8 @@ const DEBUG = true;
 
 const socket = socketIOClient('http://localhost:3001');
 socket.on('hello', (data) => {
-    console.log(data);
-
     socket.emit('frame', 0b00000001);
-    setInterval(() => {
-        socket.emit('loopback', Date.now());
-    }, 1000);
+    socket.emit('loopback', 'stfu');
 });
 
 
@@ -101,8 +97,12 @@ class App extends Component {
 
       // subscribe to audio updates
       audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
-      // subscribe buzzer
-      //audio.subscribe((e) => 
+      // hook into buzzer
+      audio.schedulerHook((data) => {
+          console.log(data.candidates[0], data.target);
+          socket.emit('schedule', data);
+      });
+      //audio.triggerHook((inst) => console.log(inst));
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
 
