@@ -99,16 +99,7 @@ var playback = (isPlaying, score, tracking) => {
         };
         if (aC.state === 'suspended')
             aC.resume();
-        //score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
-        
-        //let all = score.reduce((acc, inst) => [...acc, inst], []);
-        let flag = true;
-        let sorted = [];
-        while (flag) {
-            if (
-
-        
-
+        score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
     } else
         timerIDs.forEach(ID => window.clearTimeout(ID));
 };
