@@ -45,60 +45,8 @@ io.on('connection', (socket) => {
         console.log(Date.now() - data)
     });
     socket.on('schedule', data => {
-        data.candidates.forEach(time => {
-            let newtime = {
-                time: time + Date.now(),
-                bit: (1 << data.target),
-            };
-            let newstack = stack.filter((oldtime, ind) => {
-                if (oldtime.time < Date.now()) {
-                    return false;
-                }
-                if (newtime.time - oldtime.time < 5) {
-                    clearTimeout(oldtime.timeout);
-                    newtime.bit |= oldtime.bit;
-                    return false;
-                }
-                return true;
-            });
-            newtime.timeout = setTimeout(() => {
-                console.log(newtime.bit);
-            }, time);
-            newstack.push(newtime);
-            stack = newstack;
-        });
-        /*
-        data.candidates.forEach(time => {
-            // THESE TIMES AREN'T RIGHT
-            let dupls = [];
-            let update = {
-                time: Date.now() + time,
-                bit: (1 << data.target),
-            };
-            //console.log('original', update.bit);
-            Object.keys(stack).forEach(key => {
-                let gap = stack[key].time - update.time;
-                //console.log(stack[key].time, update.time, gap);
-                if (Math.abs(gap) < SCHEDULING_THRESHOLD) {
-                    // this pairs it with other instruments if necessary
-                    update.bit |= stack[key].bit;
-                    // prepare duplicate for deletion
-                    clearTimeout(stack[key].timeout);
-                    delete stack[key];
-                }
-            });
-            //console.log('updated', update.bit);
-            
-            let id = uuid();
-            var cb = setTimeout(() => {
-                // SEND TO ATMEGA HERE
-                //console.log(update.bit);
-                delete stack[id];
-            }, time);
-            stack[id] = { ...update, timeout: cb };
-            //console.log(Object.keys(stack).length);
-        });
-        */
+        console.log(data);
+        //port.write(data);
     });
 });
 

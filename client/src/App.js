@@ -99,10 +99,10 @@ class App extends Component {
       audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
       // hook into buzzer
       audio.schedulerHook((data) => {
-          console.log(data.candidates[0], data.target);
-          socket.emit('schedule', data);
       });
-      //audio.triggerHook((inst) => console.log(inst));
+      audio.triggerHook((inst) => {
+          socket.emit('schedule', inst.reduce((acc, i) => acc |= (1 << i), 0b00000000));
+      });
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
 
@@ -116,20 +116,20 @@ class App extends Component {
                       end: 120,
                       timesig: 5,
                       offset: 12000
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[0] },
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[0], inst: this.state.instruments.length },
 
                   [ids[1]]: { ...MeasureCalc({ 
                       start: 60,
                       end: 120,
                       timesig: 6,
                       offset: 500
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[1] },
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[1], inst: this.state.instruments.length },
                   [ids[2]]: { ...MeasureCalc({ 
                       start: 60,
                       end: 120,
                       timesig: 5,
                       offset: 4722
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[2] },
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[2], inst: this.state.instruments.length },
               }
           } :
           { measures: {} });
@@ -142,7 +142,7 @@ class App extends Component {
                       end: 120,
                       timesig: 5,
                       offset: 12000
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[3] },
+                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[3], inst: this.state.instruments.length },
 
                   /*[ids[4]]: { ...MeasureCalc({ 
                       start: 144,
@@ -201,7 +201,7 @@ class App extends Component {
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
-              instruments[inst].measures[id] = { ...calc, id };
+              instruments[inst].measures[id] = { ...calc, id, inst };
               return { instruments };
           });
       };
@@ -229,7 +229,7 @@ class App extends Component {
           self.setState(oldState => {
               let instruments = oldState.instruments;
               let id = uuidv4();
-              instruments[inst].measures[id] = { ...calc, id };
+              instruments[inst].measures[id] = { ...calc, id, inst };
               return { instruments };
           });
       };
@@ -339,7 +339,7 @@ class App extends Component {
       this.setState(oldState => {
           let instruments = oldState.instruments;
           let id = uuidv4();
-          instruments[inst].measures[id] = { ...calc, id };
+          instruments[inst].measures[id] = { ...calc, id, inst };
           let [start, end, timesig, offset] = ['', '', '', ''];
           let temp_offset = false;
           return {
@@ -575,17 +575,64 @@ class App extends Component {
   };
 
   play(isPlaying, cursor) {
+      let newState = {};
       if (!isPlaying)
           audio.kill()
       else {
-          audio.play(isPlaying, this.state.instruments.map((inst, ind) =>
-              [ind, Object.keys(inst.measures).reduce((m_acc, meas) => 
-                  [ ...m_acc, ...inst.measures[meas].beats.map((beat) => beat + inst.measures[meas].offset) ]
-              , [])])
-          , cursor);
+
+
+          // NEW ORDERING ALGORITHM
+
+          if (!this.state.ordered) {
+              var root;
+
+              let find = (node, ms) => {
+                if (Math.abs(node.loc - ms) < 5)
+                    return node;
+                if (ms < node.loc) {
+                    if ('left' in node) 
+                        return find(node.left, ms)
+                    else {
+                        node.left = { parent: node, meas: [] };
+                        return node.left;
+                    }
+                } else {
+                    if ('right' in node)
+                        return find(node.right, ms)
+                    else {
+                        node.right = { parent: node, meas: [] };
+                        return node.right;
+                    }
+                }
+              }
+
+              let loader = (loc, meas) => {
+                if (!root) {
+                    root = { loc, meas: [meas] };
+                    return;
+                }
+                let node = find(root, loc);
+                node.loc = loc;
+                node.meas.push(meas);
+              }
+              
+              this.state.instruments.forEach((inst, i_ind) =>
+                  Object.keys(inst.measures).forEach((key) =>
+                    inst.measures[key].beats.map((beat) =>
+                        loader(beat + inst.measures[key].offset, inst.measures[key])
+                    )
+                  )
+              );
+
+              audio.play(isPlaying, root, cursor);
+              newState.ordered = root;
+          } else
+              audio.play(isPlaying, this.state.ordered, cursor);
       };
+
       document.activeElement.blur();
-      this.setState(oldState => ({ isPlaying }));
+      newState.isPlaying = isPlaying;
+      this.setState(oldState => (newState));
   }
 
   preview(isPreviewing) {
@@ -694,7 +741,7 @@ class App extends Component {
                       };
 
                       let id = uuidv4();
-                      acc[params[0]].measures[id] = { ...newMeas, id };
+                      acc[params[0]].measures[id] = { ...newMeas, id, inst: params[0] };
                       return acc;
                   }, [])
           });

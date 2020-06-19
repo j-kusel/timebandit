@@ -17,7 +17,7 @@ for (let i=0; i < 5; i++) {
     gains.push(gain);
 };
 
-/*var oscs = [440, 220, 110].map((freq, ind) => {
+var oscs = [440, 220, 110].map((freq, ind) => {
     let osc = aC.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, aC.currentTime);
@@ -27,7 +27,6 @@ for (let i=0; i < 5; i++) {
     osc.start();
     return osc;
 });
-*/
 
     
 gains.forEach(gain => gain.connect(aC.destination));
@@ -39,53 +38,56 @@ var PARAMS = {
     scheduleAheadTime: 0.1, // scheduling buffer length in seconds
 };
 
-var trigger = (osc, time, params) => {
+var timerIDs = [];
+
+var trigger = (event, params) => {
     let ms = params.map(param => param/1000.0);
-    let timing = aC.currentTime + time;
-    trigger_hooks.forEach(hook => setTimeout(hook(osc), time));
-    gains[osc].gain.setValueAtTime(0.0, timing);
-    gains[osc].gain.linearRampToValueAtTime(0.7, timing + ms[0]);
-    gains[osc].gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1]);
-    gains[osc].gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1] + PARAMS.sustain);
-    gains[osc].gain.linearRampToValueAtTime(0.0, timing + ms[0] + ms[1] + PARAMS.sustain + ms[3]);
+    for (let i=0; i<event.inst.length; i++) {
+        let timing = aC.currentTime + event.time / 1000.0;
+        let osc = event.inst[i];
+        //trigger_hooks.forEach(hook => setTimeout(hook(osc), event.time));
+        gains[osc].gain.setValueAtTime(0.0, timing);
+        gains[osc].gain.linearRampToValueAtTime(0.7, timing + ms[0]);
+        gains[osc].gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1]);
+        gains[osc].gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1] + PARAMS.sustain);
+        gains[osc].gain.linearRampToValueAtTime(0.0, timing + ms[0] + ms[1] + PARAMS.sustain + ms[3]);
+    };
+    return setTimeout(() => trigger_hooks.forEach(hook => hook(event.inst)), event.time);
 };
 
 
-var timerIDs = [];
 // time handled in seconds
-function scheduler(start, target, beats) {
-    let timer = aC.currentTime;
-    let done = true;
+function scheduler(start, node) {
+    let b_start = aC.currentTime*1000 - start;
+    let b_end = b_start + PARAMS.scheduleAheadTime * 1000.0;
     let candidates = [];
-    // STILL WRONG
-    let future_beats = beats
-        .filter(beat => {
-            let total = beat + start;
-            if (total > aC.currentTime)
-                done = false
-            else
-                return false;
-            if (total < aC.currentTime + PARAMS.scheduleAheadTime) {
-                candidates.push(total);
-            }
-            return true;
-        });
 
-    if (done)
-        return;
-    let scheduled = [];
-    
-    if (candidates.length)
-        scheduler_hooks.forEach(hook => hook({target, future: candidates[0]*1000.0, candidates: candidates.map(c => (c - aC.currentTime)*1000.0)}));
-    while (candidates.length) {
-         scheduled.push(trigger(target, candidates.pop() - aC.currentTime, PARAMS.adsr));
-    };
+    let search = (n) => {
+        if (n === undefined)
+            return;
+        let next = [];
+        if (n.loc > b_start && n.loc < b_end) {
+            candidates.push({ time: n.loc - b_start, inst: n.meas.map(m => m.inst) });
+            next.push(n.left);
+            next.push(n.right);
+        } else if (n.loc > b_end)
+            next.push(n.left)
+        else if (n.loc < b_start)
+            next.push(n.right);
+        next.forEach(nx => search(nx));
+    }
 
-    subscriptions.forEach(sub => sub({
-        tracking: aC.currentTime - start
-    }));
+    search(node);
+        
+    timerIDs.forEach(id => clearTimeout(id));
+    timerIDs = [];
+    candidates.forEach((cand) => {
+        timerIDs.push(trigger(cand, PARAMS.adsr));
+        scheduler_hooks.forEach(hook => hook(cand));
+    });
+
     let new_id = window.setTimeout(() => {
-        scheduler(start, target, future_beats);
+        scheduler(start, node);
     }, PARAMS.lookahead);
     timerIDs.push(new_id);
 };
@@ -99,9 +101,16 @@ var playback = (isPlaying, score, tracking) => {
         };
         if (aC.state === 'suspended')
             aC.resume();
-        score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
-    } else
+        //score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
+        scheduler(aC.currentTime*1000 - tracking, score);
+    } else {
         timerIDs.forEach(ID => window.clearTimeout(ID));
+        gains.forEach(gain => {
+            gain.gain.cancelScheduledValues(aC.currentTime);
+            gain.gain.linearRampToValueAtTime(gain.gain.value, aC.currentTime);
+            gain.gain.linearRampToValueAtTime(0.0, aC.currentTime + 0.05);
+        });
+    }
 };
 
 
