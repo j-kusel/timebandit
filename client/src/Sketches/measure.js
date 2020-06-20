@@ -10,7 +10,7 @@ var span = [Infinity, -Infinity];
 const DEBUG = true;
 const SLOW = true;
 
-const [MOD, SHIFT, CTRL, ALT, SPACE, DEL, ESC] = [17, 16, 91, 18, 32, 46, 27];
+const [MOD, SHIFT, CTRL, ALT, SPACE, DEL, BACK, ESC] = [17, 16, 91, 18, 32, 46, 8, 27];
 const [KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL] = [67, 73, 86, 72, 74, 75, 76];
 //const [KeyZ] = [90];
 //const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
@@ -967,10 +967,12 @@ export default function measure(p) {
         };
 
 
-        if (p.keyCode === DEL
+        if ((p.keyCode === DEL || p.keyCode === BACK)
             && 'meas' in selected
         ) {
-            API.deleteMeasure(selected);
+            let to_delete = selected;
+            selected = { inst: -1 };
+            API.deleteMeasure(to_delete);
             return;
         }
 

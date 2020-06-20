@@ -62,6 +62,7 @@ class App extends Component {
 
       this.state = {
           instruments: [],
+          ordered: {},
           sizing: 600.0,
           cursor: 0.0,
           start: '',
@@ -203,14 +204,10 @@ class App extends Component {
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
 
           // re-order measures
-          
-
           self.setState(oldState => {
-
               let instruments = oldState.instruments;
               let oldMeas = instruments[inst].measures[id];
-              let newMeas = { ...calc, id, inst };
-              console.log(oldState);
+              let newMeas = { ...calc, id, inst, beat_nodes: [] };
               let ordered_cpy = Object.assign(oldState.ordered, {});
               if (Object.keys(ordered_cpy)) {
                   calc.beats.forEach((beat, ind) => {
@@ -218,23 +215,17 @@ class App extends Component {
                       // these paths seem convoluted but they limit redundancy
                       // as best as possible for the traversals.
                       let find = (node, { _clear, _target }) => {
-                          if (node === undefined) {
+                          if (node === undefined)
                               return;
-                          }
-                          if (_target) {
-                              console.log(_target);
-                              console.log(node.loc - _target);
-                          }
                           let to_clear;
                           let to_target;
                           if (_clear && Math.abs(node.loc - _clear) < 5) {
                               node.meas = node.meas.filter(meas => meas.inst !== inst);
-                              console.log('clear found');
                               // NEED TO REPLACE NODE
                           }
                           if (_target && Math.abs(node.loc - _target) < 5) {
-                              console.log('target found');
                               node.meas.push(newMeas);
+                              newMeas.beat_nodes.push(node);
                           }
                           if (_clear)
                               to_clear = (_clear < node.loc) ?
@@ -243,7 +234,6 @@ class App extends Component {
                               to_target = (_target < node.loc) ?
                                   'left' : 'right';
                               if (!node[to_target]) {
-                                  console.log('end found');
                                   node[to_target] = { loc: _target, parent: node, inst: [inst], meas: [newMeas] };
                                   to_target = null;
                               }
@@ -255,7 +245,6 @@ class App extends Component {
                               find(node[to_clear], { _clear });
                               find(node[to_target], { _target });
                           }
-                          //parent = node;
                       }
 
                       find(ordered_cpy, {
@@ -271,8 +260,28 @@ class App extends Component {
       };
 
       var deleteMeasure = (selected) => self.setState(oldState => {
+          let ordered_cpy = oldState.ordered;
+          if (Object.keys(ordered_cpy)) {
+              oldState.instruments[selected.inst].measures[selected.meas.id]
+                  .beats.forEach((beat, ind) => {
+                      let find = (node, { _clear }) => {
+                          if (node === undefined)
+                              return;
+                          if (Math.abs(node.loc - _clear) < 5) {
+                              node.meas = node.meas.filter(meas => meas.inst !== selected.inst);
+                              // NEED TO REPLACE NODE
+                          }
+                          (_clear < node.loc) ?
+                              find(node.left, { _clear }) :
+                              find(node.right, { _clear });
+                      }
+
+                      find(oldState.ordered, beat);
+                  });
+          }
+
           delete oldState.instruments[selected.inst].measures[selected.meas.id];
-          return ({ instruments: oldState.instruments });
+          return ({ instruments: oldState.instruments, selected: {} });
       });
 
       var displaySelected = (selected) => {
@@ -642,63 +651,57 @@ class App extends Component {
       let newState = {};
       if (!isPlaying)
           audio.kill()
-      else {
+      else if (Object.keys(this.state.ordered).length) {
+          var root;
 
-
-          // NEW ORDERING ALGORITHM
-
-          if (!this.state.ordered) {
-              var root;
-
-              let find = (node, ms) => {
-                if (Math.abs(node.loc - ms) < 5)
-                    return node;
-                if (ms < node.loc) {
-                    if ('left' in node) 
-                        return find(node.left, ms)
-                    else {
-                        node.left = { parent: node, meas: [] };
-                        return node.left;
-                    }
-                } else {
-                    if ('right' in node)
-                        return find(node.right, ms)
-                    else {
-                        node.right = { parent: node, meas: [] };
-                        return node.right;
-                    }
+          let find = (node, ms) => {
+            if (Math.abs(node.loc - ms) < 5)
+                return node;
+            if (ms < node.loc) {
+                if ('left' in node) 
+                    return find(node.left, ms)
+                else {
+                    node.left = { parent: node, meas: [] };
+                    return node.left;
                 }
-              }
-
-              let loader = (loc, meas) => {
-                if (!root) {
-                    root = { loc, meas: [meas] };
-                    ('beat_nodes' in meas) ?
-                        meas.beat_nodes.push(root) :
-                        meas.beat_nodes = [root];
-                    return;
+            } else {
+                if ('right' in node)
+                    return find(node.right, ms)
+                else {
+                    node.right = { parent: node, meas: [] };
+                    return node.right;
                 }
-                let node = find(root, loc);
-                node.loc = loc;
-                node.meas.push(meas);
-                ('node' in meas) ?
-                    meas.beat_nodes.push(node) :
-                    meas.beat_nodes = [node];
-              }
-              
-              this.state.instruments.forEach((inst, i_ind) =>
-                  Object.keys(inst.measures).forEach((key) =>
-                    inst.measures[key].beats.map((beat) =>
-                        loader(beat + inst.measures[key].offset, inst.measures[key])
-                    )
-                  )
-              );
+            }
+          }
 
-              audio.play(isPlaying, root, cursor);
-              newState.ordered = root;
-          } else
-              audio.play(isPlaying, this.state.ordered, cursor);
-      };
+          let loader = (loc, meas) => {
+            if (!root) {
+                root = { loc, meas: [meas] };
+                ('beat_nodes' in meas) ?
+                    meas.beat_nodes.push(root) :
+                    meas.beat_nodes = [root];
+                return;
+            }
+            let node = find(root, loc);
+            node.loc = loc;
+            node.meas.push(meas);
+            ('node' in meas) ?
+                meas.beat_nodes.push(node) :
+                meas.beat_nodes = [node];
+          }
+          
+          this.state.instruments.forEach((inst, i_ind) =>
+              Object.keys(inst.measures).forEach((key) =>
+                inst.measures[key].beats.map((beat) =>
+                    loader(beat + inst.measures[key].offset, inst.measures[key])
+                )
+              )
+          );
+
+          audio.play(isPlaying, root, cursor);
+          newState.ordered = root;
+      } else
+          audio.play(isPlaying, this.state.ordered, cursor);
 
       document.activeElement.blur();
       newState.isPlaying = isPlaying;
