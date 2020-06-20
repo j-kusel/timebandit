@@ -197,12 +197,76 @@ class App extends Component {
       };
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
-          offset = offset || this.state.instruments[inst].measures[id].offset;
+          let oldMeas = this.state.instruments[inst].measures[id].offset;
+
+          offset = offset || oldMeas;
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+
+          // re-order measures
+          
+
           self.setState(oldState => {
+
               let instruments = oldState.instruments;
-              instruments[inst].measures[id] = { ...calc, id, inst };
-              return { instruments };
+              let oldMeas = instruments[inst].measures[id];
+              let newMeas = { ...calc, id, inst };
+              console.log(oldState);
+              let ordered_cpy = Object.assign(oldState.ordered, {});
+              if (Object.keys(ordered_cpy)) {
+                  calc.beats.forEach((beat, ind) => {
+                      let parent = null;
+                      // these paths seem convoluted but they limit redundancy
+                      // as best as possible for the traversals.
+                      let find = (node, { _clear, _target }) => {
+                          if (node === undefined) {
+                              return;
+                          }
+                          if (_target) {
+                              console.log(_target);
+                              console.log(node.loc - _target);
+                          }
+                          let to_clear;
+                          let to_target;
+                          if (_clear && Math.abs(node.loc - _clear) < 5) {
+                              node.meas = node.meas.filter(meas => meas.inst !== inst);
+                              console.log('clear found');
+                              // NEED TO REPLACE NODE
+                          }
+                          if (_target && Math.abs(node.loc - _target) < 5) {
+                              console.log('target found');
+                              node.meas.push(newMeas);
+                          }
+                          if (_clear)
+                              to_clear = (_clear < node.loc) ?
+                                  'left' : 'right';
+                          if (_target) {
+                              to_target = (_target < node.loc) ?
+                                  'left' : 'right';
+                              if (!node[to_target]) {
+                                  console.log('end found');
+                                  node[to_target] = { loc: _target, parent: node, inst: [inst], meas: [newMeas] };
+                                  to_target = null;
+                              }
+                          }
+                              
+                          if (to_clear === to_target)
+                              find(node[to_clear], { _clear, _target })
+                          else {
+                              find(node[to_clear], { _clear });
+                              find(node[to_target], { _target });
+                          }
+                          //parent = node;
+                      }
+
+                      find(ordered_cpy, {
+                          _clear: oldMeas.beats[ind] + oldMeas.offset,
+                          _target: beat + offset
+                      });
+                  })
+              }
+
+              instruments[inst].measures[id] = newMeas;
+              return { instruments, ordered: ordered_cpy };
           });
       };
 
@@ -609,11 +673,17 @@ class App extends Component {
               let loader = (loc, meas) => {
                 if (!root) {
                     root = { loc, meas: [meas] };
+                    ('beat_nodes' in meas) ?
+                        meas.beat_nodes.push(root) :
+                        meas.beat_nodes = [root];
                     return;
                 }
                 let node = find(root, loc);
                 node.loc = loc;
                 node.meas.push(meas);
+                ('node' in meas) ?
+                    meas.beat_nodes.push(node) :
+                    meas.beat_nodes = [node];
               }
               
               this.state.instruments.forEach((inst, i_ind) =>
