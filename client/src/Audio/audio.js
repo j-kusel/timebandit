@@ -113,32 +113,6 @@ var playback = (isPlaying, score, tracking) => {
     }
 };
 
-
-
-
-// USE THIS IF INDEPENDENT SCHEDULERS AREN'T EFFECTIVE
-/*var compile = (score) => {
-    let pointers = score.map(() => 0);
-    console.log(pointers);
-    let ordered = [];
-    // wait for all pointers to expire
-    let current = score.reduce((acc, inst, i) => [...acc, inst[1][0]], []);
-    let lowest = current.reduce((acc, val, ind) => (val < acc.val) ? { val, ind } : acc, { val: Infinity });
-    while (current.reduce((acc, val, i) => val || acc, false)) {
-        if (lowest.val)
-            ordered.push(lowest);
-        pointers[lowest.ind]++;
-        let pointer = pointers[lowest.ind];
-        let inst = score[lowest.ind];
-        current[lowest.ind] = (pointer === inst[1].length) ?
-            null : score[lowest.ind][1][pointer];
-        lowest = current.reduce((acc, val, ind) => (val < acc.val) ? { val, ind } : acc, { val: Infinity });
-    };
-    return ordered;
-};
-*/
-
-
 var audio = {
     init: () => aC.resume().then(() => console.log('resumed')),
     play: playback, //compile(score), //score.forEach((inst, ind) =>
