@@ -28,7 +28,7 @@ var WarningModal = (props) => (
         centered
       >
         <ModalBody>
-          { props.buttons.map(b => (<ModalButton onClick={b.onClick}>{b.text}</ModalButton>)) }
+          { props.buttons.map((b, i) => (<ModalButton key={i} onClick={b.onClick}>{b.text}</ModalButton>)) }
         </ModalBody>
       </Modal.Dialog>
     </Modal>
@@ -60,8 +60,8 @@ var SettingsModal = (props) => {
                 ]}
             />,
         }
-    ].map(setting => (
-        <div>
+    ].map((setting, ind) => (
+        <div key={ind}>
             <Row>
                 <Col xs={4}><span>{setting.name}</span></Col>
                 <Col xs={8}>{setting.body}</Col>

@@ -921,9 +921,9 @@ class App extends Component {
 
     let data = [];
     if (selected.inst > -1)
-        data.push(<span>{ inst.name }</span>);
+        data.push(<span key="name">{ inst.name }</span>);
     if (selected.meas)
-        data.push(<span> : {meas.start} - {meas.end} / {meas.timesig}</span>);
+        data.push(<span key="info"> : {meas.start} - {meas.end} / {meas.timesig}</span>);
       
     let metadata = (<Metadata x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.META_HEIGHT - CONFIG.LOG_HEIGHT}>
         { data }

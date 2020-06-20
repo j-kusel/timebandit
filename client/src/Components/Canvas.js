@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import P5Wrapper from 'react-p5-wrapper';
 import measure from '../Sketches/measure';
 import c from '../config/CONFIG.json';
+import _ from 'lodash';
 
 var P5Container = styled.div`
     div {
@@ -17,21 +18,33 @@ class UI extends Component {
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
 
-        if (nextProps.mode !== this.props.mode)
-            return true;
-        if (nextProps.panels !== this.props.panels)
-            return true;
-        if (nextProps.insertMeas !== this.props.insertMeas)
-            return true;
-        if (nextProps.editMeas !== this.props.editMeas)
-            return true;
-        if (nextProps.locks.length !== this.props.locks.length) {
+        if (nextProps.mode !== this.props.mode ||
+            nextProps.panels !== this.props.panels ||
+            !_.isEqual(nextProps.insertMeas, this.props.insertMeas) ||
+            !_.isEqual(nextProps.editMeas, this.props.editMeas) ||
+            nextProps.locks.length !== this.props.locks.length ||
+            nextProps.instruments.length !== this.props.instruments.length ||
+            nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ) {
             return true;
         }
+
+        /*if (nextProps.mode !== this.props.mode)
+            {console.log('MODE'); return true;}
+        if (nextProps.panels !== this.props.panels)
+            {console.log('PANELS'); return true;}
+        if (!_.isEqual(nextProps.insertMeas, this.props.insertMeas))
+            {console.log('INSERTMEAS'); return true;}
+
+        if (!_.isEqual(nextProps.editMeas, this.props.editMeas))
+            {console.log('EDITMEAS'); console.log(nextProps.editMeas, this.props.editMeas); return true;}
+        if (nextProps.locks.length !== this.props.locks.length) {
+            {console.log('LOCKS'); return true;}
+        }
         if (nextProps.instruments.length !== this.props.instruments.length)
-            return true;
+        {console.log('INSTRUMENTS'); return true;}
         if (nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ)
-            return true;
+        {console.log('CONSTANTS'); return true;}
+        */
         let flag = false;
         nextProps.instruments.forEach((inst, index) => {
             if (Object.keys(inst.measures).length !== Object.keys(this.props.instruments[index].measures).length)
