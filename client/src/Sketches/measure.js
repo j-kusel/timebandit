@@ -1,6 +1,7 @@
 import { order_by_key, check_proximity_by_key } from '../Util/index.js';
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
+import _ from 'lodash';
 
 var scale = 1.0;
 var viewport = 0;
@@ -319,7 +320,7 @@ export default function measure(p) {
         p.rect(0, p.height - c.TRACKING_HEIGHT, p.width, c.TRACKING_HEIGHT);
 
         Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
-        if ('meas' in selected) {
+        if (selected.meas) {
             let first = c.PANES_WIDTH + selected.meas.offset*scale + viewport;
             let last = first + selected.meas.ms*scale;
             if (mod_check([2], modifiers) &&
@@ -345,6 +346,13 @@ export default function measure(p) {
         let new_rollover = {};
         instruments.forEach((inst, i_ind) => {
             var yloc = i_ind*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
+
+            if (p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
+                Object.assign(new_rollover, {
+                    type: 'inst',
+                    inst: i_ind,
+                });
+
             // push into instrument channel
             p.push();
             p.translate(0, yloc - c.PLAYBACK_HEIGHT);
@@ -381,12 +389,13 @@ export default function measure(p) {
 
                 let origin = (offset)*scale + viewport;
                 let final = ms * scale;
-
-                p.push()
-                p.stroke(primary);
-                p.stroke(primary);
-                p.pop();
                 
+                if (p.mouseX > origin && p.mouseX < (origin + final) &&
+                    p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
+                    Object.assign(new_rollover, {
+                        type: 'measure',
+                        meas: measure
+                    });
 
 
                 let position = (tick) => (tick*scale + viewport);
@@ -401,7 +410,7 @@ export default function measure(p) {
                 p.line(0, 0, 0, c.INST_HEIGHT);
 
                 // handle selection
-                if ('meas' in selected && key === selected.meas.id) {
+                if (selected.meas && key === selected.meas.id) {
                     p.fill(0, 255, 0, 60);
                     p.rect(0, 0, final, c.INST_HEIGHT);
                 }
@@ -452,12 +461,10 @@ export default function measure(p) {
 
                     if (ro) {
                         alpha = 100;
-                        new_rollover = {
+                        Object.assign(new_rollover, {
                             type: 'beat',
-                            inst: i_ind,
-                            meas: measure,
                             beat: index
-                        }
+                        })
                             
                         if (mod_check(1, modifiers)
                             && 'meas' in selected
@@ -485,7 +492,14 @@ export default function measure(p) {
 
                 // draw tempo graph
                 p.stroke(240, 200, 200);
-                let scaleY = (input) => c.INST_HEIGHT - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*c.INST_HEIGHT;
+                let bottom = ('temprange' in range) ?
+                    (range.temprange[0] || range.tempo[0]) :
+                    range.tempo[0];
+                let top = ('temprange' in range) ?
+                    (range.temprange[1] || range.tempo[1]) :
+                    range.tempo[1];
+
+                let scaleY = (input) => c.INST_HEIGHT - (input - bottom)/(top - bottom)*c.INST_HEIGHT;
                 let ystart = scaleY(s);
                 let yend = scaleY(e);
                 p.line(0, ystart, beats.slice(-1)[0]*scale, yend);
@@ -593,9 +607,6 @@ export default function measure(p) {
                         Mouse.cursor = 'ns-resize';
                         new_rollover = {
                             type: 'tempo',
-                            inst: selected.inst,
-                            meas: selected.meas,
-                            index: i,
                             tempo: tempo_slope*i + select.start
                         };
                         break;
@@ -633,23 +644,23 @@ export default function measure(p) {
         if (DEBUG) {
             p.push();
             p.translate(0, (instruments.length+1)*c.INST_HEIGHT);
-            debug_messages.push('meas' in selected ?
+            debug_messages.push(selected.meas ?
                 `selected - start: ${selected.meas.start.toFixed(2)}, end: ${selected.meas.end.toFixed(2)}, ms: ${selected.meas.ms.toFixed(2)}` :
                 `selected - none`
             );
 
-            debug_messages.push(('meas' in selected && 'temp' in selected.meas) ?
+            debug_messages.push((selected.meas && 'temp' in selected.meas) ?
                 `temp - start: ${selected.meas.temp.start.toFixed(2)}, end: ${selected.meas.temp.end.toFixed(2)}, ms: ${selected.meas.temp.ms.toFixed(2)}` :
                 `temp - none`
             );
 
-            debug_messages.push(`rollover - type: ${Mouse.rollover.type}, index: ${Mouse.rollover.beat}`);
+            debug_messages.push(`rollover - type: ${Mouse.rollover.type}, inst: ${Mouse.rollover.inst}, meas: ${'meas' in Mouse.rollover ? Mouse.rollover.meas.id : undefined}, index: ${Mouse.rollover.beat}`);
             debug_messages.push(`drag - mode: ${Mouse.drag.mode}`);
 
             p.stroke(primary); //200, 240, 200);
             p.textSize(c.DEBUG_TEXT);
             p.textAlign(p.LEFT, p.TOP);
-            let lines = ('meas' in selected) ?
+            let lines = (selected.meas) ?
                 [`selected: ${'temp' in selected.meas ? [selected.meas.temp.start, selected.meas.temp.end].join(' ') : 'no temp'}  beats - ${selected.meas.ms.toFixed(1)} ms`] :
                 [''];
 
@@ -1027,7 +1038,6 @@ export default function measure(p) {
             Mouse.outside_origin = false;
 
         if (Mouse.rollover.type === 'tempo') {
-            console.log('INSIDE', Mouse.rollover.index);
             Mouse.drag.mode = 'tempo';
             Mouse.drag.grab = Mouse.rollover.index;
             Mouse.grabbed = Mouse.rollover.index;
@@ -1066,7 +1076,9 @@ export default function measure(p) {
         Object.assign(Mouse.drag, { x: 0, y: 0 });
 
         let measures = instruments[inst].ordered;
-        for (let m=0; m<measures.length; m++) {
+
+        // might be deprecated with new rollover system
+        /*for (let m=0; m<measures.length; m++) {
             var left = measures[m].offset*scale + viewport + c.PANES_WIDTH;
             var right = left + measures[m].ms*scale; 
             if (p.mouseX > left
@@ -1085,9 +1097,20 @@ export default function measure(p) {
                 }
                 break;
             } 
+        };*/
+
+        let newSelect = {
+            inst: (Mouse.rollover.inst || -1),
+            meas: Mouse.rollover.meas,
         };
+        if (!_.isEqual(newSelect, selected)) {
+            selected = newSelect;
+            return;
+        }
 
         let measure = selected.meas;
+
+
         if (mod_check([1, 2], modifiers)) {
             measure.temp = initialize_temp(measure);
             Mouse.grabbed = Mouse.rollover.beat === measure.beats.length - 1 ?
@@ -1127,14 +1150,14 @@ export default function measure(p) {
             || selected.meas === -1)
             return;
 
-        if (!('meas' in selected))
+        if (!(selected.meas))
             return;
 
         var beat_lock = (selected.meas.id in locked && locked[selected.meas.id].beats) ?
             parse_bits(locked[selected.meas.id].beats) : [];
 
         var ticks = (selected.meas.timesig) * CONSTANTS.PPQ_tempo;
-        var tick_array = Array.from({length: ticks}, (_, i) => i);
+        var tick_array = Array.from({length: ticks}, (__, i) => i);
 
 
         var closest = (position, inst, div) =>
@@ -1209,7 +1232,7 @@ export default function measure(p) {
             let lock = lock_target * CONSTANTS.PPQ_tempo;
             let snap = _snapper * CONSTANTS.PPQ_tempo;
 
-            let ms = new_C * tick_array.reduce((sum, _, i) => {
+            let ms = new_C * tick_array.reduce((sum, __, i) => {
                 if (i === lock)
                     locked = sum*new_C;
                 if (i === snap)
@@ -1308,7 +1331,7 @@ export default function measure(p) {
                     let last = 0;
 
 
-                    measure.ticks.forEach((_, i) => {
+                    measure.ticks.forEach((__, i) => {
                         if (!(i%CONSTANTS.PPQ))
                             update.beats.push(cumulative);
                         update.ticks.push(cumulative);
@@ -1348,7 +1371,7 @@ export default function measure(p) {
                             update.beats = [];
                             update.ticks = [];
                             cumulative = 0;
-                            measure.ticks.forEach((_, i) => {
+                            measure.ticks.forEach((__, i) => {
                                 if (!(i%CONSTANTS.PPQ))
                                     update.beats.push(cumulative);
                                 update.ticks.push(cumulative);
@@ -1365,6 +1388,8 @@ export default function measure(p) {
                             */
                     }
                         
+                    let temprange = [Math.min(update.start, range.tempo[0]), Math.max(update.end, range.tempo[1])];
+                    Object.assign(range, { temprange });
                     Object.assign(measure.temp, update);
                     return;
                 }
@@ -1384,7 +1409,7 @@ export default function measure(p) {
 
                 let new_beats = [];
                 let new_ticks = [];
-                measure.ticks.forEach((_, i) => {
+                measure.ticks.forEach((__, i) => {
                     if (!(i%CONSTANTS.PPQ))
                         new_beats.push(cumulative);
                     new_ticks.push(cumulative);
@@ -1411,11 +1436,8 @@ export default function measure(p) {
                 if (measure.offset > (crowd.start[0] + c.NUDGE_THRESHOLD)
                     && crowd.start[1] < c.SNAP_THRESHOLD
                 ) {
-                    console.log('ONE');
                     if (!nudge_cache) {
-                        console.log('TWO');
                         measure.temp.start = temp_start;
-                        //nudge_factory = (measure, oldSlope, target, _snapper, anchor, locks) => {
                         let nudge = nudge_factory(measure, fresh_slope*measure.timesig, crowd.start[0], measure.timesig-1, 0, locks);
                         nudge_cache = nudge(crowd.start[1], 0.01, 0);
                     }
@@ -1424,26 +1446,17 @@ export default function measure(p) {
                     && crowd.end[1] < c.SNAP_THRESHOLD
                 ) {
 
-                    console.log('THREE');
                     if (!nudge_cache) {
-
-                        console.log('FOUR');
                         measure.temp.start = temp_start;
-
-        //var nudge_factory = (measure, oldSlope, target, snapper, anchor, locks) => {
                         let nudge = nudge_factory(measure, fresh_slope, crowd.end[0], measure.timesig, beat_lock[0], locks);
                         nudge_cache = nudge(crowd.end[1], 0.001, 0);
                     }
                     Object.assign(update, nudge_cache); 
-                } else {
-                    console.log('FIVE');
+                } else 
                     nudge_cache = false;
-                }
 
-                if (nudge_cache) {
-                    console.log('SIX');
+                if (nudge_cache) 
                     Object.assign(update, nudge_cache);
-                }
 
 
                 new_beats = [];
@@ -1452,7 +1465,7 @@ export default function measure(p) {
                 last = 0;
                 inc = update.slope / (CONSTANTS.PPQ * measure.timesig);
                 
-                measure.ticks.forEach((_, i) => {
+                measure.ticks.forEach((__, i) => {
                     if (!(i%CONSTANTS.PPQ))
                         new_beats.push(cumulative);
                     new_ticks.push(cumulative);
@@ -1469,6 +1482,8 @@ export default function measure(p) {
                 update.ms = cumulative;
                 if (locked_beat)
                     update.offset = measure.offset + measure.beats[locked_beat] - new_beats[locked_beat];
+                let temprange = [Math.min(update.start, range.tempo[0]), Math.max(update.end, range.tempo[1])];
+                Object.assign(range, { temprange });
 
                 Object.assign(measure.temp, update);
             }
@@ -1648,7 +1663,7 @@ export default function measure(p) {
 
         let new_beats = [];
         let new_ticks = [];
-        measure.ticks.forEach((_, i) => {
+        measure.ticks.forEach((__, i) => {
             if (!(i%CONSTANTS.PPQ))
                 new_beats.push(cumulative);
             new_ticks.push(cumulative);
@@ -1665,6 +1680,10 @@ export default function measure(p) {
         if (beat_lock.length === 1)
             measure.temp.offset += measure.beats[beat_lock[0]] - new_beats[beat_lock[0]];
 
+        Object.assign(range, { temprange: [
+            Math.min(measure.temp.start, range.tempo[0]),
+            Math.max(measure.temp.end, range.tempo[1])
+        ] });
 
         measure.temp.ticks = new_ticks;
         measure.temp.beats = new_beats;
@@ -1689,7 +1708,7 @@ export default function measure(p) {
         if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X &&
             Math.abs(Mouse.drag.y) < c.DRAG_THRESHOLD_X
         ) {
-            if ('meas' in selected)
+            if (selected.meas)
                 delete selected.meas.temp;
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
@@ -1701,6 +1720,8 @@ export default function measure(p) {
         }
 
         let measure = selected.meas;
+        range.tempo = range.temprange;
+        delete range.temprange;
 
         if (Mouse.drag.mode === 'tempo') {
             API.updateMeasure(selected.inst, selected.meas.id, measure.temp.start, measure.temp.end, measure.beats.length - 1, measure.temp.offset);
