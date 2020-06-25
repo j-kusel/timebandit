@@ -347,7 +347,8 @@ export default function measure(p) {
         instruments.forEach((inst, i_ind) => {
             var yloc = i_ind*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
 
-            if (p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
+            if (Mouse.drag.mode === '' &&
+                p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
                 Object.assign(new_rollover, {
                     type: 'inst',
                     inst: i_ind,
@@ -360,13 +361,15 @@ export default function measure(p) {
             p.fill(secondary_light2);
 
             // handle inst selection
-            if (selected.meas === -1 && selected.inst === i_ind)
+            if (!selected.meas && selected.inst === i_ind)
                 p.fill(230);
 
             p.rect(0, 0, p.width-1, 99);
 
-            Object.keys(inst.measures).forEach((key, m_ind) => {
-                let measure = inst.measures[key];
+            inst.ordered.forEach((measure, m_ind) => {
+            //Object.keys(inst.measures).forEach((key, m_ind) => {
+                //let measure = inst.measures[key];
+                let key = measure.id;
 
                 // skip if offscreen
                 /*if (final + origin < c.PANES_WIDTH ||
@@ -390,9 +393,11 @@ export default function measure(p) {
                 let origin = (offset)*scale + viewport;
                 let final = ms * scale;
                 
-                if (p.mouseX > origin && p.mouseX < (origin + final) &&
+                if (Mouse.drag.mode === '' &&
+                    p.mouseX > origin && p.mouseX < (origin + final) &&
                     p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
                     Object.assign(new_rollover, {
+                        ind: m_ind,
                         type: 'measure',
                         meas: measure
                     });
@@ -459,7 +464,8 @@ export default function measure(p) {
                         && beat_rollover(coord, index, Mouse.loc)
                     );
 
-                    if (ro) {
+                    if (ro &&
+                        Mouse.drag.mode === '') {
                         alpha = 100;
                         Object.assign(new_rollover, {
                             type: 'beat',
@@ -762,6 +768,12 @@ export default function measure(p) {
             let tracking_vis = tracking*scale + viewport;
             p.line(tracking_vis, c.PLAYBACK_HEIGHT, tracking_vis, c.INST_HEIGHT*2 + c.PLAYBACK_HEIGHT);
         };
+        if (Mouse.drag.mode === 'measure')
+            Mouse.cursor = 'ew-resize'
+        else if (Mouse.drag.mode === 'tempo')
+            Mouse.cursor = 'ns-resize'
+        else if (Mouse.drag.mode === 'tick')
+            Mouse.cursor = 'text';
         document.body.style.cursor = Mouse.cursor;
                 
 
@@ -857,7 +869,7 @@ export default function measure(p) {
             p.rect(0, 0, c.EDITOR_WIDTH, c.EDITOR_HEIGHT);
             p.stroke(secondary);
             p.line(0, c.EDITOR_HEIGHT, c.INSERT_WIDTH, c.EDITOR_HEIGHT); 
-            if ('meas' in selected) {
+            if (selected.meas) {
                 // push into padding
                 p.push();
                 p.stroke(secondary);
@@ -1077,30 +1089,9 @@ export default function measure(p) {
 
         let measures = instruments[inst].ordered;
 
-        // might be deprecated with new rollover system
-        /*for (let m=0; m<measures.length; m++) {
-            var left = measures[m].offset*scale + viewport + c.PANES_WIDTH;
-            var right = left + measures[m].ms*scale; 
-            if (p.mouseX > left
-                && p.mouseX < right
-                && p.mouseY > 0 
-                && p.mouseY < p.height
-            ) {
-                if (!('meas' in selected) || measures[m].id !== selected.meas.id) {
-                    updateSelected({
-                        inst,
-                        meas: measures[m],
-                        ind: m
-                    });
-                    // always return if new selection
-                    return;
-                }
-                break;
-            } 
-        };*/
-
         let newSelect = {
-            inst: (Mouse.rollover.inst || -1),
+            ind: Mouse.rollover.ind,
+            inst: inst,
             meas: Mouse.rollover.meas,
         };
         if (!_.isEqual(newSelect, selected)) {
@@ -1145,6 +1136,8 @@ export default function measure(p) {
 
     p.mouseDragged = function(event) {
 
+        if (Mouse.drag.mode === '')
+            return;
         if (Mouse.rollover.beat === 0
             || Mouse.outside_origin
             || selected.meas === -1)
@@ -1346,11 +1339,27 @@ export default function measure(p) {
 
                     update.offset += (measure.ms - cumulative)/2; 
                     let offset = update.offset;
-                    console.log(crowd);
-                    if (update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD)
+                    let startflag = false;
+                    let endflag = false;
+
+                    // restore if this gets dicey later, but i think its okay
+                    if (update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD) {
+                        endflag = true;
+                        //update.offset += crowd.end[0] - cumulative - offset;
+                    }
+                    if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD) {
+                        startflag = true;
+                        //update.offset -= offset - crowd.start[0];
+                    }
+
+                    if (startflag) 
+                        update.offset = crowd.start[0]
+                    else if (endflag)
                         update.offset += crowd.end[0] - cumulative - offset;
-                    if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD)
-                        update.offset -= offset - crowd.start[0];
+                            
+
+                            
+                    console.log(offset, update.offset);
 
                     end_lock = update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD;
                     start_lock = update.offset < crowd.start[0] + c.SNAP_THRESHOLD;
@@ -1360,6 +1369,7 @@ export default function measure(p) {
                     let new_end = update.end;
                         
                     if (cumulative > crowd.end[0] - crowd.start[0]) {
+                            console.log('jump'); 
                             update.offset = crowd.start[0];
                             if (!nudge_cache) {
                                 measure.temp.offset = update.offset;
@@ -1632,8 +1642,6 @@ export default function measure(p) {
         // INVERT THIS DRAG AT SOME POINT?
 
         var SNAP_THRESH = 2.0;
-        /*if ((locks & (1 << 3)) && slope * dir < SNAP_THRESH) {
-        */
 
         // if DIRECTION is locked
         if (locks & (1 << 3)) {
