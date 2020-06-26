@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import _ from 'lodash';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import uuidv4 from 'uuid/v4';
 import midi from './Audio/midi';
@@ -9,6 +10,8 @@ import github from './static/GitHub-Mark-32px.png';
 import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
 
 import { MeasureCalc, order_by_key } from './Util/index';
+import ordered from './Util/ordered';
+import logger from './Util/logger';
 import UI from './Components/Canvas';
 import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
 import { SettingsModal, WarningModal } from './Components/Modals';
@@ -198,6 +201,7 @@ class App extends Component {
       };
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
+          logger.log(`Updating measure ${id} in instrument ${inst}.`);  
           let oldMeas = this.state.instruments[inst].measures[id].offset;
 
           offset = offset || oldMeas;
@@ -209,50 +213,15 @@ class App extends Component {
               let oldMeas = instruments[inst].measures[id];
               let newMeas = { ...calc, id, inst, beat_nodes: [] };
               let ordered_cpy = Object.assign(oldState.ordered, {});
-              if (Object.keys(ordered_cpy)) {
-                  calc.beats.forEach((beat, ind) => {
-                      let parent = null;
-                      // these paths seem convoluted but they limit redundancy
-                      // as best as possible for the traversals.
-                      let find = (node, { _clear, _target }) => {
-                          if (node === undefined)
-                              return;
-                          let to_clear;
-                          let to_target;
-                          if (_clear && Math.abs(node.loc - _clear) < 5) {
-                              node.meas = node.meas.filter(meas => meas.inst !== inst);
-                              // NEED TO REPLACE NODE
-                          }
-                          if (_target && Math.abs(node.loc - _target) < 5) {
-                              node.meas.push(newMeas);
-                              newMeas.beat_nodes.push(node);
-                          }
-                          if (_clear)
-                              to_clear = (_clear < node.loc) ?
-                                  'left' : 'right';
-                          if (_target) {
-                              to_target = (_target < node.loc) ?
-                                  'left' : 'right';
-                              if (!node[to_target]) {
-                                  node[to_target] = { loc: _target, parent: node, inst: [inst], meas: [newMeas] };
-                                  to_target = null;
-                              }
-                          }
-                              
-                          if (to_clear === to_target)
-                              find(node[to_clear], { _clear, _target })
-                          else {
-                              find(node[to_clear], { _clear });
-                              find(node[to_target], { _target });
-                          }
-                      }
-
-                      find(ordered_cpy, {
+              if (Object.keys(ordered_cpy))
+                  calc.beats.forEach((beat, ind) =>
+                      ordered.tree.edit(ordered_cpy, {
+                          inst,
+                          newMeas,
                           _clear: oldMeas.beats[ind] + oldMeas.offset,
                           _target: beat + offset
-                      });
-                  })
-              }
+                      })
+                  );
 
               instruments[inst].measures[id] = newMeas;
               return { instruments, ordered: ordered_cpy };
@@ -260,15 +229,21 @@ class App extends Component {
       };
 
       var deleteMeasure = (selected) => self.setState(oldState => {
+          logger.log(`Deleting measure ${selected.meas.id} from instrument ${selected.inst}.`);
           let ordered_cpy = oldState.ordered;
           if (Object.keys(ordered_cpy)) {
-              oldState.instruments[selected.inst].measures[selected.meas.id]
+              let meas_to_delete = oldState.instruments[selected.inst].measures[selected.meas.id];
+              meas_to_delete
                   .beats.forEach((beat, ind) => {
                       let find = (node, { _clear }) => {
+                          console.log(_clear);
                           if (node === undefined)
                               return;
                           if (Math.abs(node.loc - _clear) < 5) {
-                              node.meas = node.meas.filter(meas => meas.inst !== selected.inst);
+                              console.log('finding it here');
+                              //node.meas = node.meas.filter(meas => meas.inst !== selected.inst);
+                              node.meas.splice(node.meas.indexOf(selected.inst));
+                              
                               // NEED TO REPLACE NODE
                           }
                           (_clear < node.loc) ?
@@ -276,12 +251,12 @@ class App extends Component {
                               find(node.right, { _clear });
                       }
 
-                      find(oldState.ordered, beat);
+                      ordered.tree.edit(ordered_cpy, { _clear: beat + meas_to_delete.offset, inst: selected.inst });
                   });
           }
 
           delete oldState.instruments[selected.inst].measures[selected.meas.id];
-          return ({ instruments: oldState.instruments, selected: {} });
+          return ({ instruments: oldState.instruments, selected: {}, ordered: ordered_cpy });
       });
 
       var displaySelected = (selected) => {
@@ -298,16 +273,19 @@ class App extends Component {
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
 
       var paste = (inst, measure, offset) => {
+          logger.log(`Pasting copied measure ${measure.id} into instrument ${inst}...`);
           var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
           self.setState(oldState => {
               let instruments = oldState.instruments;
               let id = uuidv4();
               instruments[inst].measures[id] = { ...calc, id, inst };
+              logger.log(`New measure ${id} created in instrument ${inst}.`);
               return { instruments };
           });
       };
 
       var play = (cursor) => {
+          logger.log(`Starting playback at ${cursor}ms.`);
           this.play(!this.state.isPlaying, cursor ? cursor : 0);
       };
 
@@ -326,6 +304,7 @@ class App extends Component {
               this.instOpen();
               
       var updateMode = (mode, options) => {
+          logger.log(`Entering mode ${mode}.`);
           let newState = { mode };
           if (mode === 1) {
             this.setState(newState);
@@ -390,6 +369,7 @@ class App extends Component {
               selected;
           oldState.instruments.splice(loc + 1, 0, newInst);
           oldState.newInst = false;
+          logger.log(`Adding new instrument in slot ${loc}.`);
           return oldState;
       });
   }
@@ -648,52 +628,17 @@ class App extends Component {
   };
 
   play(isPlaying, cursor) {
+
       let newState = {};
-      if (!isPlaying)
-          audio.kill()
-      else if (Object.keys(this.state.ordered).length) {
+      if (!isPlaying) {
+          audio.kill();
+      }
+      else if (_.isEqual(this.state.ordered, {})) {
           var root;
-
-          let find = (node, ms) => {
-            if (Math.abs(node.loc - ms) < 5)
-                return node;
-            if (ms < node.loc) {
-                if ('left' in node) 
-                    return find(node.left, ms)
-                else {
-                    node.left = { parent: node, meas: [] };
-                    return node.left;
-                }
-            } else {
-                if ('right' in node)
-                    return find(node.right, ms)
-                else {
-                    node.right = { parent: node, meas: [] };
-                    return node.right;
-                }
-            }
-          }
-
-          let loader = (loc, meas) => {
-            if (!root) {
-                root = { loc, meas: [meas] };
-                ('beat_nodes' in meas) ?
-                    meas.beat_nodes.push(root) :
-                    meas.beat_nodes = [root];
-                return;
-            }
-            let node = find(root, loc);
-            node.loc = loc;
-            node.meas.push(meas);
-            ('node' in meas) ?
-                meas.beat_nodes.push(node) :
-                meas.beat_nodes = [node];
-          }
-          
           this.state.instruments.forEach((inst, i_ind) =>
               Object.keys(inst.measures).forEach((key) =>
-                inst.measures[key].beats.map((beat) =>
-                    loader(beat + inst.measures[key].offset, inst.measures[key])
+                inst.measures[key].beats.forEach((beat) =>
+                    root = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], root)
                 )
               )
           );
@@ -792,33 +737,40 @@ class App extends Component {
   }
 
   load(e) {
+      let fileName = e.target.files[0].name;
       var reader = new FileReader();
-      reader.onload = (e) =>
-          this.setState({ instruments: 
-              e.target.result
-                  .split('\n')
-                  .slice(1) // remove headers
-                  .reduce((acc, line) => {
-                      let params = line.split(',');
-                      let newMeas = MeasureCalc(
-                          ['start', 'end', 'timesig', 'offset']
-                              .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
-                          , { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
-                      );
+      reader.onload = (e) => {
+          logger.log(`Loading file ${fileName}...`);
+          let numInst = -1,
+              numMeas = 0;
+          let instruments = e.target.result
+              .split('\n')
+              .slice(1) // remove headers
+              .reduce((acc, line) => {
+                  let params = line.split(',');
+                  numInst = Math.max(numInst, params[0]);
+                  numMeas++;
+                  let newMeas = MeasureCalc(
+                      ['start', 'end', 'timesig', 'offset']
+                          .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
+                      , { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
+                  );
 
-                      let pad = params[0] - (acc.length - 1);
-                      if (pad > 0) {
-                          for (let i=0; i<=pad; i++) {
-                              acc.push({ measures: {} });
-                          }
-                      };
+                  let pad = params[0] - (acc.length - 1);
+                  if (pad > 0) {
+                      for (let i=0; i<=pad; i++) {
+                          acc.push({ measures: {} });
+                      }
+                  };
 
-                      let id = uuidv4();
-                      acc[params[0]].measures[id] = { ...newMeas, id, inst: params[0] };
-                      return acc;
-                  }, [])
-          });
+                  let id = uuidv4();
+                  acc[params[0]].measures[id] = { ...newMeas, id, inst: params[0] };
+                  return acc;
+              }, []);
+          logger.log(`Loaded ${numMeas} measures across ${numInst + 1} instruments.`);
 
+          this.setState({ instruments });
+      };
 
       reader.readAsText(e.target.files[0]);
   };
