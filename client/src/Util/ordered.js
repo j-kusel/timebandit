@@ -38,7 +38,6 @@ let insert = (loc, meas, root) => {
 
 let edit = (node, { _clear, _target, inst, newMeas }) => {
     let edit = (node, { _clear, _target }) => {
-        console.log(_clear, _target);
         // these paths seem convoluted but they limit redundancy
         // as best as possible for the traversals.
         if (node === undefined)

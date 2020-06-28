@@ -1,4 +1,5 @@
 import { order_by_key, check_proximity_by_key } from '../Util/index.js';
+import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import _ from 'lodash';
@@ -188,12 +189,9 @@ export default function measure(p) {
             : (mods & (1 << keys)) !== 0;
 
     var num_check = () =>
-        p.keyIsDown(SHIFT) ?
-            NUM.reduce((acc, num, ind) =>
-                p.keyIsDown(num) ? 
-                    [...acc, ind] : acc, []) :
-            [];
-    
+        NUM.reduce((acc, num, ind) =>
+            p.keyIsDown(num) ? 
+                [...acc, ind] : acc, []);
 
     var blockText = (lines, coords, fontSize)  => {
         let font = fontSize || c.FONT_DEFAULT_SIZE;
@@ -237,9 +235,6 @@ export default function measure(p) {
         // reset select, begin logging on update
         if (selected.inst > -1 && 'meas' in selected)
             selected.meas = instruments[selected.inst].measures[selected.meas.id];
-            
-
-
 
         if ('ms' in editMeas) {
             selected.meas.temp = editMeas;
@@ -265,6 +260,7 @@ export default function measure(p) {
         });
 
         // rewrite this
+        logger.log('Recalculating snap divisions...');
         snaps.divs = NUM.slice(1).reduce((acc, num, n_ind) => {
             let add_snaps = {};
             let div = CONSTANTS.PPQ / (n_ind + 1);
@@ -575,7 +571,7 @@ export default function measure(p) {
         var scaleY = (input, scale) => scale - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*scale;
 
         // draw editor frame
-        if (mode === 2 && 'meas' in selected) {
+        if (mode === 2 && selected.meas) {
             p.push();
             let opac = p.color(primary);
             opac.setAlpha(180);
@@ -1057,9 +1053,7 @@ export default function measure(p) {
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
 
         // check for editor menus
-        if (mode === 2
-            && 'meas' in selected
-        ) {
+        if (mode === 2 && selected.meas) {
             let selStart = c.PANES_WIDTH + selected.meas.offset*scale + viewport;
             let menuStart = inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
             if (p.mouseY > menuStart
@@ -1134,8 +1128,6 @@ export default function measure(p) {
     }
 
     p.mouseDragged = function(event) {
-        console.log(Mouse.drag.mode);
-
         if (Mouse.drag.mode === '')
             return;
         if (Mouse.rollover.beat === 0
