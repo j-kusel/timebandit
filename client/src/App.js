@@ -95,7 +95,7 @@ class App extends Component {
           PPQ: CONFIG.PPQ_default
       };
 
-      ['insertFocus', 'instNameFocus'].forEach(ref => this[ref] = React.createRef());
+      ['insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'instNameFocus'].forEach(ref => this[ref] = React.createRef());
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
 
@@ -298,6 +298,15 @@ class App extends Component {
           locator: audio.locator
       });
 
+      // makes sure menus aren't in use when pressing keys
+      var checkFocus = () =>
+          [this.insertFocusStart, this.insertFocusEnd, this.insertFocusTimesig]
+              .reduce((acc, ref) => {
+                  if (!document.activeElement || !ref.current)
+                      return acc;
+                  return (acc || ref.current.id === document.activeElement.id);
+              }, false); 
+
       var toggleInst = (open) =>
           open ?
               this.instClose() :
@@ -308,7 +317,7 @@ class App extends Component {
           let newState = { mode };
           if (mode === 1) {
             this.setState(newState);
-            this.insertFocus.current.focus();
+            this.insertFocusStart.current.focus();
           } else {
               newState.insertMeas = {};
               if (mode === 2) {
@@ -342,7 +351,7 @@ class App extends Component {
           edit_timesig: ts,
       });
 
-      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit };
+      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   instOpen(e) {
@@ -430,11 +439,12 @@ class App extends Component {
           this.setState({ [e.target.name]: '' })
       else if (/^[0-9\b]+$/.test(e.target.value)) {
           let intVal = parseInt(e.target.value, 10);
+          let offset = this.state.selected.meas ? this.state.selected.meas.ms : 0;
           let newMeas = {
               start: this.state.start,
               end: this.state.end,
               timesig: this.state.timesig,
-              offset: this.state.offset ? this.state.offset : this.state.selected.meas.ms
+              offset: this.state.offset || offset
           };
           Object.assign(newMeas, { [e.target.name]: intVal });
 
@@ -799,21 +809,32 @@ class App extends Component {
             type="text"
             key="start"
             value={this.state.start}
-            ref={this.insertFocus}
+            ref={this.insertFocusStart}
+            id="startInsert"
             placeholder="start"
             name="start"
             onChange={this.handleNumInput}
         />, 
-        ...['end', 'timesig'].map((name) => 
-            <FormInput
-                type="text"
-                key={name}
-                value={this.state[name]}
-                placeholder={name}
-                name={name}
-                onChange={this.handleNumInput}
-            />
-        )
+        <FormInput
+            type="text"
+            key="end"
+            value={this.state.end}
+            ref={this.insertFocusEnd}
+            id="endInsert"
+            placeholder="end"
+            name="end"
+            onChange={this.handleNumInput}
+        />,
+        <FormInput
+            type="text"
+            key="timesig"
+            value={this.state.timesig}
+            ref={this.insertFocusTimesig}
+            id="timesigInsert"
+            placeholder="timesig"
+            name="timesig"
+            onChange={this.handleNumInput}
+        />
     ];
 
     let edit_inputs = ['start', 'end', 'timesig'].map((name) => 
