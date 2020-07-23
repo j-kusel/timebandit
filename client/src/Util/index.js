@@ -57,7 +57,20 @@ var check_proximity_by_key = (obj, arr, key) => {
     return last_gap[0];
 };
         
+var bit_toggle = (list, item) => list ^ (1 << item);
 
-export { MeasureCalc, order_by_key, check_proximity_by_key };
+var parse_bits = (n) => {
+    let bits = [];
+    let counter = 0;
+    while(n) {
+        if (n & 1)
+            bits.push(counter);
+        n = n >> 1;
+        counter += 1;
+    };
+    return bits;
+};
+
+export { MeasureCalc, order_by_key, check_proximity_by_key, bit_toggle, parse_bits };
 
 

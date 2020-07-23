@@ -1,28 +1,28 @@
-import { order_by_key, check_proximity_by_key } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, parse_bits, bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import _ from 'lodash';
+import _Window from '../Util/window.js';
+import _Mouse from '../Util/mouse.js';
+import _Keyboard from '../Util/keyboard.js';
 
-var scale = 1.0;
-var viewport = 0;
-var range = [0, 100];
-var span = [Infinity, -Infinity];
 
 const DEBUG = true;
 const SLOW = true;
 
+var API;
+
 const [SHIFT, ALT, SPACE, DEL, BACK, ESC] = [16, 18, 32, 46, 8, 27];
 let mac = window.navigator.platform.indexOf('Mac') >= 0;
-const MOD = mac ? 224 : 17;
-const CTRL = mac ? 17 : 91;
+const CTRL = mac ? 224 : 17;
+const MOD = mac ? 17 : 91;
 const [KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL] = [67, 73, 86, 72, 74, 75, 76];
 //const [KeyZ] = [90];
 //const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
 const NUM = []
 for (let i=48; i < 58; i++)
     NUM.push(i);
-
 
 // generates measure.gaps in 'measure' drag mode
 var calcGaps = (measures, id) => {
@@ -40,31 +40,6 @@ var calcGaps = (measures, id) => {
         return acc;
     }, [])
         .concat([[ last.offset + last.ms, Infinity ]]);
-};
-
-// returns a temp object for editing measures
-var initialize_temp = (measure) => ({
-    start: measure.start,
-    end: measure.end,
-    ms: measure.ms,
-    ticks: measure.ticks,
-    beats: measure.beats,
-    offset: measure.offset
-});
-
-
-var bit_toggle = (list, item) => list ^ (1 << item);
-
-var parse_bits = (n) => {
-    let bits = [];
-    let counter = 0;
-    while(n) {
-        if (n & 1)
-            bits.push(counter);
-        n = n >> 1;
-        counter += 1;
-    };
-    return bits;
 };
 
 // tweaks learning rate for nudge algorithms
@@ -99,78 +74,23 @@ var insert = (list, item) => {
     return insert(left, item).concat(right);
 }; */
 
-class MouseInfo {
-    constructor() {
-        this.grabbed = 0;
-        this.drag = {
-            x: 0, y: 0,
-            mode: '',
-        };
-        this.outside_origin = true;
-        this.rollover = {};
-        this.cursor = 'default';
-        this.translate = [];
-    }
+// holds arrays of beats by measure id key, MOVE THIS LATER
+var locked = {};
 
-    get loc() {
-        return this.translate.slice(-1)[0];
-    }
+var Window = new _Window();
+var Mouse = new _Mouse(Window);
+var Keyboard = new _Keyboard;
 
-    push(t) {
-        let last = this.translate.slice(-1)[0];
-        if (last)
-            this.translate.push({
-                x: last.x + t.x,
-                y: last.y + t.y
-            })
-        else
-            this.translate.push(t);
-    }
-
-    pop() {
-        return this.translate.pop();
-    }
-};
-
-var Mouse = new MouseInfo();
+var range = [0, 100];
 
 export default function measure(p) {
-    var API, CONSTANTS;
     var instruments = [];
 
     // temporary holding for editing measures
-    var insertMeas = {};
-    var editMeas = {};
     var copied;
 
-    // modes: ESC, INS, EDITOR
-    var mode = 0;
-    var panels = false;
     var locks = 0;
 
-    var selected = {
-        inst: -1,
-        meas: undefined
-    };
-
-    // stores pressed modifier keys in bits
-    var modifiers = 0;
-    var bit_loader = (acc, mod, ind) =>
-        p.keyIsDown(mod) ?
-            acc |(1 << (ind + 1)) : acc;
-    var mod_check = (keys, mods) => 
-        (typeof(keys) === 'object') ?
-            keys.reduce((bool, key) =>
-                bool && (mods & (1 << key)) !== 0, true)
-            : (mods & (1 << keys)) !== 0;
-    var held_nums = [];
-    var num_counter = 0;
-
-    var dir;
-
-    // holds arrays of beats by measure id key, MOVE THIS LATER
-    var locked = {};
-    
     var snaps = {
         divs: [],
         div_index: 0,
@@ -194,14 +114,14 @@ export default function measure(p) {
     };
 
     var updateSelected = (newSelected) => {
-        if (selected.meas) {
-            if (selected.meas.id === newSelected.meas.id)
+        if (Window.selected.meas) {
+            if (Window.selected.meas.id === newSelected.meas.id)
                 return;
-            editMeas = {};
-            delete selected.meas.temp;
+            Window.editMeas = {};
+            delete Window.selected.meas.temp;
         }
-        Object.assign(selected, newSelected);
-        API.displaySelected(selected);
+        Object.assign(Window.selected, newSelected);
+        API.displaySelected(Window.selected);
     }
 
     p.setup = function () {
@@ -216,26 +136,28 @@ export default function measure(p) {
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         debug_messages = [];
         instruments = props.instruments;
-        insertMeas = props.insertMeas;
+        Window.insertMeas = props.insertMeas;
 
-        editMeas = props.editMeas;
-        panels = props.panels;
-        mode = props.mode;
-        ({ API, CONSTANTS } = props);
+        Window.editMeas = props.editMeas;
+        Window.panels = props.panels;
+        Window.mode = props.mode;
+        Window.insts = props.instruments.length;
+        API = props.API;
+        Window.CONSTANTS = props.CONSTANTS;
 
-        var beat_lock = (selected.meas && selected.meas.id in locked && locked[selected.meas.id].beats) ?
-            parse_bits(locked[selected.meas.id].beats) : [];
+        var beat_lock = (Window.selected.meas && Window.selected.meas.id in locked && locked[Window.selected.meas.id].beats) ?
+            parse_bits(locked[Window.selected.meas.id].beats) : [];
 
         // reset select, begin logging on update
-        if (selected.inst > -1 && selected.meas)
-            selected.meas = instruments[selected.inst].measures[selected.meas.id];
+        if (Window.selected.inst > -1 && Window.selected.meas)
+            Window.selected.meas = instruments[Window.selected.inst].measures[Window.selected.meas.id];
 
-        if ('ms' in editMeas) {
-            selected.meas.temp = editMeas;
+        if ('ms' in Window.editMeas) {
+            Window.selected.meas.temp = Window.editMeas;
             if (beat_lock.length === 1)
-                selected.meas.temp.offset = selected.meas.temp.offset + selected.meas.beats[beat_lock[0]] - editMeas.beats[beat_lock[0]];
-        } else if (selected.meas && 'temp' in selected.meas)
-            delete selected.meas.temp;
+                Window.selected.meas.temp.offset = Window.selected.meas.temp.offset + Window.selected.meas.beats[beat_lock[0]] - Window.editMeas.beats[beat_lock[0]];
+        } else if (Window.selected.meas && 'temp' in Window.selected.meas)
+            delete Window.selected.meas.temp;
 
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
@@ -245,9 +167,9 @@ export default function measure(p) {
             inst.ordered = order_by_key(inst.measures, 'offset');
             if (inst.ordered.length) {
                 let last = inst.ordered[inst.ordered.length - 1];
-                span = [
-                    Math.min(span[0], inst.ordered[0].offset),
-                    Math.max(span[1], last.offset + last.ms)
+                Window.span = [
+                    Math.min(Window.span[0], inst.ordered[0].offset),
+                    Math.max(Window.span[1], last.offset + last.ms)
                 ];
             };
         });
@@ -256,7 +178,7 @@ export default function measure(p) {
         logger.log('Recalculating snap divisions...');
         snaps.divs = NUM.slice(1).reduce((acc, num, n_ind) => {
             let add_snaps = {};
-            let div = CONSTANTS.PPQ / (n_ind + 1);
+            let div = Window.CONSTANTS.PPQ / (n_ind + 1);
             instruments.forEach((inst, i_ind) =>
                 inst.ordered.forEach((measure) => {
                     for (let i=0; i < measure.ticks.length; i += div) {
@@ -274,7 +196,7 @@ export default function measure(p) {
             return [...acc, add_snaps];
         }, []);
 
-        range = CONSTANTS.range;
+        range = Window.CONSTANTS.range;
         
 
     }
@@ -288,34 +210,21 @@ export default function measure(p) {
         Mouse.cursor = 'default';
 
         // key check
-        modifiers = [CTRL, SHIFT, MOD, ALT].reduce(bit_loader, 0);
-        snaps.div_index = (num_counter) ?
-            held_nums[held_nums.length-1] - 1 : 0;
+        let [ctrl, shift, mod, alt] = [CTRL, SHIFT, MOD, ALT].map(k => p.keyIsDown(k));
+        snaps.div_index = (Keyboard.num_counter) ?
+            Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
 
-        // DRAW BACKGROUND
-        p.stroke(secondary_light);
-        p.fill(secondary_light);
-        p.rect(0, 0, p.width, p.height);
-       
-        // DRAW TOP BAR
-        p.stroke(secondary);
-        p.fill(secondary);
-        p.rect(0, 0, p.width, c.PLAYBACK_HEIGHT);
-
-        // DRAW BOTTOM BAR
-        p.stroke(secondary);
-        p.fill(secondary);
-        p.rect(0, p.height - c.TRACKING_HEIGHT, p.width, c.TRACKING_HEIGHT);
+        Window.drawFrame(p);
 
         Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
-        if (selected.meas) {
-            let first = c.PANES_WIDTH + selected.meas.offset*scale + viewport;
-            let last = first + selected.meas.ms*scale;
-            if (mod_check([2], modifiers) &&
+        if (Window.selected.meas) {
+            let first = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
+            let last = first + Window.selected.meas.ms*Window.scale;
+            if (shift &&
                 (p.mouseX > first
                     && p.mouseX < last
-                    && p.mouseY >= selected.inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
-                    && p.mouseY < (selected.inst + 1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
+                    && p.mouseY >= Window.selected.inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
+                    && p.mouseY < (Window.selected.inst + 1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
                     && true))
                 Mouse.cursor = 'ew-resize';
         }
@@ -349,7 +258,7 @@ export default function measure(p) {
             p.fill(secondary_light2);
 
             // handle inst selection
-            if (!selected.meas && selected.inst === i_ind)
+            if (!Window.selected.meas && Window.selected.inst === i_ind)
                 p.fill(230);
 
             p.rect(0, 0, p.width-1, 99);
@@ -378,8 +287,8 @@ export default function measure(p) {
                     [measure.ticks, measure.beats, measure.offset, measure.beats.slice(-1)[0], measure.start, measure.end];
 
 
-                let origin = (offset)*scale + viewport;
-                let final = ms * scale;
+                let origin = (offset)*Window.scale + Window.viewport;
+                let final = ms * Window.scale;
                 
                 if (Mouse.drag.mode === '' &&
                     p.mouseX > origin && p.mouseX < (origin + final) &&
@@ -391,7 +300,7 @@ export default function measure(p) {
                     });
 
 
-                let position = (tick) => (tick*scale + viewport);
+                let position = (tick) => (tick*Window.scale + Window.viewport);
                 
                 // push into first beat
                 p.push();
@@ -403,7 +312,7 @@ export default function measure(p) {
                 p.line(0, 0, 0, c.INST_HEIGHT);
 
                 // handle selection
-                if (selected.meas && key === selected.meas.id) {
+                if (Window.selected.meas && key === Window.selected.meas.id) {
                     p.fill(0, 255, 0, 60);
                     p.rect(0, 0, final, c.INST_HEIGHT);
                 }
@@ -413,15 +322,15 @@ export default function measure(p) {
                 p.stroke(240);
                 let step = 1;
                 // BREAK OUT INTO FUNCTION
-                if (scale < 1) { 
-                    if (scale < 0.05)
-                        step = (scale < 0.025) ? CONSTANTS.PPQ : CONSTANTS.PPQ_mod * 2 
+                if (Window.scale < 1) { 
+                    if (Window.scale < 0.05)
+                        step = (Window.scale < 0.025) ? Window.CONSTANTS.PPQ : Window.CONSTANTS.PPQ_mod * 2 
                     else 
-                        step = CONSTANTS.PPQ_mod;
+                        step = Window.CONSTANTS.PPQ_mod;
                 };
 
                 for (var i=0; i < ticks.length; i += step) {
-                    let loc = ticks[i]*scale;
+                    let loc = ticks[i]*Window.scale;
                     if (loc + origin > p.width)
                         continue;
                     p.line(loc, 0, loc, c.INST_HEIGHT);
@@ -440,7 +349,7 @@ export default function measure(p) {
                 let translated = p.mouseX - Mouse.loc.x;
                 // draw beats
                 beats.forEach((beat, index) => {
-                    let coord = beat*scale;
+                    let coord = beat*Window.scale;
                     let alpha = 255;
                     let color = (key in locked && (locked[key].beats & (1 << index))) ?
                         [0, 0, 255] : [255, 0, 0];
@@ -455,18 +364,17 @@ export default function measure(p) {
                         alpha = 100;
                         Object.assign(new_rollover, { type: 'beat', beat: index });
                             
-                        if (mod_check(1, modifiers)
-                            && selected.meas
+                        if (ctrl
+                            && Window.selected.meas
                         ) {
                             // change Mouse.rollover cursor
-                            let shifted = mod_check(2, modifiers);
-                            Mouse.cursor = (shifted) ?
+                            Mouse.cursor = (shift) ?
                                 'text' : 'pointer';
 
                             if (key in locked) {
                                 let bits = parse_bits(locked[key].beats);
-                                if ((bits.length >= 2 && (bits.indexOf(new_rollover.beat) === -1) && !shifted)
-                                    || (bits.indexOf(new_rollover.beat) !== -1 && shifted)
+                                if ((bits.length >= 2 && (bits.indexOf(new_rollover.beat) === -1) && !shift)
+                                    || (bits.indexOf(new_rollover.beat) !== -1 && shift)
                                 )
                                     Mouse.cursor = 'not-allowed';
                             };
@@ -493,14 +401,14 @@ export default function measure(p) {
                 let last = [0, ystart];
                 beats.slice(1).forEach((beat, i) => {
                     let next = [
-                        beat * scale,
+                        beat * Window.scale,
                         c.INST_HEIGHT - ((((i+1)/measure.timesig)*(end-start) + start) - bottom)/spread*c.INST_HEIGHT
                     ];
                     p.line(last[0], last[1], next[0], next[1]);
                     last = next;
                 });
 
-                //p.line(0, ystart, beats.slice(-1)[0]*scale, yend);
+                //p.line(0, ystart, beats.slice(-1)[0]*Window.scale, yend);
 
                 // draw tempo markings
                 p.fill(100);
@@ -523,7 +431,7 @@ export default function measure(p) {
                     p.textAlign(p.RIGHT, p.TOP);
                     tempo_loc.y = yend + c.TEMPO_PADDING;
                 };
-                p.text(end.toFixed(2), ms*scale - c.TEMPO_PADDING, tempo_loc.y);
+                p.text(end.toFixed(2), ms*Window.scale - c.TEMPO_PADDING, tempo_loc.y);
 
                 // return from measure translate
                 p.pop();
@@ -534,7 +442,7 @@ export default function measure(p) {
             // draw snap
             if (snaps.snapped_inst) {
                 p.stroke(200, 240, 200);
-                let x = snaps.snapped_inst.target * scale + viewport;
+                let x = snaps.snapped_inst.target * Window.scale + Window.viewport;
                 p.line(x, Math.min(snaps.snapped_inst.origin, snaps.snapped_inst.inst)*c.INST_HEIGHT,
                     x, (Math.max(snaps.snapped_inst.origin, snaps.snapped_inst.inst) + 1)*c.INST_HEIGHT);
             };
@@ -549,13 +457,13 @@ export default function measure(p) {
         if (snaps.div_index >= 1)
             Object.keys(snaps.divs[snaps.div_index]).forEach(key => {
                 let inst = snaps.divs[snaps.div_index][key][0].inst;
-                let xloc = key*scale + viewport;
+                let xloc = key*Window.scale + Window.viewport;
                 let yloc = inst * c.INST_HEIGHT;
                 p.line(xloc, yloc, xloc, yloc + c.INST_HEIGHT);
             });
 
         // draw debug
-        let mouse = (p.mouseX - viewport)/scale;
+        let mouse = (p.mouseX - Window.viewport)/Window.scale;
         let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
         cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
             parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
@@ -569,16 +477,16 @@ export default function measure(p) {
         var scaleY = (input, scale) => scale - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*scale;
 
         // draw editor frame
-        if (mode === 2 && selected.meas) {
+        if (Window.mode === 2 && Window.selected.meas) {
             p.push();
             let opac = p.color(primary);
             opac.setAlpha(180);
             p.stroke(opac);
             p.fill(opac);
 
-            let select = selected.meas;
-            let x = select.offset * scale + viewport;
-            let y = selected.inst*c.INST_HEIGHT;
+            let select = Window.selected.meas;
+            let x = select.offset * Window.scale + Window.viewport;
+            let y = Window.selected.inst*c.INST_HEIGHT;
             p.translate(x, y);
             Mouse.push({ x, y });
 
@@ -589,11 +497,11 @@ export default function measure(p) {
 
 
             if (Mouse.drag.mode === 'tempo' && 'temp' in select) {
-                p.ellipse(select.temp.beats[Mouse.drag.index]*scale, Mouse.loc.y, 10, 10); 
+                p.ellipse(select.temp.beats[Mouse.drag.index]*Window.scale, Mouse.loc.y, 10, 10); 
                 Mouse.cursor = 'ns-resize';
             } else if (Mouse.drag.mode !== 'tick') {
                 for (let i=0; i < select.beats.length; i++) {
-                    let xloc = select.beats[i]*scale;
+                    let xloc = select.beats[i]*Window.scale;
                     let yloc = c.INST_HEIGHT - base - slope*i;
                     if (p.mouseX > Mouse.loc.x + xloc - 5 &&
                         p.mouseX < Mouse.loc.x + xloc + 5 &&
@@ -617,7 +525,7 @@ export default function measure(p) {
             let PANES_THIN = c.PANES_WIDTH/4;
             let inc = 180.0 / c.INST_HEIGHT;
             let op = p.color(primary)
-            let end = select.ms*scale;
+            let end = select.ms*Window.scale;
             for (let i=0; i <= c.INST_HEIGHT; i++) {
                 op.setAlpha(i*inc);
                 p.stroke(op);
@@ -625,7 +533,7 @@ export default function measure(p) {
                 p.line(end, i, end + PANES_THIN, i);
             }
             p.translate(0, c.INST_HEIGHT);
-            p.rect(-PANES_THIN, 0, PANES_THIN*2 + select.ms*scale, c.LOCK_HEIGHT);
+            p.rect(-PANES_THIN, 0, PANES_THIN*2 + select.ms*Window.scale, c.LOCK_HEIGHT);
 
             p.stroke(secondary);
             p.fill(secondary);
@@ -641,13 +549,13 @@ export default function measure(p) {
         if (DEBUG) {
             p.push();
             p.translate(0, (instruments.length+1)*c.INST_HEIGHT);
-            debug_messages.push(selected.meas ?
-                `selected - start: ${selected.meas.start.toFixed(2)}, end: ${selected.meas.end.toFixed(2)}, ms: ${selected.meas.ms.toFixed(2)}` :
-                `selected - none`
+            debug_messages.push(Window.selected.meas ?
+                `Window.selected - start: ${Window.selected.meas.start.toFixed(2)}, end: ${Window.selected.meas.end.toFixed(2)}, ms: ${Window.selected.meas.ms.toFixed(2)}` :
+                `Window.selected - none`
             );
 
-            debug_messages.push((selected.meas && 'temp' in selected.meas) ?
-                `temp - start: ${selected.meas.temp.start.toFixed(2)}, end: ${selected.meas.temp.end.toFixed(2)}, ms: ${selected.meas.temp.ms.toFixed(2)}` :
+            debug_messages.push((Window.selected.meas && 'temp' in Window.selected.meas) ?
+                `temp - start: ${Window.selected.meas.temp.start.toFixed(2)}, end: ${Window.selected.meas.temp.end.toFixed(2)}, ms: ${Window.selected.meas.temp.ms.toFixed(2)}` :
                 `temp - none`
             );
 
@@ -657,8 +565,8 @@ export default function measure(p) {
             p.stroke(primary); //200, 240, 200);
             p.textSize(c.DEBUG_TEXT);
             p.textAlign(p.LEFT, p.TOP);
-            let lines = (selected.meas) ?
-                [`selected: ${'temp' in selected.meas ? [selected.meas.temp.start, selected.meas.temp.end].join(' ') : 'no temp'}  beats - ${selected.meas.ms.toFixed(1)} ms`] :
+            let lines = (Window.selected.meas) ?
+                [`Window.selected: ${'temp' in Window.selected.meas ? [Window.selected.meas.temp.start, Window.selected.meas.temp.end].join(' ') : 'no temp'}  beats - ${Window.selected.meas.ms.toFixed(1)} ms`] :
                 [''];
 
             lines.push(`location: ${cursor_loc}`);
@@ -712,29 +620,29 @@ export default function measure(p) {
         let t_mouseY = p.mouseY - Mouse.loc.y;
         p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
         let draw_beats = beat => {
-            let x = ('inst' in insertMeas) ? 
-                (insertMeas.temp_offset + beat) * scale :
-                t_mouseX + beat*scale;
-            let y = ('inst' in insertMeas) ?
-                insertMeas.inst * c.INST_HEIGHT :
+            let x = ('inst' in Window.insertMeas) ? 
+                (Window.insertMeas.temp_offset + beat) * Window.scale :
+                t_mouseX + beat*Window.scale;
+            let y = ('inst' in Window.insertMeas) ?
+                Window.insertMeas.inst * c.INST_HEIGHT :
                 Math.floor(0.01*t_mouseY)*c.INST_HEIGHT;
             p.line(x, y, x, y + c.INST_HEIGHT);
         };
         Mouse.pop();
 
-        if (mode === 1) {
+        if (Window.mode === 1) {
             let inst = Math.floor(0.01*t_mouseY);
             if (API.pollSelecting()) {
                 if (inst < instruments.length && inst >= 0) {
-                    p.rect(t_mouseX, inst*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+                    p.rect(t_mouseX, inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
                     p.stroke(255, 0, 0);
-                    if ('beats' in insertMeas)
-                        insertMeas.beats.forEach(draw_beats);
+                    if ('beats' in Window.insertMeas)
+                        Window.insertMeas.beats.forEach(draw_beats);
                 }
-            } else if ('temp_offset' in insertMeas) {
-                p.rect(insertMeas.temp_offset*scale, selected.inst*c.INST_HEIGHT, insertMeas.ms*scale, c.INST_HEIGHT);
+            } else if ('temp_offset' in Window.insertMeas) {
+                p.rect(Window.insertMeas.temp_offset*Window.scale, Window.selected.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
                 p.stroke(255, 0, 0);
-                insertMeas.beats.forEach(draw_beats);
+                Window.insertMeas.beats.forEach(draw_beats);
             };
         };
 
@@ -754,7 +662,7 @@ export default function measure(p) {
                 isPlaying = false;
                 API.play(isPlaying, null);
             };
-            let tracking_vis = tracking*scale + viewport;
+            let tracking_vis = tracking*Window.scale + Window.viewport;
             p.line(tracking_vis, c.PLAYBACK_HEIGHT, tracking_vis, c.INST_HEIGHT*2 + c.PLAYBACK_HEIGHT);
         };
         if (Mouse.drag.mode === 'measure')
@@ -792,7 +700,7 @@ export default function measure(p) {
             c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
         // right
         p.textAlign(p.RIGHT, p.TOP);
-        let _span = span.map(s => s.toFixed(2)); // format decimal places
+        let _span = Window.span.map(s => s.toFixed(2)); // format decimal places
         let len = _span[1]-_span[0];
         p.text(`${_span[0]} - ${_span[1]}, \u2248 ${Math.floor(len/60000.0)}'${Math.floor(len/1000.0) % 60}"`, p.width - c.TOOLBAR_WIDTH - c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
         p.pop();
@@ -814,14 +722,14 @@ export default function measure(p) {
         p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT);
 
 
-        if (mode === 1) {
+        if (Window.mode === 1) {
             p.push();
             p.rect(0, 0, c.EDITOR_WIDTH, c.INSERT_HEIGHT);
 
             p.stroke(secondary);
             p.line(c.INSERT_WIDTH, c.EDITOR_HEIGHT, c.EDITOR_WIDTH, c.EDITOR_HEIGHT); 
 
-            if ('beats' in insertMeas) {
+            if ('beats' in Window.insertMeas) {
                 p.stroke(secondary);
                 p.fill(secondary);
 
@@ -830,13 +738,13 @@ export default function measure(p) {
                 p.push();
                 p.translate(c.INSERT_PADDING, c.INSERT_PADDING);
                 let last = c.EDITOR_WIDTH - c.INSERT_PADDING*2;
-                insertMeas.beats.forEach((beat) => {
-                    let x = (beat/insertMeas.ms)*last;
+                Window.insertMeas.beats.forEach((beat) => {
+                    let x = (beat/Window.insertMeas.ms)*last;
                     p.line(x, 0, x, c.PREVIEW_HEIGHT);
                 });
                 // draw tempo
-                let ystart = scaleY(insertMeas.start, c.PREVIEW_HEIGHT);
-                let yend = scaleY(insertMeas.end, c.PREVIEW_HEIGHT);
+                let ystart = scaleY(Window.insertMeas.start, c.PREVIEW_HEIGHT);
+                let yend = scaleY(Window.insertMeas.end, c.PREVIEW_HEIGHT);
                 p.line(0, ystart, last, yend);
 
                 // push into metadata
@@ -844,8 +752,8 @@ export default function measure(p) {
                 p.translate(0, c.PREVIEW_HEIGHT + c.INSERT_PADDING);
                 p.textAlign(p.LEFT, p.TOP);
                 let lines = [
-                    `${insertMeas.start} - ${insertMeas.end} / ${insertMeas.timesig}`,
-                    `${insertMeas.ms.toFixed(2)}ms`
+                    `${Window.insertMeas.start} - ${Window.insertMeas.end} / ${Window.insertMeas.timesig}`,
+                    `${Window.insertMeas.ms.toFixed(2)}ms`
                 ];
                 blockText(lines, { x: 0, y: 0 }, 6); 
                 p.pop();
@@ -854,17 +762,17 @@ export default function measure(p) {
             p.pop();
         };
 
-        if (mode === 2) {
+        if (Window.mode === 2) {
             p.rect(0, 0, c.EDITOR_WIDTH, c.EDITOR_HEIGHT);
             p.stroke(secondary);
             p.line(0, c.EDITOR_HEIGHT, c.INSERT_WIDTH, c.EDITOR_HEIGHT); 
-            if (selected.meas) {
+            if (Window.selected.meas) {
                 // push into padding
                 p.push();
                 p.stroke(secondary);
                 p.translate(c.INSERT_PADDING, c.INSERT_PADDING);
                 let last = c.EDITOR_WIDTH - c.INSERT_PADDING*2;
-                let meas = instruments[selected.inst].ordered[selected.ind];
+                let meas = instruments[Window.selected.inst].ordered[Window.selected.ind];
                 meas.beats.forEach((beat) => {
                     let x = (beat/meas.ms)*last;
                     p.line(x, 0, x, c.PREVIEW_HEIGHT);
@@ -878,7 +786,7 @@ export default function measure(p) {
         }
         p.pop();
 
-        if (panels) {
+        if (Window.panels) {
             p.fill(255, 0, 0, 10);
             p.rect(0, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length, p.width, c.INST_HEIGHT);
         };
@@ -894,132 +802,99 @@ export default function measure(p) {
     }
 
     p.keyReleased = function(e) {
-        let numpress = NUM.indexOf(p.keyCode);
-        if (!API.checkFocus() && numpress >= 0 &&
-            held_nums.indexOf(numpress) >= 0
-        ) {
-            num_counter--;
-            if (!num_counter)
-                held_nums = [];
+        if (!API.checkFocus() && Keyboard.checkNumRelease(p))
             return false;
-        }
         return false;
     }
 
     p.keyPressed = function(e) {
         if (API.disableKeys())
             return;
+        if (!API.checkFocus() && Keyboard.checkNumPress(p))
+            return;
 
-        let numpress = NUM.indexOf(p.keyCode);
-        if (!API.checkFocus() && numpress >= 0) {
-            held_nums.push(numpress);
-            num_counter++;
+        let dir = Keyboard.checkDirection(p);
+        if (Window.selected.meas && dir) {
+            if (dir === 'DOWN') {
+                if (Window.selected.inst >= instruments.length - 1)
+                    return;
+                let ind = check_proximity_by_key(Window.selected.meas, instruments[Window.selected.inst + 1].ordered, 'offset');
+                Window.select({ ind,
+                    inst: Math.min(Window.selected.inst + 1, instruments.length - 1),
+                    meas: instruments[Window.selected.inst + 1].ordered[ind],
+                });
+            } else if (dir === 'UP') { // || p.keyCode === UP) {
+                if (Window.selected.inst <= 0)
+                    return;
+                let ind = check_proximity_by_key(Window.selected.meas, instruments[Window.selected.inst - 1].ordered, 'offset');
+                Window.select({ ind,
+                    inst: Math.max(Window.selected.inst - 1, 0),
+                    meas: instruments[Window.selected.inst -1].ordered[ind],
+                });
+            } else if (dir === 'LEFT') { // || p.keyCode === LEFT) {
+                let ind = Math.max(Window.selected.ind - 1, 0);
+                Window.select({ ind,
+                    inst: Window.selected.inst,
+                    meas: instruments[Window.selected.inst].ordered[ind]
+                });
+            } else if (dir === 'RIGHT') { // || p.keyCode === RIGHT) {
+                let ind =  Math.min(Window.selected.ind + 1, instruments[Window.selected.inst].ordered.length - 1);
+                Window.select({ ind,
+                    inst: Window.selected.inst,
+                    meas: instruments[Window.selected.inst].ordered[ind]
+                });
+            };
             return;
         }
 
-        if (selected.meas) {
-
-            // DIRECTIONAL KEYS
-            if (p.keyCode === KeyJ) { // || p.keyCode === DOWN) {
-                if (selected.inst >= instruments.length - 1)
-                    return;
-                let ind = check_proximity_by_key(selected.meas, instruments[selected.inst + 1].ordered, 'offset');
-                
-                updateSelected({
-                    ind,
-                    inst: Math.min(selected.inst + 1, instruments.length - 1),
-                    meas: instruments[selected.inst + 1].ordered[ind],
-                });
-
-                return;
-            }
-
-            if (p.keyCode === KeyK) { // || p.keyCode === UP) {
-                if (selected.inst <= 0)
-                    return;
-                let ind = check_proximity_by_key(selected.meas, instruments[selected.inst - 1].ordered, 'offset');
-
-                updateSelected({
-                    ind,
-                    inst: Math.max(selected.inst - 1, 0),
-                    meas: instruments[selected.inst -1].ordered[ind],
-                });
-
-                return;
-            };
-
-            if (p.keyCode === KeyH) { // || p.keyCode === LEFT) {
-                let ind = Math.max(selected.ind - 1, 0);
-                
-                updateSelected({
-                    ind,
-                    inst: selected.inst,
-                    meas: instruments[selected.inst].ordered[ind]
-                });
-                
-                return;
-            };
-
-            if (p.keyCode === KeyL) { // || p.keyCode === RIGHT) {
-                let ind =  Math.min(selected.ind + 1, instruments[selected.inst].ordered.length - 1);
-                updateSelected({
-                    ind,
-                    inst: selected.inst,
-                    meas: instruments[selected.inst].ordered[ind]
-                });
-
-                return;
-            };
-        }
-
         if (p.keyCode === ESC) {
-            if (mode === 0)
+            if (Window.mode === 0)
                 API.toggleInst(true);
             else {
-                mode = 0;
-                API.updateMode(mode);
+                Window.mode = 0;
+                API.updateMode(Window.mode);
             }
             return;
         };
 
         if (p.keyCode === KeyI) {
-            mode = 1;
-            API.updateMode(mode);
+            Window.mode = 1;
+            API.updateMode(Window.mode);
             return;
         };
 
         if (p.keyCode === KeyV) {
-            mode = 2;
-            //API.displaySelected(selected);
-            API.updateMode(mode);
+            Window.mode = 2;
+            //API.displaySelected(Window.selected);
+            API.updateMode(Window.mode);
             return;
         };
 
 
         if ((p.keyCode === DEL || p.keyCode === BACK)) {
-            if (!API.checkFocus() && selected.meas) {
-                let to_delete = selected;
-                selected = { inst: -1 };
+            if (!API.checkFocus() && Window.selected.meas) {
+                let to_delete = Window.selected;
+                Window.selected = { inst: -1 };
                 API.deleteMeasure(to_delete);
             }
             return;
         }
 
         if (p.keyCode === SPACE) {
-            (mode === 1) ?
-                API.preview((p.mouseX - viewport)/scale) :
-                API.play((p.mouseX - viewport)/scale);
+            (Window.mode === 1) ?
+                API.preview((p.mouseX - Window.viewport)/Window.scale) :
+                API.play((p.mouseX - Window.viewport)/Window.scale);
             return;
         }
 
         // CTRL/MOD functions
         if (p.keyIsDown(MOD)) {
             if (p.keyCode === KeyC
-                && selected.meas
+                && Window.selected.meas
             )
-                copied = instruments[selected.inst].measures[selected.meas];
+                copied = instruments[Window.selected.inst].measures[Window.selected.meas];
             else if (p.keyCode === KeyV && copied)
-                API.paste(selected.inst, copied, (p.mouseX-viewport)/scale);
+                API.paste(Window.selected.inst, copied, (p.mouseX-Window.viewport)/Window.scale);
             /* ADD UNDO HISTORY HERE
             else if (p.keyCode === KeyZ)
                 p.keyIsDown(SHIFT) ?
@@ -1031,111 +906,42 @@ export default function measure(p) {
 
     p.mouseWheel = function(event) {
         event.preventDefault();
-        if (p.keyIsDown(CTRL)) {
-            let change = 1.0-event.delta/c.SCROLL_SENSITIVITY;
-            scale = scale*change;
-            viewport = p.mouseX - change*(p.mouseX - viewport);
-            API.newScaling(scale);
-        };
-        viewport -= event.deltaX;
-        API.reportWindow(viewport, scale);
+        let zoom = p.keyIsDown(CTRL);
+        Window.updateView(event, p, { zoom });
+        if (zoom)
+            API.newScaling(Window.scale);
+        API.reportWindow(Window.viewport, Window.scale);
     };
 
     p.mousePressed = function(e) {
-
-        // return if outside canvas or over active menu
-        if (p.mouseX === Infinity 
-            || p.mouseX < 0
-            || p.mouseY === Infinity 
-            || p.mouseY < 0
-            || p.mouseY > p.height
-        ) {
-            Mouse.outside_origin = true;
+        Mouse.updatePress(p);
+        if (Mouse.outside_origin)
             return;
-        } else
-            Mouse.outside_origin = false;
-
-        if (Mouse.rollover.type === 'tempo') {
-            Mouse.drag.mode = 'tempo';
-            console.log(Mouse.rollover);
-            Mouse.drag.grab = Mouse.rollover.beat;
-            Mouse.grabbed = Mouse.rollover.beat;
-            return;
-        };
 
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
-
-        // check for editor menus
-        if (mode === 2 && selected.meas) {
-            let selStart = c.PANES_WIDTH + selected.meas.offset*scale + viewport;
-            let menuStart = inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
-            if (p.mouseY > menuStart
-                && p.mouseY < menuStart + c.LOCK_HEIGHT
-                && p.mouseX > selStart
-                && p.mouseX < selStart + selected.meas.ms*scale
-            ) {
-                Mouse.outside_origin = true;
-                return;
-            } else {
-                editMeas = {};
-            }
-        }
-
         if (inst >= instruments.length || inst < 0)
             return;
 
         if (API.pollSelecting()) {
-            insertMeas.temp_offset = API.confirmSelecting(inst);
-            insertMeas.inst = inst;
+            Window.insertMeas.temp_offset = API.confirmSelecting(inst);
+            Window.insertMeas.inst = inst;
             return;
         }
 
-        Object.assign(Mouse.drag, { x: 0, y: 0 });
-
-        let measures = instruments[inst].ordered;
-
-        let newSelect = {
-            ind: Mouse.rollover.ind,
-            inst: inst,
-            meas: Mouse.rollover.meas,
-        };
-        if (!_.isEqual(newSelect, selected)) {
-            selected = newSelect;
+        Mouse.select(p);
+        if (Mouse.outside_origin)
             return;
-        }
-
-        let measure = selected.meas;
-
-        if (measure) {
-            if (mod_check([1, 2], modifiers)) {
-                measure.temp = initialize_temp(measure);
-                Mouse.grabbed = Mouse.rollover.beat === measure.beats.length - 1 ?
-                    60000.0/measure.beats.slice(-1)[0]
-                    : 60000.0/(measure.ticks[(Mouse.rollover.beat * CONSTANTS.PPQ)]);
-                dir = 0;
-                measure.temp.start = measure.start;
-                if (measure.end > measure.start)
-                    dir = 1;
-                if (measure.start > measure.end)
-                    dir = -1;
-                Mouse.drag.mode = 'tick';
-                Mouse.drag.grab = Mouse.rollover.beat;
-            } else if (mod_check(2, modifiers)) {
-                // SHIFT held?
-                measure.temp = initialize_temp(measure);
-                Mouse.drag.mode = 'measure';
-            } else if (mod_check(1, modifiers)) {
-                // LOCKING
-                // CTRL held?
-                if (!(selected.meas.id in locked))
-                    locked[selected.meas.id] = {
-                        beats: [],
-                        meta: {}
-                    };
-                // IS THIS DUMB?
-                if (parse_bits(locked[selected.meas.id].beats).length < 2 || parse_bits(locked[selected.meas.id].beats).indexOf(Mouse.rollover.beat) !== -1)
-                    locked[selected.meas.id].beats = bit_toggle(locked[selected.meas.id].beats, Mouse.rollover.beat);
-            };
+       
+        if (Window.selected.meas) {
+            let [shift, ctrl] = [p.keyIsDown(SHIFT), p.keyIsDown(CTRL)];
+            if (shift) {
+                if (ctrl)
+                    Mouse.tickMode()
+                else
+                    Mouse.measureMode();
+            } else if (ctrl) {
+                Mouse.beatLock(locked);
+            }
         };
 
     }
@@ -1145,16 +951,16 @@ export default function measure(p) {
             return;
         if (Mouse.rollover.beat === 0
             || Mouse.outside_origin
-            || selected.meas === -1)
+            || Window.selected.meas === -1)
             return;
 
-        if (!(selected.meas))
+        if (!(Window.selected.meas))
             return;
 
-        var beat_lock = (selected.meas.id in locked && locked[selected.meas.id].beats) ?
-            parse_bits(locked[selected.meas.id].beats) : [];
+        var beat_lock = (Window.selected.meas.id in locked && locked[Window.selected.meas.id].beats) ?
+            parse_bits(locked[Window.selected.meas.id].beats) : [];
 
-        var ticks = (selected.meas.timesig) * CONSTANTS.PPQ_tempo;
+        var ticks = (Window.selected.meas.timesig) * Window.CONSTANTS.PPQ_tempo;
         var tick_array = Array.from({length: ticks}, (__, i) => i);
 
 
@@ -1172,19 +978,20 @@ export default function measure(p) {
             candidates.reduce((acc, candidate, index) => {
                 let next = position + candidate;
                 let target, gap, inst;
-                ({ target, gap, inst } = closest(next, selected.inst, snaps.div_index));
+                ({ target, gap, inst } = closest(next, Window.selected.inst, snaps.div_index));
                 if (Math.abs(gap) < Math.abs(acc.gap)) 
                     return { index, target, gap, inst };
                 return acc;
             }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
-        let measure = selected.meas;
-        if (!('temp' in measure))
+        let measure = Window.selected.meas;
+        /*if (!('temp' in measure))
             measure.temp = initialize_temp(measure);
+            */
         if (!('gaps' in measure))
-            measure.gaps = calcGaps(instruments[selected.inst].ordered, selected.meas.id);
+            measure.gaps = calcGaps(instruments[Window.selected.inst].ordered, Window.selected.meas.id);
 
-        let position = measure.offset + Mouse.drag.x/scale;
+        let position = measure.offset + Mouse.drag.x/Window.scale;
         var crowding = (gaps, position, ms, options) => {
             let strict = (options && 'strict' in options) ? options.strict : false;
             let final = position + ms;
@@ -1214,21 +1021,21 @@ export default function measure(p) {
                 }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
         }
 
-        var PPQ_mod = CONSTANTS.PPQ / CONSTANTS.PPQ_tempo;
+        var PPQ_mod = Window.CONSTANTS.PPQ / Window.CONSTANTS.PPQ_tempo;
         var C = (delta) => 60000.0 * (measure.beats.length - 1) / (delta);
-        var sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
-        var grab = Mouse.drag.grab * CONSTANTS.PPQ_tempo;
+        var sigma = (start, constant) => ((n) => (1.0 / ((start * Window.CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
+        var grab = Mouse.drag.grab * Window.CONSTANTS.PPQ_tempo;
         var snapper = Mouse.drag.grab;
 
         var quickCalc = (start, slope, timesig, lock_target, _snapper) => {
             var C1 = (delta) => 60000.0 * (timesig) / (delta);
-            var sigma = (start, constant) => ((n) => (1.0 / ((start * CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
+            var sigma = (start, constant) => ((n) => (1.0 / ((start * Window.CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
 
             let new_C = C1(slope);
             let locked = 0;
             let snapped = -1;
-            let lock = lock_target * CONSTANTS.PPQ_tempo;
-            let snap = _snapper * CONSTANTS.PPQ_tempo;
+            let lock = lock_target * Window.CONSTANTS.PPQ_tempo;
+            let snap = _snapper * Window.CONSTANTS.PPQ_tempo;
 
             let ms = new_C * tick_array.reduce((sum, __, i) => {
                 if (i === lock)
@@ -1261,7 +1068,7 @@ export default function measure(p) {
             let diff_null = !!(locks & (1 << 2));
             let slope_lock = !!(locks & (1 << 4));
 
-            //let anchor_target = anchor * CONSTANTS.PPQ_tempo;
+            //let anchor_target = anchor * Window.CONSTANTS.PPQ_tempo;
 
             let ms;
             let nudge = (gap, alpha, depth) => {
@@ -1300,6 +1107,7 @@ export default function measure(p) {
         // y-drag
         if (Mouse.drag.mode === 'tempo') {
             Mouse.drag.y += event.movementY;
+            console.log(Window.selected.meas.temp);
             let spread = range.tempo[1] - range.tempo[0];
             let change = Mouse.drag.y / c.INST_HEIGHT * spread;
             let locked_beat = beat_lock.length ?
@@ -1327,12 +1135,12 @@ export default function measure(p) {
                     update.slope = update.end - update.start;
                     let inc = (measure.end - measure.start)/measure.ticks.length;
                     let cumulative = 0.0;
-                    let K = 60000.0 / CONSTANTS.PPQ;
+                    let K = 60000.0 / Window.CONSTANTS.PPQ;
                     let last = 0;
 
 
                     measure.ticks.forEach((__, i) => {
-                        if (!(i%CONSTANTS.PPQ))
+                        if (!(i%Window.CONSTANTS.PPQ))
                             update.beats.push(cumulative);
                         update.ticks.push(cumulative);
                         if (i%PPQ_mod === 0) 
@@ -1369,7 +1177,7 @@ export default function measure(p) {
                             update.ticks = [];
                             cumulative = 0;
                             measure.ticks.forEach((__, i) => {
-                                if (!(i%CONSTANTS.PPQ))
+                                if (!(i%Window.CONSTANTS.PPQ))
                                     update.beats.push(cumulative);
                                 update.ticks.push(cumulative);
                                 if (i%PPQ_mod === 0) 
@@ -1389,17 +1197,17 @@ export default function measure(p) {
 
                 let fresh_slope = (new_slope - pivot) / (Mouse.grabbed - locked_beat);
                 let temp_start = (new_slope + measure.start) - fresh_slope*Mouse.grabbed;
-                let inc = fresh_slope/CONSTANTS.PPQ;
+                let inc = fresh_slope/Window.CONSTANTS.PPQ;
 
                 
                 let cumulative = 0.0;
-                let K = 60000.0 / CONSTANTS.PPQ;
+                let K = 60000.0 / Window.CONSTANTS.PPQ;
                 let last = 0;
 
                 let new_beats = [];
                 let new_ticks = [];
                 measure.ticks.forEach((__, i) => {
-                    if (!(i%CONSTANTS.PPQ))
+                    if (!(i%Window.CONSTANTS.PPQ))
                         new_beats.push(cumulative);
                     new_ticks.push(cumulative);
                     if (i%PPQ_mod === 0) 
@@ -1455,10 +1263,10 @@ export default function measure(p) {
                 new_ticks = [];
                 cumulative = 0.0;
                 last = 0;
-                inc = update.slope / (CONSTANTS.PPQ * measure.timesig);
+                inc = update.slope / (Window.CONSTANTS.PPQ * measure.timesig);
                 
                 measure.ticks.forEach((__, i) => {
-                    if (!(i%CONSTANTS.PPQ))
+                    if (!(i%Window.CONSTANTS.PPQ))
                         new_beats.push(cumulative);
                     new_ticks.push(cumulative);
                     if (i%PPQ_mod === 0) 
@@ -1487,12 +1295,12 @@ export default function measure(p) {
       
         Mouse.drag.x += event.movementX;
         if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X) {
-            delete measure.temp;
+            //delete measure.temp;
             return;
         } 
 
         if (Mouse.drag.mode === 'measure') {
-            let position = measure.offset + Mouse.drag.x/scale;
+            let position = measure.offset + Mouse.drag.x/Window.scale;
             let close = snap_eval(position, measure.beats);
 
             // determine whether start or end are closer
@@ -1515,7 +1323,7 @@ export default function measure(p) {
             if (close.index !== -1) {
                 let gap = close.target - (measure.beats[close.index] + position);
                 if (Math.abs(gap) < 50) {
-                    snaps.snapped_inst = { ...close, origin: selected.inst };
+                    snaps.snapped_inst = { ...close, origin: Window.selected.inst };
                     update.offset = position + gap;
                 } else
                     snaps.snapped_inst = {};
@@ -1527,14 +1335,14 @@ export default function measure(p) {
 
         
 
-        let beatscale = (-Mouse.drag.x*scale); // /p.width
+        let beatscale = (-Mouse.drag.x*Window.scale); // /p.width
 
         // divide this by scale? depending on zoom?
         let slope = measure.end - measure.start;
         var temp_start;
 
         let perc = Math.abs(slope) < c.FLAT_THRESHOLD ?
-            ((dir === 1) ? -c.FLAT_THRESHOLD : c.FLAT_THRESHOLD) :
+            ((Window.selected.dir === 1) ? -c.FLAT_THRESHOLD : c.FLAT_THRESHOLD) :
             Mouse.grabbed/Math.abs(slope);
 
         let amp_lock = beatscale/perc;
@@ -1585,7 +1393,7 @@ export default function measure(p) {
         if (crowd.start[1] < 0 || crowd.end[1] < 0)
             return;
 
-        let snap_to = closest(loc, selected.inst, snaps.div_index).target;
+        let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
         
         let gap = loc - snap_to;
 
@@ -1594,7 +1402,7 @@ export default function measure(p) {
             snap_to = crowd.start[0];
             gap = crowd.start[1];
         } else if (crowd.end[1] < c.SNAP_THRESHOLD) {
-            snapper = (measure.beats.length - 1) * CONSTANTS.PPQ_tempo;
+            snapper = (measure.beats.length - 1) * Window.CONSTANTS.PPQ_tempo;
             snap_to = crowd.end[0];
             gap = crowd.end[1];
         }
@@ -1628,19 +1436,19 @@ export default function measure(p) {
         // if DIRECTION is locked
         if (locks & (1 << 3)) {
             // flat measure can't change direction
-            if (!dir)
+            if (!Window.selected.dir)
                 return;
-            if (measure.temp.slope * dir < SNAP_THRESH) {
+            if (measure.temp.slope * Window.selected.dir < SNAP_THRESH) {
                 measure.temp.slope = 0;
                 if (locks & (1 << 2))
                     measure.temp.start = measure.end;
                 else if (locks & (1 << 1))
                     measure.temp.end = measure.start;
             }
-            /*inc = (dir === 1) ?
+            /*inc = (Window.selected.dir === 1) ?
                 Math.max(inc, 0) : inc;
             if (locks & (1 << 2))
-                measure.temp.start = (dir === 1) ?
+                measure.temp.start = (Window.selected.dir === 1) ?
                     Math.min(measure.temp.start, measure.end) :
                     Math.max(measure.temp.start, measure.end);
                     */
@@ -1648,13 +1456,13 @@ export default function measure(p) {
 
         let inc = measure.temp.slope/measure.ticks.length;
         let cumulative = 0.0;
-        let K = 60000.0 / CONSTANTS.PPQ;
+        let K = 60000.0 / Window.CONSTANTS.PPQ;
         let last = 0;
 
         let new_beats = [];
         let new_ticks = [];
         measure.ticks.forEach((__, i) => {
-            if (!(i%CONSTANTS.PPQ))
+            if (!(i%Window.CONSTANTS.PPQ))
                 new_beats.push(cumulative);
             new_ticks.push(cumulative);
             if (i%PPQ_mod === 0) 
@@ -1698,31 +1506,31 @@ export default function measure(p) {
         if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X &&
             Math.abs(Mouse.drag.y) < c.DRAG_THRESHOLD_X
         ) {
-            if (selected.meas)
-                delete selected.meas.temp;
+            if (Window.selected.meas)
+                delete Window.selected.meas.temp;
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
         };
 
-        if (!(selected.meas)) {
+        if (!(Window.selected.meas)) {
             Mouse.drag.mode = '';
             return;
         }
 
-        let measure = selected.meas;
+        let measure = Window.selected.meas;
         range.tempo = range.temprange;
         delete range.temprange;
 
         if (Mouse.drag.mode === 'tempo') {
-            API.updateMeasure(selected.inst, selected.meas.id, measure.temp.start, measure.temp.end, measure.beats.length - 1, measure.temp.offset);
+            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.temp.start, measure.temp.end, measure.beats.length - 1, measure.temp.offset);
             console.log(measure.temp);
-            delete selected.meas.temp;
+            delete Window.selected.meas.temp;
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
         };
 
         if (Mouse.drag.mode === 'measure') {
-            API.updateMeasure(selected.inst, selected.meas.id, measure.start, measure.end, measure.beats.length - 1, measure.temp.offset);
+            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.start, measure.end, measure.beats.length - 1, measure.temp.offset);
 
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
@@ -1735,12 +1543,12 @@ export default function measure(p) {
             if (end < 10)
                 return;
             
-            API.updateMeasure(selected.inst, selected.meas.id, measure.temp.start, end, measure.beats.length - 1, measure.temp.offset);
+            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.temp.start, end, measure.beats.length - 1, measure.temp.offset);
         };
     }
 
     p.mouseMoved = function(event) {
-        API.newCursor((p.mouseX - viewport)/scale);
+        API.newCursor((p.mouseX - Window.viewport)/Window.scale);
         return false;
     };
     
