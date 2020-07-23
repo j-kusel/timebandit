@@ -264,22 +264,13 @@ export default function measure(p) {
             p.rect(0, 0, p.width-1, 99);
 
             inst.ordered.forEach((measure, m_ind) => {
-            //Object.keys(inst.measures).forEach((key, m_ind) => {
-                //let measure = inst.measures[key];
                 let key = measure.id;
 
                 // skip if offscreen
                 /*if (final + origin < c.PANES_WIDTH ||
                     origin > p.width
                 )
-                    return;
-                    */
-
-                // check for temporary display
-                /*var [ticks, beats, offset] = ((measure.temp_ticks && measure.temp_ticks.length) || measure.temp_offset) ?
-                    ['temp_ticks', 'temp_beats', 'temp_offset'] :
-                    ['ticks', 'beats', 'offset'];
-                    */
+                    return; */
 
                 let temp = 'temp' in measure;
                 var [ticks, beats, offset, ms, start, end] = temp ?
@@ -408,8 +399,6 @@ export default function measure(p) {
                     last = next;
                 });
 
-                //p.line(0, ystart, beats.slice(-1)[0]*Window.scale, yend);
-
                 // draw tempo markings
                 p.fill(100);
                 p.textSize(c.TEMPO_PT);
@@ -450,8 +439,6 @@ export default function measure(p) {
             p.pop();
         });
 
-
-
         // draw snaps
         p.stroke(100, 255, 100);
         if (snaps.div_index >= 1)
@@ -474,20 +461,15 @@ export default function measure(p) {
 
 
 
-        var scaleY = (input, scale) => scale - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*scale;
+
+        //if (Window.mode === 2 && Window.selected.meas) {
 
         // draw editor frame
         if (Window.mode === 2 && Window.selected.meas) {
-            p.push();
-            let opac = p.color(primary);
-            opac.setAlpha(180);
-            p.stroke(opac);
-            p.fill(opac);
-
+            
             let select = Window.selected.meas;
             let x = select.offset * Window.scale + Window.viewport;
             let y = Window.selected.inst*c.INST_HEIGHT;
-            p.translate(x, y);
             Mouse.push({ x, y });
 
             let spread = Math.abs(range.tempo[1] - range.tempo[0]);
@@ -496,52 +478,27 @@ export default function measure(p) {
             let base = (select.start - range.tempo[0])/spread*c.INST_HEIGHT;
 
 
+            let handle;
             if (Mouse.drag.mode === 'tempo' && 'temp' in select) {
-                p.ellipse(select.temp.beats[Mouse.drag.index]*Window.scale, Mouse.loc.y, 10, 10); 
+                handle = [select.temp.beats[Mouse.drag.index]*Window.scale, Mouse.loc.y, 10, 10]; 
                 Mouse.cursor = 'ns-resize';
             } else if (Mouse.drag.mode !== 'tick') {
                 for (let i=0; i < select.beats.length; i++) {
                     let xloc = select.beats[i]*Window.scale;
                     let yloc = c.INST_HEIGHT - base - slope*i;
-                    if (p.mouseX > Mouse.loc.x + xloc - 5 &&
-                        p.mouseX < Mouse.loc.x + xloc + 5 &&
-                        p.mouseY > Mouse.loc.y + yloc - 5 &&
-                        p.mouseY < Mouse.loc.y + yloc + 5 
-                    ) {
-                        p.ellipse(xloc, yloc, 10, 10); 
-                        Mouse.cursor = 'ns-resize';
-                        Object.assign(new_rollover, {
-                            type: 'tempo',
-                            tempo: tempo_slope*i + select.start
-                        });
+                    if (Mouse.rolloverCheck(p, [xloc, yloc], {
+                        type: 'tempo',
+                        tempo: tempo_slope*i + select.start
+                    })) {
+                        handle = [xloc, yloc, 10, 10]; 
                         break;
                     }
                 };
             };
+            
+            Window.drawEditorFrame(p, [x, y], handle);
             Mouse.pop();
 
-
-
-            let PANES_THIN = c.PANES_WIDTH/4;
-            let inc = 180.0 / c.INST_HEIGHT;
-            let op = p.color(primary)
-            let end = select.ms*Window.scale;
-            for (let i=0; i <= c.INST_HEIGHT; i++) {
-                op.setAlpha(i*inc);
-                p.stroke(op);
-                p.line(-PANES_THIN, i, 0, i);
-                p.line(end, i, end + PANES_THIN, i);
-            }
-            p.translate(0, c.INST_HEIGHT);
-            p.rect(-PANES_THIN, 0, PANES_THIN*2 + select.ms*Window.scale, c.LOCK_HEIGHT);
-
-            p.stroke(secondary);
-            p.fill(secondary);
-            p.textSize(10);
-            p.textAlign(p.LEFT, p.CENTER);
-            //p.text(`${select.start} -> ${select.end} / ${select.timesig}`, 5, c.PANES_WIDTH);
-                
-            p.pop();
         }
 
         Mouse.rollover = new_rollover;
@@ -675,116 +632,9 @@ export default function measure(p) {
                 
 
         p.pop();
-        p.fill(primary);
-        p.stroke(primary);
-
         
-        // draw tabs
-        p.stroke(primary);
-        p.fill(primary);
-
-        p.push();
-        p.translate(0, p.height - c.TRACKING_HEIGHT)
-        p.rect(0, 0, p.width, c.TRACKING_HEIGHT);
-        // left
-        
-        // LOCATION
-        // left    
-
-        p.push();
-        p.stroke(secondary);
-        p.fill(secondary);
-        p.textAlign(p.LEFT, p.TOP);
-        p.textSize(10);
-        p.text(isPlaying ? `LOCATION: ${API.exposeTracking().locator()}` : `CURSOR: ${cursor_loc}`,
-            c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
-        // right
-        p.textAlign(p.RIGHT, p.TOP);
-        let _span = Window.span.map(s => s.toFixed(2)); // format decimal places
-        let len = _span[1]-_span[0];
-        p.text(`${_span[0]} - ${_span[1]}, \u2248 ${Math.floor(len/60000.0)}'${Math.floor(len/1000.0) % 60}"`, p.width - c.TOOLBAR_WIDTH - c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
-        p.pop();
-
-        p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, 0);
-        p.textSize(8);
-        p.textAlign(p.LEFT, p.CENTER);
-        p.stroke(secondary);
-        p.fill(secondary);
-
-        p.line(0, 0, 0, c.TRACKING_HEIGHT);
-        p.line(c.INSERT_WIDTH, 0, c.INSERT_WIDTH, c.TRACKING_HEIGHT);
-        p.translate(c.INSERT_PADDING, 0);
-        p.text('- INSERT', 0, c.TRACKING_HEIGHT/2);
-        p.text('- EDITOR', c.INSERT_WIDTH, c.TRACKING_HEIGHT/2);
-        p.pop();
-
-        p.push();
-        p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT);
-
-
-        if (Window.mode === 1) {
-            p.push();
-            p.rect(0, 0, c.EDITOR_WIDTH, c.INSERT_HEIGHT);
-
-            p.stroke(secondary);
-            p.line(c.INSERT_WIDTH, c.EDITOR_HEIGHT, c.EDITOR_WIDTH, c.EDITOR_HEIGHT); 
-
-            if ('beats' in Window.insertMeas) {
-                p.stroke(secondary);
-                p.fill(secondary);
-
-                // draw beats
-                // push into padding
-                p.push();
-                p.translate(c.INSERT_PADDING, c.INSERT_PADDING);
-                let last = c.EDITOR_WIDTH - c.INSERT_PADDING*2;
-                Window.insertMeas.beats.forEach((beat) => {
-                    let x = (beat/Window.insertMeas.ms)*last;
-                    p.line(x, 0, x, c.PREVIEW_HEIGHT);
-                });
-                // draw tempo
-                let ystart = scaleY(Window.insertMeas.start, c.PREVIEW_HEIGHT);
-                let yend = scaleY(Window.insertMeas.end, c.PREVIEW_HEIGHT);
-                p.line(0, ystart, last, yend);
-
-                // push into metadata
-                p.push();
-                p.translate(0, c.PREVIEW_HEIGHT + c.INSERT_PADDING);
-                p.textAlign(p.LEFT, p.TOP);
-                let lines = [
-                    `${Window.insertMeas.start} - ${Window.insertMeas.end} / ${Window.insertMeas.timesig}`,
-                    `${Window.insertMeas.ms.toFixed(2)}ms`
-                ];
-                blockText(lines, { x: 0, y: 0 }, 6); 
-                p.pop();
-                p.pop();
-            }
-            p.pop();
-        };
-
-        if (Window.mode === 2) {
-            p.rect(0, 0, c.EDITOR_WIDTH, c.EDITOR_HEIGHT);
-            p.stroke(secondary);
-            p.line(0, c.EDITOR_HEIGHT, c.INSERT_WIDTH, c.EDITOR_HEIGHT); 
-            if (Window.selected.meas) {
-                // push into padding
-                p.push();
-                p.stroke(secondary);
-                p.translate(c.INSERT_PADDING, c.INSERT_PADDING);
-                let last = c.EDITOR_WIDTH - c.INSERT_PADDING*2;
-                let meas = instruments[Window.selected.inst].ordered[Window.selected.ind];
-                meas.beats.forEach((beat) => {
-                    let x = (beat/meas.ms)*last;
-                    p.line(x, 0, x, c.PREVIEW_HEIGHT);
-                });
-                // draw tempo
-                let ystart = scaleY(meas.start, c.PREVIEW_HEIGHT);
-                let yend = scaleY(meas.end, c.PREVIEW_HEIGHT);
-                p.line(0, ystart, last, yend);
-                p.pop();
-            }
-        }
-        p.pop();
+        Window.drawTabs(p, { locator: API.exposeTracking().locator(), cursor_loc, isPlaying });
+        Window.drawToolbar(p, range);
 
         if (Window.panels) {
             p.fill(255, 0, 0, 10);

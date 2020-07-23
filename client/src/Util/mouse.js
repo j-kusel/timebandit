@@ -2,6 +2,10 @@ import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { bit_toggle, parse_bits } from './index.js';
 
+var cursors = {
+    'tempo': 'ns-resize'
+};
+
 export default class _Mouse {
     constructor(Window) {
         this.grabbed = 0;
@@ -86,14 +90,29 @@ export default class _Mouse {
                 locked[Window.selected.meas.id].beats = bit_toggle(locked[Window.selected.meas.id].beats, this.rollover.beat);
         }
 
+        this.clickTempo = () => {
+            this.drag.mode = 'tempo';
+            Window.initialize_temp();
+            this.drag.grab = this.rollover.beat;
+            this.grabbed = this.rollover.beat;
+        }
+
+
     }
 
-    clickTempo() {
-        this.drag.mode = 'tempo';
-        Window.initialize_temp();
-        this.drag.grab = this.rollover.beat;
-        this.grabbed = this.rollover.beat;
+    rolloverCheck(p, coords, meta) {
+        if (p.mouseX > this.loc.x + coords[0] - 5 &&
+            p.mouseX < this.loc.x + coords[0] + 5 &&
+            p.mouseY > this.loc.y + coords[1] - 5 &&
+            p.mouseY < this.loc.y + coords[1] + 5 
+        ) {
+            this.rollover = meta;
+            this.cursor = cursors[meta.type];
+            return true;
+        }
+        return false;
     }
+
 
     get loc() {
         return this.translate.slice(-1)[0];
