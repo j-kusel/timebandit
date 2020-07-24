@@ -216,8 +216,9 @@ export default function measure(p) {
 
         Window.drawFrame(p);
 
-        Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
-        if (Window.selected.meas) {
+
+        // THIS IS IN A STRANGE SPOT
+        /*if (Window.selected.meas) {
             let first = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
             let last = first + Window.selected.meas.ms*Window.scale;
             if (shift &&
@@ -228,10 +229,12 @@ export default function measure(p) {
                     && true))
                 Mouse.cursor = 'ew-resize';
         }
+        */
 
         // push below playback bar
         p.push();
-        
+        //Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
+
         p.translate(0, c.PLAYBACK_HEIGHT);
         p.stroke(primary);
         p.fill(primary);
@@ -244,12 +247,19 @@ export default function measure(p) {
         instruments.forEach((inst, i_ind) => {
             var yloc = i_ind*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
 
-            if (Mouse.drag.mode === '' &&
-                p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
+            Mouse.push({ x: 0, y: yloc });
+            if (Mouse.drag.mode === '')
+                Mouse.rolloverCheck(p, [null, 0, null, c.INST_HEIGHT], {
+                    type: 'inst',
+                    inst: i_ind,
+                });
+            Mouse.pop();
+                /*p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
                 Object.assign(new_rollover, {
                     type: 'inst',
                     inst: i_ind,
                 });
+                */
 
             // push into instrument channel
             p.push();
@@ -281,14 +291,24 @@ export default function measure(p) {
                 let origin = (offset)*Window.scale + Window.viewport;
                 let final = ms * Window.scale;
                 
-                if (Mouse.drag.mode === '' &&
-                    p.mouseX > origin && p.mouseX < (origin + final) &&
+                // THE FIRST ONE WORKS, ALL OTHER MEASURES OFF BY PANES_WIDTH ???
+                Mouse.push({ x: origin + c.PANES_WIDTH, y: yloc });
+                console.log(p.mouseX, Object.assign({}, Mouse.loc).x, origin);
+                if (Mouse.drag.mode === '')
+                    Mouse.rolloverCheck(p, [0, 0, final, c.INST_HEIGHT], {
+                        ind: m_ind,
+                        type: 'measure',
+                        meas: measure
+                    });
+                    /*p.mouseX > origin && p.mouseX < (origin + final) &&
                     p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
                     Object.assign(new_rollover, {
                         ind: m_ind,
                         type: 'measure',
                         meas: measure
                     });
+                    */
+                Mouse.pop();
 
 
                 let position = (tick) => (tick*Window.scale + Window.viewport);
@@ -337,7 +357,6 @@ export default function measure(p) {
                 p.text([measure.timesig, '4'].join('\n'), 0, c.INST_HEIGHT/2);
                 p.pop();
 
-                let translated = p.mouseX - Mouse.loc.x;
                 // draw beats
                 beats.forEach((beat, index) => {
                     let coord = beat*Window.scale;
@@ -346,18 +365,12 @@ export default function measure(p) {
                         [0, 0, 255] : [255, 0, 0];
 
                     // try Mouse.rollover
-                    if (!temp //&& !Mouse.drag.x
-                        && p.mouseY >= yloc
-                        && p.mouseY < yloc + c.INST_HEIGHT
-                        && translated > coord-c.ROLLOVER_TOLERANCE
-                        && translated < coord+c.ROLLOVER_TOLERANCE
-                    ) {
+                    if (!temp && Mouse.rolloverCheck(p, 
+                        [coord-c.ROLLOVER_TOLERANCE, 0, coord+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
+                        { type: 'beat', beat: index }
+                    )) {
                         alpha = 100;
-                        Object.assign(new_rollover, { type: 'beat', beat: index });
-                            
-                        if (ctrl
-                            && Window.selected.meas
-                        ) {
+                        if (ctrl && Window.selected.meas) {
                             // change Mouse.rollover cursor
                             Mouse.cursor = (shift) ?
                                 'text' : 'pointer';
@@ -375,6 +388,7 @@ export default function measure(p) {
                     p.stroke(...color, alpha);
                     p.line(coord, 0, coord, c.INST_HEIGHT);
                 });
+                Mouse.pop();
 
                 // draw tempo graph
                 p.stroke(240, 200, 200);
@@ -501,7 +515,7 @@ export default function measure(p) {
 
         }
 
-        Mouse.rollover = new_rollover;
+        //Mouse.rollover = new_rollover;
 
         if (DEBUG) {
             p.push();
@@ -573,6 +587,7 @@ export default function measure(p) {
         // draw cursor / insertMeas
         p.stroke(200);
         p.fill(240);
+        Mouse.push({x: c.PANES_WIDTH, y:0});
         let t_mouseX = p.mouseX - Mouse.loc.x;
         let t_mouseY = p.mouseY - Mouse.loc.y;
         p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
@@ -635,6 +650,7 @@ export default function measure(p) {
         
         Window.drawTabs(p, { locator: API.exposeTracking().locator(), cursor_loc, isPlaying });
         Window.drawToolbar(p, range);
+        Mouse.updateRollover();
 
         if (Window.panels) {
             p.fill(255, 0, 0, 10);

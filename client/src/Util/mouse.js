@@ -3,7 +3,8 @@ import c from '../config/CONFIG.json';
 import { bit_toggle, parse_bits } from './index.js';
 
 var cursors = {
-    'tempo': 'ns-resize'
+    'tempo': 'ns-resize',
+    'inst': 'default'
 };
 
 export default class _Mouse {
@@ -15,6 +16,7 @@ export default class _Mouse {
         };
         this.outside_origin = true;
         this.rollover = {};
+        this._rollover = {};
         this.cursor = 'default';
         this.translate = [];
 
@@ -101,18 +103,38 @@ export default class _Mouse {
     }
 
     rolloverCheck(p, coords, meta) {
-        if (p.mouseX > this.loc.x + coords[0] - 5 &&
-            p.mouseX < this.loc.x + coords[0] + 5 &&
-            p.mouseY > this.loc.y + coords[1] - 5 &&
-            p.mouseY < this.loc.y + coords[1] + 5 
-        ) {
-            this.rollover = meta;
+        // a four-number array checks within a box,
+        // a two-number array checks a point within tolerances
+
+        let tolerance = 0;
+        if (coords.length === 2) {
+            coords.push(coords[0]);
+            coords.push(coords[1]);
+            tolerance = 5;
+        }
+
+        let xCheck = () =>
+            (coords[0] === null) ? true :
+                (p.mouseX >= this.loc.x + coords[0] - tolerance &&
+                p.mouseX < this.loc.x + coords[2] + tolerance);
+
+        let yCheck = () => 
+            (coords[1] === null) ? true :
+                (p.mouseY >= this.loc.y + coords[1] - tolerance &&
+                p.mouseY < this.loc.y + coords[3] + tolerance); 
+
+        if (xCheck() && yCheck()) {
+            Object.assign(this._rollover, meta);
             this.cursor = cursors[meta.type];
             return true;
         }
         return false;
     }
 
+    updateRollover() {
+        this.rollover = this._rollover;
+        this._rollover = {};
+    }
 
     get loc() {
         return this.translate.slice(-1)[0];
