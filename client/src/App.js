@@ -752,7 +752,9 @@ class App extends Component {
       reader.onload = (e) => {
           logger.log(`Loading file ${fileName}...`);
           let numInst = -1,
-              numMeas = 0;
+              numMeas = 0,
+              gaps = [];
+          
           let instruments = e.target.result
               .split('\n')
               .slice(1) // remove headers
@@ -765,6 +767,31 @@ class App extends Component {
                           .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
                       , { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
                   );
+                  /*let spread = [newMeas.offset, newMeas.offset + newMeas.ms];
+                  let clean = true;
+                  if (!gaps.length) {
+                      gaps.push([-Infinity, spread[0]]);
+                      gaps.push([spread[1], Infinity]);
+                  } else {
+                      for (let i=0; i<gaps.length; i++) {
+                          if (spread[0] > gaps[i][0]) {
+                              if (spread[0] 
+                              if (spread[1] < gaps[i][1]) {
+                                  gaps.splice(i + 1, [spread[1], gaps[i][1]]);
+                                  gaps[i][1] = spread[0];
+                                  break;
+                              } else {
+                                  // ending collision
+                                  alert('ending collision!');
+                                  clean = false;
+                                  break;
+                              }
+                          } else {
+
+                      gaps = gaps.reduce((acc, gap) => {
+                          if (
+                          */
+
 
                   let pad = params[0] - (acc.length - 1);
                   if (pad > 0) {

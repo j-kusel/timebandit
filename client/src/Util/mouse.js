@@ -2,25 +2,38 @@ import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { bit_toggle, parse_bits } from './index.js';
 
-var cursors = {
+var drag_cursors = {
     'tempo': 'ns-resize',
-    'inst': 'default'
+    'inst': 'default',
+    'measure': 'ew-resize',
+    'beat': 'text'
 };
 
-export default class _Mouse {
-    constructor(Window) {
-        this.grabbed = 0;
-        this.drag = {
-            x: 0, y: 0,
-            mode: '',
-        };
-        this.outside_origin = true;
-        this.rollover = {};
-        this._rollover = {};
-        this.cursor = 'default';
-        this.translate = [];
+var cursors = {
+    'tempo': (__) => 'ns-resize',
+    'inst': (__) => 'default',
+    'measure': (mods) => 
+        mods.shift ? 'ew-resize' : 'default',
+    'beat': (mods) =>
+        mods.ctrl ? (mods.shift ? 'text' : 'pointer') : 'default'
+};
 
-        this.select = (p) => {
+export default (p, Window) => {
+    class _Mouse {
+        constructor() {
+            this.grabbed = 0;
+            this.drag = {
+                x: 0, y: 0,
+                mode: '',
+            };
+            this.outside_origin = true;
+            this.rollover = {};
+            this._rollover = {};
+            this.cursor = 'default';
+            this.translate = [];
+        }
+
+        select() {
             let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
             if (inst >= Window.insts)
                 this.outside_origin = true
@@ -37,7 +50,7 @@ export default class _Mouse {
             };
         };
 
-        this.checkOrigin = (p) => {
+        checkOrigin = (p) => {
             // return if outside canvas or over active menu
             if (p.mouseX === Infinity 
                 || p.mouseX < 0
@@ -63,7 +76,7 @@ export default class _Mouse {
             return false;
         };
 
-        this.tickMode = () => {
+        tickMode() {
             let measure = Window.selected.meas;
             Window.initialize_temp();
             this.grabbed = this.rollover.beat === measure.beats.length - 1 ?
@@ -76,12 +89,12 @@ export default class _Mouse {
             this.drag.grab = this.rollover.beat;
         }
 
-        this.measureMode = () => {
+        measureMode() {
             Window.initialize_temp();
             this.drag.mode = 'measure';
         }
 
-        this.beatLock = (locked) => {
+        beatLock(locked) {
             if (!(Window.selected.meas.id in locked))
                 locked[Window.selected.meas.id] = {
                     beats: [],
@@ -92,81 +105,94 @@ export default class _Mouse {
                 locked[Window.selected.meas.id].beats = bit_toggle(locked[Window.selected.meas.id].beats, this.rollover.beat);
         }
 
-        this.clickTempo = () => {
+        clickTempo() {
             this.drag.mode = 'tempo';
             Window.initialize_temp();
             this.drag.grab = this.rollover.beat;
             this.grabbed = this.rollover.beat;
         }
 
+        rolloverCheck(coords, meta) {
+            // a four-number array checks within a box,
+            // a two-number array checks a point within tolerances
 
-    }
+            let tolerance = 0;
+            if (coords.length === 2) {
+                coords.push(coords[0]);
+                coords.push(coords[1]);
+                tolerance = 5;
+            }
 
-    rolloverCheck(p, coords, meta) {
-        // a four-number array checks within a box,
-        // a two-number array checks a point within tolerances
+            let xCheck = () =>
+                (coords[0] === null) ? true :
+                    (p.mouseX >= this.loc.x + coords[0] - tolerance &&
+                    p.mouseX < this.loc.x + coords[2] + tolerance);
 
-        let tolerance = 0;
-        if (coords.length === 2) {
-            coords.push(coords[0]);
-            coords.push(coords[1]);
-            tolerance = 5;
+            let yCheck = () => 
+                (coords[1] === null) ? true :
+                    (p.mouseY >= this.loc.y + coords[1] - tolerance &&
+                    p.mouseY < this.loc.y + coords[3] + tolerance); 
+
+            if (xCheck() && yCheck()) {
+                Object.assign(this._rollover, meta);
+                this.cursor = (meta.meas &&
+                    Window.selected.meas &&
+                    meta.meas.id === Window.selected.meas.id
+                ) ?
+                    cursors[meta.type](Window.mods) :
+                    'default';
+                return true;
+            }
+            return false;
         }
 
-        let xCheck = () =>
-            (coords[0] === null) ? true :
-                (p.mouseX >= this.loc.x + coords[0] - tolerance &&
-                p.mouseX < this.loc.x + coords[2] + tolerance);
-
-        let yCheck = () => 
-            (coords[1] === null) ? true :
-                (p.mouseY >= this.loc.y + coords[1] - tolerance &&
-                p.mouseY < this.loc.y + coords[3] + tolerance); 
-
-        if (xCheck() && yCheck()) {
-            Object.assign(this._rollover, meta);
-            this.cursor = cursors[meta.type];
-            return true;
+        dragCursorUpdate() {
+            if (this.drag.mode === 'measure')
+                this.cursor = 'ew-resize'
+            else if (this.drag.mode === 'tempo')
+                this.cursor = 'ns-resize'
+            else if (this.drag.mode === 'tick')
+                this.cursor = 'text';
         }
-        return false;
-    }
 
-    updateRollover() {
-        this.rollover = this._rollover;
-        this._rollover = {};
-    }
 
-    get loc() {
-        return this.translate.slice(-1)[0];
-    }
+        updateRollover() {
+            this.rollover = this._rollover;
+            this._rollover = {};
+        }
 
-    push(t) {
-        let last = this.translate.slice(-1)[0];
-        if (last)
-            this.translate.push({
-                x: last.x + t.x,
-                y: last.y + t.y
-            })
-        else
-            this.translate.push(t);
-    }
+        get loc() {
+            return this.translate.slice(-1)[0];
+        }
 
-    pop() {
-        return this.translate.pop();
-    }
+        push(t) {
+            let last = this.translate.slice(-1)[0];
+            if (last)
+                this.translate.push({
+                    x: last.x + t.x,
+                    y: last.y + t.y
+                })
+            else
+                this.translate.push(t);
+        }
 
-    updatePress(p) {
-        this.drag = { x: 0, y: 0 };
-        this.outside_origin = this.checkOrigin(p);
-        if (this.outside_origin)
-            return true;
+        pop() {
+            return this.translate.pop();
+        }
 
-        if (this.rollover.type === 'tempo') {
-            this.clickTempo();
-            return true;
-        };
-        return false;
-    }
+        updatePress() {
+            this.drag = { x: 0, y: 0 };
+            this.outside_origin = this.checkOrigin(p);
+            if (this.outside_origin)
+                return true;
 
-};
+            if (this.rollover.type === 'tempo') {
+                this.clickTempo();
+                return true;
+            };
+            return false;
+        }
+    };
+    return new _Mouse();
+}
 

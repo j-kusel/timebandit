@@ -6,6 +6,8 @@ import _ from 'lodash';
 import _Window from '../Util/window.js';
 import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
+import _Debugger from '../Util/debugger.js';
+import keycodes from '../Util/keycodes.js';
 
 
 const DEBUG = true;
@@ -77,9 +79,6 @@ var insert = (list, item) => {
 // holds arrays of beats by measure id key, MOVE THIS LATER
 var locked = {};
 
-var Window = new _Window();
-var Mouse = new _Mouse(Window);
-var Keyboard = new _Keyboard;
 
 var range = [0, 100];
 
@@ -105,13 +104,12 @@ export default function measure(p) {
     // misc
     var isPlaying = false;
 
+    var Window = _Window(p);
+    var Mouse = _Mouse(p, Window);
+    var Keyboard = _Keyboard(p);
+
     // debugger
-    var debug_messages = [];
-    var blockText = (lines, coords, fontSize)  => {
-        let font = fontSize || c.FONT_DEFAULT_SIZE;
-        let lineY = (y) => font*y + coords.y;
-        lines.forEach((line, i) => p.text(line, coords.x, lineY(i)));
-    };
+    var Debug = _Debugger(p, Window, Mouse);
 
     var updateSelected = (newSelected) => {
         if (Window.selected.meas) {
@@ -134,7 +132,6 @@ export default function measure(p) {
     }
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
-        debug_messages = [];
         instruments = props.instruments;
         Window.insertMeas = props.insertMeas;
 
@@ -202,7 +199,6 @@ export default function measure(p) {
     }
 
     p.draw = function () {
-        debug_messages = [];
         if (SLOW)
             p.frameRate(10);
 
@@ -210,18 +206,19 @@ export default function measure(p) {
         Mouse.cursor = 'default';
 
         // key check
-        let [ctrl, shift, mod, alt] = [CTRL, SHIFT, MOD, ALT].map(k => p.keyIsDown(k));
+        ['CTRL', 'SHIFT', 'MOD', 'ALT'].forEach(k =>
+            Object.assign(Window.mods, { [k.toLowerCase()]: p.keyIsDown(keycodes[k]) }));
         snaps.div_index = (Keyboard.num_counter) ?
             Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
 
-        Window.drawFrame(p);
+        Window.drawFrame();
 
 
         // THIS IS IN A STRANGE SPOT
         /*if (Window.selected.meas) {
             let first = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
             let last = first + Window.selected.meas.ms*Window.scale;
-            if (shift &&
+            if (Window.mods.shift &&
                 (p.mouseX > first
                     && p.mouseX < last
                     && p.mouseY >= Window.selected.inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
@@ -233,7 +230,7 @@ export default function measure(p) {
 
         // push below playback bar
         p.push();
-        //Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
+        Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
 
         p.translate(0, c.PLAYBACK_HEIGHT);
         p.stroke(primary);
@@ -242,28 +239,22 @@ export default function measure(p) {
         p.translate(c.PANES_WIDTH, 0);
 
 
+
         // update Mouse location
         let new_rollover = {};
         instruments.forEach((inst, i_ind) => {
-            var yloc = i_ind*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
+            var yloc = i_ind*c.INST_HEIGHT;
 
+            p.push();
+            p.translate(0, yloc);
             Mouse.push({ x: 0, y: yloc });
             if (Mouse.drag.mode === '')
-                Mouse.rolloverCheck(p, [null, 0, null, c.INST_HEIGHT], {
+                Mouse.rolloverCheck([null, 0, null, c.INST_HEIGHT], {
                     type: 'inst',
                     inst: i_ind,
                 });
-            Mouse.pop();
-                /*p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
-                Object.assign(new_rollover, {
-                    type: 'inst',
-                    inst: i_ind,
-                });
-                */
 
             // push into instrument channel
-            p.push();
-            p.translate(0, yloc - c.PLAYBACK_HEIGHT);
             p.stroke(255, 0, 0);
             p.fill(secondary_light2);
 
@@ -276,11 +267,6 @@ export default function measure(p) {
             inst.ordered.forEach((measure, m_ind) => {
                 let key = measure.id;
 
-                // skip if offscreen
-                /*if (final + origin < c.PANES_WIDTH ||
-                    origin > p.width
-                )
-                    return; */
 
                 let temp = 'temp' in measure;
                 var [ticks, beats, offset, ms, start, end] = temp ?
@@ -288,46 +274,30 @@ export default function measure(p) {
                     [measure.ticks, measure.beats, measure.offset, measure.beats.slice(-1)[0], measure.start, measure.end];
 
 
-                let origin = (offset)*Window.scale + Window.viewport;
-                let final = ms * Window.scale;
-                
-                // THE FIRST ONE WORKS, ALL OTHER MEASURES OFF BY PANES_WIDTH ???
-                Mouse.push({ x: origin + c.PANES_WIDTH, y: yloc });
-                console.log(p.mouseX, Object.assign({}, Mouse.loc).x, origin);
-                if (Mouse.drag.mode === '')
-                    Mouse.rolloverCheck(p, [0, 0, final, c.INST_HEIGHT], {
-                        ind: m_ind,
-                        type: 'measure',
-                        meas: measure
-                    });
-                    /*p.mouseX > origin && p.mouseX < (origin + final) &&
-                    p.mouseY > yloc && p.mouseY <= yloc + c.INST_HEIGHT)
-                    Object.assign(new_rollover, {
-                        ind: m_ind,
-                        type: 'measure',
-                        meas: measure
-                    });
-                    */
-                Mouse.pop();
-
-
                 let position = (tick) => (tick*Window.scale + Window.viewport);
-                
+                let origin = position(offset);
+                let final = ms * Window.scale;
+
+                 // skip if offscreen
+                if (origin + final < 0 ||
+                    origin > p.width
+                )
+                    return;
+               
                 // push into first beat
                 p.push();
                 p.translate(origin, 0);
-                Mouse.push({ x: origin, y: yloc - c.PLAYBACK_HEIGHT });
-
-                // draw origin
-                p.stroke(0, 255, 0);
-                p.line(0, 0, 0, c.INST_HEIGHT);
+                Mouse.push({ x: origin, y: 0 });
+                if (Mouse.drag.mode === '')
+                    Mouse.rolloverCheck([0, 0, final, c.INST_HEIGHT], {
+                        ind: m_ind, type: 'measure', meas: measure
+                    });
 
                 // handle selection
                 if (Window.selected.meas && key === Window.selected.meas.id) {
                     p.fill(0, 255, 0, 60);
                     p.rect(0, 0, final, c.INST_HEIGHT);
                 }
-
 
                 // draw ticks
                 p.stroke(240);
@@ -342,20 +312,14 @@ export default function measure(p) {
 
                 for (var i=0; i < ticks.length; i += step) {
                     let loc = ticks[i]*Window.scale;
-                    if (loc + origin > p.width)
+                    // skip if offscreen
+                    if (loc + origin > p.width || loc + origin < 0)
                         continue;
                     p.line(loc, 0, loc, c.INST_HEIGHT);
                 };
 
                 // draw timesig
-                p.push();
-                p.translate(c.TIMESIG_PADDING, c.TIMESIG_PADDING);
-                p.fill(100);
-                p.textSize(c.INST_HEIGHT*0.25);
-                p.textLeading(c.INST_HEIGHT*0.20);
-                p.textAlign(p.LEFT, p.CENTER);
-                p.text([measure.timesig, '4'].join('\n'), 0, c.INST_HEIGHT/2);
-                p.pop();
+                Window.drawTimesig(measure.timesig, '4');
 
                 // draw beats
                 beats.forEach((beat, index) => {
@@ -365,20 +329,20 @@ export default function measure(p) {
                         [0, 0, 255] : [255, 0, 0];
 
                     // try Mouse.rollover
-                    if (!temp && Mouse.rolloverCheck(p, 
+                    if (!temp && Mouse.rolloverCheck( 
                         [coord-c.ROLLOVER_TOLERANCE, 0, coord+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
                         { type: 'beat', beat: index }
                     )) {
                         alpha = 100;
-                        if (ctrl && Window.selected.meas) {
+                        if (Window.mods.ctrl && Window.selected.meas) {
                             // change Mouse.rollover cursor
-                            Mouse.cursor = (shift) ?
+                            Mouse.cursor = (Window.mods.shift) ?
                                 'text' : 'pointer';
 
                             if (key in locked) {
                                 let bits = parse_bits(locked[key].beats);
-                                if ((bits.length >= 2 && (bits.indexOf(new_rollover.beat) === -1) && !shift)
-                                    || (bits.indexOf(new_rollover.beat) !== -1 && shift)
+                                if ((bits.length >= 2 && (bits.indexOf(new_rollover.beat) === -1) && !Window.mods.shift)
+                                    || (bits.indexOf(new_rollover.beat) !== -1 && Window.mods.shift)
                                 )
                                     Mouse.cursor = 'not-allowed';
                             };
@@ -438,7 +402,6 @@ export default function measure(p) {
 
                 // return from measure translate
                 p.pop();
-                Mouse.translate.pop();
 
             });
 
@@ -451,6 +414,7 @@ export default function measure(p) {
             };
 
             p.pop();
+            Mouse.pop();
         });
 
         // draw snaps
@@ -463,7 +427,6 @@ export default function measure(p) {
                 p.line(xloc, yloc, xloc, yloc + c.INST_HEIGHT);
             });
 
-        // draw debug
         let mouse = (p.mouseX - Window.viewport)/Window.scale;
         let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
         cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
@@ -472,11 +435,6 @@ export default function measure(p) {
         cursor_loc += '.' + parseInt(Math.abs(mouse % 1000), 10).toString().padStart(3, "0");
         if (mouse < 0.0)
            cursor_loc = '-' + cursor_loc;
-
-
-
-
-        //if (Window.mode === 2 && Window.selected.meas) {
 
         // draw editor frame
         if (Window.mode === 2 && Window.selected.meas) {
@@ -492,6 +450,7 @@ export default function measure(p) {
             let base = (select.start - range.tempo[0])/spread*c.INST_HEIGHT;
 
 
+            // MOVE THIS BLOCK TO BEAT DRAWING BLOCK WHEN QUEUING
             let handle;
             if (Mouse.drag.mode === 'tempo' && 'temp' in select) {
                 handle = [select.temp.beats[Mouse.drag.index]*Window.scale, Mouse.loc.y, 10, 10]; 
@@ -500,7 +459,7 @@ export default function measure(p) {
                 for (let i=0; i < select.beats.length; i++) {
                     let xloc = select.beats[i]*Window.scale;
                     let yloc = c.INST_HEIGHT - base - slope*i;
-                    if (Mouse.rolloverCheck(p, [xloc, yloc], {
+                    if (Mouse.rolloverCheck([xloc, yloc], {
                         type: 'tempo',
                         tempo: tempo_slope*i + select.start
                     })) {
@@ -510,76 +469,17 @@ export default function measure(p) {
                 };
             };
             
-            Window.drawEditorFrame(p, [x, y], handle);
+            Window.drawEditorFrame([x, y], handle);
             Mouse.pop();
 
         }
-
-        //Mouse.rollover = new_rollover;
+        Mouse.pop();
 
         if (DEBUG) {
-            p.push();
-            p.translate(0, (instruments.length+1)*c.INST_HEIGHT);
-            debug_messages.push(Window.selected.meas ?
-                `Window.selected - start: ${Window.selected.meas.start.toFixed(2)}, end: ${Window.selected.meas.end.toFixed(2)}, ms: ${Window.selected.meas.ms.toFixed(2)}` :
-                `Window.selected - none`
-            );
-
-            debug_messages.push((Window.selected.meas && 'temp' in Window.selected.meas) ?
-                `temp - start: ${Window.selected.meas.temp.start.toFixed(2)}, end: ${Window.selected.meas.temp.end.toFixed(2)}, ms: ${Window.selected.meas.temp.ms.toFixed(2)}` :
-                `temp - none`
-            );
-
-            debug_messages.push(`rollover - type: ${Mouse.rollover.type}, inst: ${Mouse.rollover.inst}, meas: ${'meas' in Mouse.rollover ? Mouse.rollover.meas.id : undefined}, index: ${Mouse.rollover.beat}`);
-            debug_messages.push(`drag - mode: ${Mouse.drag.mode}`);
-
-            p.stroke(primary); //200, 240, 200);
-            p.textSize(c.DEBUG_TEXT);
-            p.textAlign(p.LEFT, p.TOP);
-            let lines = (Window.selected.meas) ?
-                [`Window.selected: ${'temp' in Window.selected.meas ? [Window.selected.meas.temp.start, Window.selected.meas.temp.end].join(' ') : 'no temp'}  beats - ${Window.selected.meas.ms.toFixed(1)} ms`] :
-                [''];
-
-            lines.push(`location: ${cursor_loc}`);
-            lines = [...lines, ...(debug_messages || [])];
-            blockText(lines, { x: 0, y: c.DEBUG_TEXT }, c.DEBUG_TEXT);
-
-            p.textAlign(p.CENTER, p.CENTER);
-
-
-            let lineY = (line) => c.DEBUG_TEXT*line + c.DEBUG_HEIGHT;
-
-            p.push();
-            p.translate(0, lineY(lines.length) + 5);
-            p.fill(240);
-            p.textSize(8);
-            [
-                {name: 'MOD', code: MOD},
-                {name: 'SHIFT', code: SHIFT},
-                {name: 'CTRL', code: CTRL},
-                {name: 'ALT', code: ALT},
-                {name: 'C', code: KeyC},
-                {name: 'V', code: KeyV},
-            ].forEach((key, ind) => {
-                if (p.keyIsDown(key.code))
-                    p.fill(120);
-                p.rect(5 + ind*25, 0, 20, 15);
-                p.fill(240);
-                p.text(key.name, 15 + ind*25, 7);
-            });
-
-            p.push();
-            p.translate(0, 20);
-            NUM.forEach((num, ind) => {
-                if (p.keyIsDown(num))
-                    p.fill(120);
-                p.rect(5 + ind*25, 0, 20, 15);
-                p.fill(240);
-                p.text(ind, 15 + ind*25, 7);
-            });
-            p.pop();
-            p.pop();
-            p.pop();
+            Debug.push(`location: ${cursor_loc}`);
+            Debug.write({ x: 0, y: (instruments.length+1)*c.INST_HEIGHT + c.DEBUG_TEXT }, c.DEBUG_TEXT);
+            Debug.frameRate();
+            Debug.clear();
         };
 
             
@@ -637,19 +537,15 @@ export default function measure(p) {
             let tracking_vis = tracking*Window.scale + Window.viewport;
             p.line(tracking_vis, c.PLAYBACK_HEIGHT, tracking_vis, c.INST_HEIGHT*2 + c.PLAYBACK_HEIGHT);
         };
-        if (Mouse.drag.mode === 'measure')
-            Mouse.cursor = 'ew-resize'
-        else if (Mouse.drag.mode === 'tempo')
-            Mouse.cursor = 'ns-resize'
-        else if (Mouse.drag.mode === 'tick')
-            Mouse.cursor = 'text';
+
+        Mouse.dragCursorUpdate();
         document.body.style.cursor = Mouse.cursor;
                 
 
         p.pop();
         
-        Window.drawTabs(p, { locator: API.exposeTracking().locator(), cursor_loc, isPlaying });
-        Window.drawToolbar(p, range);
+        Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc, isPlaying });
+        Window.drawToolbar(range);
         Mouse.updateRollover();
 
         if (Window.panels) {
@@ -657,18 +553,10 @@ export default function measure(p) {
             p.rect(0, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length, p.width, c.INST_HEIGHT);
         };
             
-        if (DEBUG) {
-            p.textAlign(p.RIGHT, p.TOP);
-            p.textSize(18);
-            p.stroke(secondary);
-            p.fill(secondary);
-            p.text(Math.round(p.frameRate()), p.width - 10, 5);
-        }
-
     }
 
     p.keyReleased = function(e) {
-        if (!API.checkFocus() && Keyboard.checkNumRelease(p))
+        if (!API.checkFocus() && Keyboard.checkNumRelease())
             return false;
         return false;
     }
@@ -676,10 +564,10 @@ export default function measure(p) {
     p.keyPressed = function(e) {
         if (API.disableKeys())
             return;
-        if (!API.checkFocus() && Keyboard.checkNumPress(p))
+        if (!API.checkFocus() && Keyboard.checkNumPress())
             return;
 
-        let dir = Keyboard.checkDirection(p);
+        let dir = Keyboard.checkDirection();
         if (Window.selected.meas && dir) {
             if (dir === 'DOWN') {
                 if (Window.selected.inst >= instruments.length - 1)
@@ -773,14 +661,14 @@ export default function measure(p) {
     p.mouseWheel = function(event) {
         event.preventDefault();
         let zoom = p.keyIsDown(CTRL);
-        Window.updateView(event, p, { zoom });
+        Window.updateView(event, { zoom });
         if (zoom)
             API.newScaling(Window.scale);
         API.reportWindow(Window.viewport, Window.scale);
     };
 
     p.mousePressed = function(e) {
-        Mouse.updatePress(p);
+        Mouse.updatePress();
         if (Mouse.outside_origin)
             return;
 
@@ -794,18 +682,19 @@ export default function measure(p) {
             return;
         }
 
-        Mouse.select(p);
+        Mouse.select();
+
         if (Mouse.outside_origin)
             return;
        
         if (Window.selected.meas) {
-            let [shift, ctrl] = [p.keyIsDown(SHIFT), p.keyIsDown(CTRL)];
-            if (shift) {
-                if (ctrl)
+            //let [shift, ctrl] = [p.keyIsDown(SHIFT), p.keyIsDown(CTRL)];
+            if (Window.mods.shift) {
+                if (Window.mods.ctrl)
                     Mouse.tickMode()
                 else
                     Mouse.measureMode();
-            } else if (ctrl) {
+            } else if (Window.mods.ctrl) {
                 Mouse.beatLock(locked);
             }
         };
