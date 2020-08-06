@@ -24,8 +24,4 @@ The result is around 3466ms. This can be said to be the __true time__ of the mea
 <img src="https://render.githubusercontent.com/render/math?math=$$\sum_{t=0}^{5*4-1} 60000/p/(60 + 60t/(5*4)) \approx 3529.02$$"><br>
 In quavered time at a PPQ of 4, the sum of 3529ms exceeds the comparable true time by 63ms. Higher PPQs allow a tradeoff between computational cost and greater fidelity with respect to true time, but compatibility with other software and devices should always be considered.
 
-
-
-
-
-
+>Note that the summation formula for quavered time results in some peculiarities: in true time, our 60-120 BPM example from above could be reversed and would last the same duration. At 4 PPQ, the same reversed example would take 3404ms, over a tenth of a second faster.
