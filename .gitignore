@@ -4,6 +4,12 @@
 */node_modules
 /server/config/env
 
+# hardware build
+*.o
+*.hex
+*.elf
+*.map
+
 # testing
 /coverage
 
