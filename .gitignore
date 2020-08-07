@@ -5,6 +5,12 @@
 */node_modules
 /server/config/env
 
+# hardware build
+*.o
+*.hex
+*.elf
+*.map
+
 # testing
 /coverage
 
@@ -17,6 +23,7 @@
 .env.development.local
 .env.test.local
 .env.production.local
+/junk
 
 npm-debug.log*
 yarn-debug.log*
