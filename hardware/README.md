@@ -32,7 +32,7 @@ You will need the following packages to build and flash the software:
 sudo apt-get install avrdude avrdude-doc binutils-avr avr-libc gcc-avr gdb-avr
 ```
 
-With the same Arduino connection setup as outlined in the article above, simply run the command `make flash` in the desired version folder and avrdude will work its magic.
+With the same Arduino connection setup as outlined in the article above, simply run the command `make flash` in the desired version folder and `avrdude` will work its magic.
 
 ##### Mac/Windows
 Guides coming soon!
