@@ -2,12 +2,13 @@ import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { bit_toggle, parse_bits } from './index.js';
 
-var drag_cursors = {
+/*var drag_cursors = {
     'tempo': 'ns-resize',
     'inst': 'default',
     'measure': 'ew-resize',
     'beat': 'text'
 };
+*/
 
 var cursors = {
     'tempo': (__) => 'ns-resize',

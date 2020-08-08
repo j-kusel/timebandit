@@ -1,7 +1,10 @@
 import c from '../config/CONFIG.json';
-import { primary, secondary } from '../config/CONFIG.json';
-import { SHIFT, ALT, SPACE, DEL, BACK, ESC, CTRL, MOD } from './keycodes.js';
-import { KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL, KeyZ } from './keycodes.js';
+import { primary } from '../config/CONFIG.json';
+//import { secondary } from '../config/CONFIG.json';
+import { SHIFT, ALT, CTRL, MOD } from './keycodes.js';
+//import { SPACE, DEL, BACK, ESC } from './keycodes.js';
+import { KeyC, KeyV, } from './keycodes.js';
+//import { KeyI, KeyH, KeyJ, KeyK, KeyL, KeyZ } from './keycodes.js';
 import { NUM } from './keycodes.js';
 
 

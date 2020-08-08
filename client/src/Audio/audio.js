@@ -17,18 +17,6 @@ for (let i=0; i < 5; i++) {
     gains.push(gain);
 };
 
-var oscs = [440, 220, 110].map((freq, ind) => {
-    let osc = aC.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, aC.currentTime);
-
-    console.log(gains[ind]);
-    osc.connect(gains[ind]);
-    osc.start();
-    return osc;
-});
-
-    
 gains.forEach(gain => gain.connect(aC.destination));
 
 var PARAMS = {

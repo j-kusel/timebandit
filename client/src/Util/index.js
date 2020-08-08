@@ -53,6 +53,7 @@ var check_proximity_by_key = (obj, arr, key) => {
         if (last_gap[1] < gap[1])
             return true;
         last_gap = [ind, gap[1]];
+        return false;
     });
     return last_gap[0];
 };

@@ -24,6 +24,8 @@
 .env.test.local
 .env.production.local
 /junk
+/env/*
+sysadmin.js
 
 npm-debug.log*
 yarn-debug.log*

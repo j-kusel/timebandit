@@ -25,8 +25,11 @@ var button_mixin = `
 let timing = '0.3s';
 var transition_mixin = ['transition', '-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
     .reduce((acc, t) => `${acc}${t}: ${timing};\n`, '');
-var transition_mixin2 = (change) => ['transition', '-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
+
+// to use later
+/*var transition_mixin2 = (change) => ['transition', '-webkit-transition', '-moz-transition', '-ms-transition', '-o-transition']
     .reduce((acc, t) => `${acc}${t}: ${timing} ${change};\n`, '');
+    */
 
 
 var Playback = styled.button`
@@ -196,9 +199,9 @@ var Edit = styled.div`
 `;
 
 const Link = ({ className, children }) => (
-      <a className={className}>
-        {children}
-      </a>
+  <button className={className}>
+    {children}
+  </button>
 );
 
 const StyledLink = styled(Link)`

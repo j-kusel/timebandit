@@ -1,8 +1,10 @@
-import { order_by_key, check_proximity_by_key, parse_bits, bit_toggle } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, parse_bits } from '../Util/index.js';
+//import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
-import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
-import _ from 'lodash';
+import { primary, secondary_light2 } from '../config/CONFIG.json';
+//import { secondary, secondary_light, } from '../config/CONFIG.json';
+//import _ from 'lodash';
 import _Window from '../Util/window.js';
 import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
@@ -15,11 +17,14 @@ const SLOW = true;
 
 var API;
 
-const [SHIFT, ALT, SPACE, DEL, BACK, ESC] = [16, 18, 32, 46, 8, 27];
+
+const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
+//const [SHIFT, ALT] = [16, 18];
 let mac = window.navigator.platform.indexOf('Mac') >= 0;
 const CTRL = mac ? 224 : 17;
 const MOD = mac ? 17 : 91;
-const [KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL] = [67, 73, 86, 72, 74, 75, 76];
+const [KeyC, KeyI, KeyV] = [67, 73, 86];
+//const [KeyH, KeyJ, KeyK, KeyL] = [72, 74, 75, 76];
 //const [KeyZ] = [90];
 //const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
 const NUM = []
@@ -111,7 +116,8 @@ export default function measure(p) {
     // debugger
     var Debug = _Debugger(p, Window, Mouse);
 
-    var updateSelected = (newSelected) => {
+    // might be deprecated
+    /*var updateSelected = (newSelected) => {
         if (Window.selected.meas) {
             if (Window.selected.meas.id === newSelected.meas.id)
                 return;
@@ -120,7 +126,7 @@ export default function measure(p) {
         }
         Object.assign(Window.selected, newSelected);
         API.displaySelected(Window.selected);
-    }
+    }*/
 
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
@@ -746,7 +752,6 @@ export default function measure(p) {
         if (!('gaps' in measure))
             measure.gaps = calcGaps(instruments[Window.selected.inst].ordered, Window.selected.meas.id);
 
-        let position = measure.offset + Mouse.drag.x/Window.scale;
         var crowding = (gaps, position, ms, options) => {
             let strict = (options && 'strict' in options) ? options.strict : false;
             let final = position + ms;
@@ -777,9 +782,6 @@ export default function measure(p) {
         }
 
         var PPQ_mod = Window.CONSTANTS.PPQ / Window.CONSTANTS.PPQ_tempo;
-        var C = (delta) => 60000.0 * (measure.beats.length - 1) / (delta);
-        var sigma = (start, constant) => ((n) => (1.0 / ((start * Window.CONSTANTS.PPQ_tempo * constant / 60000.0) + n)));
-        var grab = Mouse.drag.grab * Window.CONSTANTS.PPQ_tempo;
         var snapper = Mouse.drag.grab;
 
         var quickCalc = (start, slope, timesig, lock_target, _snapper) => {
@@ -903,8 +905,6 @@ export default function measure(p) {
                         cumulative += last;
                     });
                     update.beats.push(cumulative);
-                    let start_lock = false;
-                    let end_lock = false;
 
 
                     update.offset += (measure.ms - cumulative)/2; 
@@ -916,7 +916,6 @@ export default function measure(p) {
 
                     Object.assign(update, { cumulative });
 
-                    let new_end = update.end;
                         
                     if (cumulative > crowd.end[0] - crowd.start[0]) {
                             console.log('jump'); 

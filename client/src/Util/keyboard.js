@@ -1,5 +1,6 @@
-import { SHIFT, ALT, SPACE, DEL, BACK, ESC, CTRL, MOD } from './keycodes.js';
-import { KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL, KeyZ } from './keycodes.js';
+//import { SHIFT, ALT, SPACE, DEL, BACK, ESC, CTRL, MOD } from './keycodes.js';
+import { KeyH, KeyJ, KeyK, KeyL } from './keycodes.js';
+//import { KeyC, KeyI, KeyV, KeyZ } from './keycodes.js';
 import { NUM } from './keycodes.js';
 
 export default (p) => {

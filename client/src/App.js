@@ -13,7 +13,8 @@ import { MeasureCalc, order_by_key } from './Util/index';
 import ordered from './Util/ordered';
 import logger from './Util/logger';
 import UI from './Components/Canvas';
-import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
+import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
+//import { Log, Metadata, Rehearsal } from './Components/Styled';
 import { SettingsModal, WarningModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -46,7 +47,8 @@ var calcRange = (measures) => {
     };
 };
 
-var timeToChrono = (time) => {
+// might be deprecated
+/*var timeToChrono = (time) => {
     let chrono = [parseInt(Math.abs(time / 3600000), 10)];
     chrono = chrono.concat([60000, 1000].map((num) =>
         parseInt(Math.abs(time / num), 10).toString().padStart(2, "0")))
@@ -55,7 +57,7 @@ var timeToChrono = (time) => {
     if (time < 0.0)
        chrono = '-' + chrono;
     return chrono;
-};
+};*/
 
 
 
@@ -138,7 +140,8 @@ class App extends Component {
           } :
           { measures: {} });
           
-      DEBUG ? this.state.instruments.push({
+      if (DEBUG)
+          this.state.instruments.push({
               name: 'asdf',
               measures: {
                   [ids[3]]: { ...MeasureCalc({ 
@@ -156,7 +159,7 @@ class App extends Component {
                   }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[4] },
                   */
               }
-          }) : null;
+          });
 
       
       this.sizing = 600.0;
@@ -235,6 +238,8 @@ class App extends Component {
               let meas_to_delete = oldState.instruments[selected.inst].measures[selected.meas.id];
               meas_to_delete
                   .beats.forEach((beat, ind) => {
+                      // IN PROGRESS
+                      /*
                       let find = (node, { _clear }) => {
                           console.log(_clear);
                           if (node === undefined)
@@ -250,6 +255,7 @@ class App extends Component {
                               find(node.left, { _clear }) :
                               find(node.right, { _clear });
                       }
+                      */
 
                       ordered.tree.edit(ordered_cpy, { _clear: beat + meas_to_delete.offset, inst: selected.inst });
                   });
@@ -537,13 +543,14 @@ class App extends Component {
     document.activeElement.blur();
 
     // DEPRECATED, GET THIS WORKING AGAIN
-    let tempo_ppqs = PPQ_OPTIONS.reduce((acc, ppq, ind) => {
+    /*let tempo_ppqs = PPQ_OPTIONS.reduce((acc, ppq, ind) => {
         console.log(ppq.PPQ_tempo);
         console.log(eventKey % ppq.PPQ_tempo);
         return (eventKey % ppq.PPQ_tempo) ?
             acc :
             [...acc, { eventKey: ind, text: `${ppq.PPQ_tempo} (${ppq.PPQ_desc})`} ]},
         []);
+        */
     this.setState(oldState => ({ PPQ: eventKey }));
   };
 
@@ -752,8 +759,8 @@ class App extends Component {
       reader.onload = (e) => {
           logger.log(`Loading file ${fileName}...`);
           let numInst = -1,
-              numMeas = 0,
-              gaps = [];
+              numMeas = 0;
+              //gaps = [];
           
           let instruments = e.target.result
               .split('\n')
@@ -925,10 +932,12 @@ class App extends Component {
     if (selected.meas)
         data.push(<span key="info"> : {meas.start} - {meas.end} / {meas.timesig}</span>);
       
-    let metadata = (<Metadata x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.META_HEIGHT - CONFIG.LOG_HEIGHT}>
+    // add later
+    /*let metadata = (<Metadata x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.META_HEIGHT - CONFIG.LOG_HEIGHT}>
         { data }
         <p id="sizing">View: {(this.state.sizing/1000).toFixed(2)}"</p>
       </Metadata>);
+      */
 
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
