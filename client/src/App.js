@@ -20,14 +20,13 @@ import { SettingsModal, WarningModal } from './Components/Modals';
 import CONFIG from './config/CONFIG.json';
 import socketIOClient from 'socket.io-client';
 
-const DEBUG = true;
+const DEBUG = process.env.NODE_ENV === 'development';
 
 const socket = socketIOClient('http://localhost:3001');
 socket.on('hello', (data) => {
     socket.emit('frame', 0b00000001);
     socket.emit('loopback', 'stfu');
 });
-
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 // later do custom PPQs
