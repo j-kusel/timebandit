@@ -12,8 +12,8 @@ import _Debugger from '../Util/debugger.js';
 import keycodes from '../Util/keycodes.js';
 
 
-const DEBUG = true;
-const SLOW = true;
+const DEBUG = process.env.NODE_ENV === 'development';
+const SLOW = process.env.NODE_ENV === 'development';
 
 var API;
 
