@@ -20,7 +20,7 @@ import { SettingsModal, WarningModal } from './Components/Modals';
 import CONFIG from './config/CONFIG.json';
 import socketIOClient from 'socket.io-client';
 
-const DEBUG = process.env.NODE_ENV === 'development';
+const DEBUG = false; //process.env.NODE_ENV === 'development';
 
 const socket = socketIOClient('http://localhost:3001');
 socket.on('hello', (data) => {
@@ -65,7 +65,10 @@ class App extends Component {
       super(props, context);
 
       this.state = {
-          instruments: [],
+          instruments: [/*{
+              name: 'default',
+              measures: {}
+          }*/],
           ordered: {},
           sizing: 600.0,
           cursor: 0.0,
@@ -137,7 +140,7 @@ class App extends Component {
                   }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[2], inst: this.state.instruments.length },
               }
           } :
-          { measures: {} });
+          { name: 'default', measures: {} });
           
       if (DEBUG)
           this.state.instruments.push({
@@ -265,13 +268,21 @@ class App extends Component {
       });
 
       var displaySelected = (selected) => {
-          self.setState(oldState => ({
+          let newState = {
               selected,
-              editMeas: {},
-              edit_start: selected.meas.start,
-              edit_end: selected.meas.end,
-              edit_timesig: selected.meas.timesig
-          }));
+              editMeas: {}
+          };
+          
+          if (selected.meas)
+              Object.assign(newState, {
+                  edit_start: selected.meas.start,
+                  edit_end: selected.meas.end,
+                  edit_timesig: selected.meas.timesig
+              });
+
+          console.log(newState);
+          self.setState(oldState => newState);
+          
       };
 
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));

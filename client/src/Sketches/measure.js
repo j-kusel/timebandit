@@ -705,6 +705,7 @@ export default function measure(p) {
             }
         };
 
+        API.displaySelected(Window.selected);
     }
 
     p.mouseDragged = function(event) {

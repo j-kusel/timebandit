@@ -39,15 +39,15 @@ export default (p, Window) => {
             if (inst >= Window.insts)
                 this.outside_origin = true
             else {
-                let newSelect = {
+                this.outside_origin = !Window.select({
                     ind: this.rollover.ind,
                     inst: inst,
                     meas: this.rollover.meas,
-                };
-                if (!_.isEqual(newSelect, Window.selected)) {
+                });
+                /*if (!_.isEqual(newSelect, Window.selected)) {
                     Window.selected = newSelect;
                     this.outside_origin = true;
-                }
+                }*/
             };
         };
 

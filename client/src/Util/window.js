@@ -58,6 +58,7 @@ export default (p) => {
 
 
         select(newSelected) {
+            console.log(newSelected);
             if (this.selected.meas) {
                 if (this.selected.meas.id === newSelected.meas.id)
                     return false;
@@ -65,6 +66,7 @@ export default (p) => {
                 delete this.selected.meas.temp;
             }
             Object.assign(this.selected, newSelected);
+            return true;
         }
      
         drawFrame() {
