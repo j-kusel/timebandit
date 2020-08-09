@@ -60,7 +60,7 @@ export default (p) => {
         select(newSelected) {
             console.log(newSelected);
             if (this.selected.meas) {
-                if (this.selected.meas.id === newSelected.meas.id)
+                if (newSelected.meas && (this.selected.meas.id === newSelected.meas.id))
                     return false;
                 this.editMeas = {};
                 delete this.selected.meas.temp;

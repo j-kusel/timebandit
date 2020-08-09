@@ -1,4 +1,4 @@
-import _ from 'lodash';
+//import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { bit_toggle, parse_bits } from './index.js';
 
@@ -39,7 +39,7 @@ export default (p, Window) => {
             if (inst >= Window.insts)
                 this.outside_origin = true
             else {
-                this.outside_origin = !Window.select({
+                this.outside_origin = Window.select({
                     ind: this.rollover.ind,
                     inst: inst,
                     meas: this.rollover.meas,
@@ -49,6 +49,7 @@ export default (p, Window) => {
                     this.outside_origin = true;
                 }*/
             };
+            console.log(this.outside_origin);
         };
 
         checkOrigin = (p) => {

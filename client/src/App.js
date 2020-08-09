@@ -402,6 +402,7 @@ class App extends Component {
 
   handleMeasure(e) {
       e.preventDefault();
+      console.log(this.state.selected);
       let inst = this.state.insertInst || this.state.selected.inst;
       
       let selected = this.state.selected.meas;

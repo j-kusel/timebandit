@@ -690,9 +690,6 @@ export default function measure(p) {
 
         Mouse.select();
 
-        if (Mouse.outside_origin)
-            return;
-       
         if (Window.selected.meas) {
             //let [shift, ctrl] = [p.keyIsDown(SHIFT), p.keyIsDown(CTRL)];
             if (Window.mods.shift) {
@@ -705,11 +702,12 @@ export default function measure(p) {
             }
         };
 
+        console.log(Mouse.outside_origin);
         API.displaySelected(Window.selected);
     }
 
     p.mouseDragged = function(event) {
-        if (Mouse.drag.mode === '')
+        if (!Mouse.drag.mode)
             return;
         if (Mouse.rollover.beat === 0
             || Mouse.outside_origin
