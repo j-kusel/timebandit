@@ -20,7 +20,7 @@ import { SettingsModal, WarningModal } from './Components/Modals';
 import CONFIG from './config/CONFIG.json';
 import socketIOClient from 'socket.io-client';
 
-const DEBUG = false; //process.env.NODE_ENV === 'development';
+const DEBUG = process.env.NODE_ENV === 'development';
 
 const socket = socketIOClient('http://localhost:3001');
 socket.on('hello', (data) => {
@@ -965,7 +965,7 @@ class App extends Component {
               </NewInst>
           </Panel>
           
-          { (this.state.mode === 2 && 'meas' in this.state.selected) ?
+          { (this.state.mode === 2 && this.state.selected.meas) ?
               <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset}
                 top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}
                 width={this.state.selected.meas.ms * this.state.scale}
