@@ -10,6 +10,7 @@ import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
 import _Debugger from '../Util/debugger.js';
 import keycodes from '../Util/keycodes.js';
+import tutorials from '../Util/tutorials.js';
 
 
 const DEBUG = process.env.NODE_ENV === 'development';
@@ -127,6 +128,15 @@ export default function measure(p) {
         Object.assign(Window.selected, newSelected);
         API.displaySelected(Window.selected);
     }*/
+
+    var subs = [];
+    var buttons = [];
+    var subscriber = (type, func) =>
+        (type === 'draw') ?
+            subs.push(func) :
+            buttons.push(func);
+    var tuts = tutorials(p, subscriber);
+    console.log(buttons.length);
 
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
@@ -559,6 +569,7 @@ export default function measure(p) {
             p.rect(0, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length, p.width, c.INST_HEIGHT);
         };
             
+        subs.forEach(sub => sub());
     }
 
     p.keyReleased = function(e) {
@@ -674,7 +685,7 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
-        Mouse.updatePress();
+        Mouse.updatePress(buttons);
         if (Mouse.outside_origin)
             return;
 

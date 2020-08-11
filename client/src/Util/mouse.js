@@ -182,8 +182,12 @@ export default (p, Window) => {
             return this.translate.pop();
         }
 
-        updatePress() {
+        updatePress(buttons) {
             this.drag = { x: 0, y: 0 };
+            if (buttons.some(click => click())) {
+                this.outside_origin = true;
+                return true;
+            }
             this.outside_origin = this.checkOrigin(p);
             if (this.outside_origin)
                 return true;
