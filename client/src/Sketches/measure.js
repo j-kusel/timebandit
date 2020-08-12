@@ -10,7 +10,7 @@ import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
 import _Debugger from '../Util/debugger.js';
 import keycodes from '../Util/keycodes.js';
-import tutorials from '../Util/tutorials.js';
+import tutorials from '../Util/tutorials/index.js';
 
 
 const DEBUG = process.env.NODE_ENV === 'development';
@@ -131,16 +131,18 @@ export default function measure(p) {
 
     var subs = [];
     var buttons = [];
-    var subscriber = (type, func) =>
-        (type === 'draw') ?
+    var subscriber = (type, func) => {
+        console.log('subscribing');
+        return (type === 'draw') ?
             subs.push(func) :
             buttons.push(func);
+    };
     var tuts = tutorials(p, subscriber);
-    console.log(buttons.length);
 
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
         p.background(255);
+        console.log(tuts.quickstart());
     };
 
     p.windowResized = function () {
@@ -713,7 +715,6 @@ export default function measure(p) {
             }
         };
 
-        console.log(Mouse.outside_origin);
         API.displaySelected(Window.selected);
     }
 
