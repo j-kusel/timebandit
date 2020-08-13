@@ -3,35 +3,22 @@ import uuidv4 from 'uuid/v4';
 //
 
 var init = (p, sub, unsub) => {
-    var hole = (coords) => {
-        p.rect(0, 0, p.width, coords.y);
-        p.rect(0, coords.y, coords.x, coords.y2-coords.y);
-        p.rect(coords.x2, coords.y, p.width-coords.x2, coords.y2-coords.y);
-        p.rect(0, coords.y2, p.width, p.height-coords.y2)
-    }
-
     var displays = {};
     var events = {};
     var register = (type, callback) => {
         let id = uuidv4();
-        if (type === 'display') {
-            console.log('registering display');
-            displays[id] = callback;
-        }
-        else if (type === 'event') {
-            console.log('registering event');
+        if (type === 'display')
+            displays[id] = callback
+        else if (type === 'event')
             events[id] = callback;
-        }
         return id;
     }
+
     var unregister = (type, ID) => {
-        if (type === 'display') {
-            console.log('unregistering display ', ID);
-            delete displays[ID];
-        } else if (type === 'event') {
-            console.log('unregistering event ', ID);
+        if (type === 'display')
+            delete displays[ID]
+        else if (type === 'event') 
             delete events[ID];
-        }
     }
 
     // register draw loop
@@ -42,15 +29,11 @@ var init = (p, sub, unsub) => {
     );
 
     // register event listeners
-    sub('event', () => {
-        console.log(Object.keys(events).join(' | '));
-        return Object.keys(events).some(key => {
-            if (events[key])
-                return events[key]()
-            else
-                return false;
-        });
-    });
+    sub('event', () =>
+        Object.keys(events).some(key =>
+            (events[key]) ? events[key]() : false
+        )
+    );
 
     class Button {
         constructor(text, coords, alt, callback) {
@@ -65,21 +48,15 @@ var init = (p, sub, unsub) => {
 
         register() {
             this.eventID = register('event', () => {
-                console.log('doin the callback!');
                 if (p.mouseX > this.coords.x &&
                     p.mouseX < this.coords.x + this.coords.width &&
                     p.mouseY > this.coords.y &&
-                    p.mouseY < this.coords.y + this.coords.height
+                    p.mouseY < this.coords.y + this.coords.height &&
+                    events[this.eventID]
                 ) {
-                    console.log('clicked: ', this.text);
-                    if (!events[this.eventID]) {
-                        console.log('wrong window!');
-                        return false;
-                    };
                     this.callback();
                     return true;
                 }
-                console.log('missed');
                 return false;
             });
         }
@@ -110,11 +87,8 @@ var init = (p, sub, unsub) => {
             this.coords = options.coords;
             this.criteria = options.criteria;
             this.text = options.text;
-            var self = this;
-
-
-            
             this.drawID = '';
+
             this.buttons = [
                 new Button('X', {
                     x: this.coords.x2 - 18, y: this.coords.y + 18,
@@ -132,13 +106,17 @@ var init = (p, sub, unsub) => {
         }
 
         show() {
-            console.log('showing');
             var panel = () => {
                 p.push();
                 p.fill("rgba(140, 114, 114, 0.44)");
                 p.stroke("rgba(140, 114, 114, 0)");
                 // four boxes around 
-                hole(this.highlight);
+                let { x, y, x2, y2 } = this.highlight;
+                p.rect(0, 0, p.width, y);
+                p.rect(0, y, x, y2-y);
+                p.rect(x2, y, p.width-x2, y2-y);
+                p.rect(0, y2, p.width, p.height-y2)
+
                 p.translate(this.coords.x, this.coords.y);
                 p.fill(255);
                 p.stroke(0);
@@ -149,13 +127,6 @@ var init = (p, sub, unsub) => {
             this.buttons.forEach(button => button.register());
 
             this.drawID = register('display', panel);
-            /*this.eventIDs = this.buttons.map(button => {
-                console.log('registering ', button.text, ' for ' + this.text);
-                button.eventID = register('event', button.callback);
-                return button.eventID;
-            });
-            */
-            //console.log(this.eventIDs.join(' | '));
         }
 
         hide() {
@@ -172,9 +143,6 @@ var init = (p, sub, unsub) => {
         }
 
         backward() {
-            console.log('going backward');
-            console.log(this.previous);
-            console.log(this.text);
             this.hide();
             if (this.previous)
                 this.previous.show();
@@ -192,7 +160,6 @@ var init = (p, sub, unsub) => {
     class Tutorial {
         constructor(steps) {
             this.steps = [];
-            console.log('creating tutorial');
         }
 
         add(step) {

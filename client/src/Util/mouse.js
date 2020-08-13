@@ -183,22 +183,10 @@ export default (p, Window) => {
 
         updatePress(buttons) {
             this.drag = { x: 0, y: 0 };
-            console.log('about to click');
-            if (buttons.some(click => {
-                let clicked = click();
-                console.log('HELLLLLOOOOO');
-                console.log(clicked);
-                return clicked;
-                
-            })) {
-                console.log('click successful');
+            if (buttons.some(click => click())) {
                 buttons = [];
                 this.outside_origin = true;
-                //return true;
-            } else {
-                console.log('failure');
             }
-            console.log('do we even get here?');
             this.outside_origin = this.checkOrigin(p);
             if (this.outside_origin)
                 return true;

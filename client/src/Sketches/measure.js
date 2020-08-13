@@ -117,26 +117,17 @@ export default function measure(p) {
     // debugger
     var Debug = _Debugger(p, Window, Mouse);
 
-    // might be deprecated
-    /*var updateSelected = (newSelected) => {
-        if (Window.selected.meas) {
-            if (Window.selected.meas.id === newSelected.meas.id)
-                return;
-            Window.editMeas = {};
-            delete Window.selected.meas.temp;
-        }
-        Object.assign(Window.selected, newSelected);
-        API.displaySelected(Window.selected);
-    }*/
-
     var subs = [];
     var buttons = [];
+    var core_buttons = [];
     var subscriber = (type, func) => {
         console.log('subscribing');
         return (type === 'draw') ?
             subs.push(func) :
             buttons.push(func);
     };
+
+
     var tuts = tutorials(p, subscriber);
 
     p.setup = function () {
@@ -159,6 +150,33 @@ export default function measure(p) {
         Window.insts = props.instruments.length;
         API = props.API;
         Window.CONSTANTS = props.CONSTANTS;
+        core_buttons = [];
+        core_buttons.push(() => {
+            let insert_x = (p.width - c.TOOLBAR_WIDTH) / 3.0;
+            if (p.mouseX > insert_x &&
+                p.mouseX < insert_x + c.INSERT_WIDTH &&
+                p.mouseY > p.height - c.TRACKING_HEIGHT &&
+                p.mouseY < p.height
+            ) {
+                Window.mode = (Window.mode === 1) ? 0 : 1;
+                API.updateMode(Window.mode);
+                return true;
+            } else
+                return false;
+        });
+        core_buttons.push(() => {
+            let insert_x = (p.width - c.TOOLBAR_WIDTH) / 3.0 + c.INSERT_WIDTH;
+            if (p.mouseX > insert_x &&
+                p.mouseX < insert_x + c.INSERT_WIDTH &&
+                p.mouseY > p.height - c.TRACKING_HEIGHT &&
+                p.mouseY < p.height
+            ) {
+                Window.mode = (Window.mode === 2) ? 0 : 2;
+                API.updateMode(Window.mode);
+                return true;
+            } else
+                return false;
+        });
 
         var beat_lock = (Window.selected.meas && Window.selected.meas.id in locked && locked[Window.selected.meas.id].beats) ?
             parse_bits(locked[Window.selected.meas.id].beats) : [];
@@ -688,6 +706,7 @@ export default function measure(p) {
 
     p.mousePressed = function(e) {
         Mouse.updatePress(buttons);
+        Mouse.updatePress(core_buttons);
         if (Mouse.outside_origin)
             return;
 
