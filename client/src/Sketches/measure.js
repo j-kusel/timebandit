@@ -16,7 +16,7 @@ import tutorials from '../Util/tutorials/index.js';
 const DEBUG = process.env.NODE_ENV === 'development';
 const SLOW = process.env.NODE_ENV === 'development';
 
-var API;
+var API = {};
 
 
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
@@ -89,6 +89,9 @@ var locked = {};
 var range = [0, 100];
 
 export default function measure(p) {
+    // monkey-patching Processing for a p.mouseDown function
+    p.mouseDown = false;
+
     var instruments = [];
 
     // temporary holding for editing measures
@@ -128,12 +131,13 @@ export default function measure(p) {
     };
 
 
-    var tuts = tutorials(p, subscriber);
-
+    var tuts;
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
         p.background(255);
-        console.log(tuts.quickstart());
+        tuts = tutorials(p, subscriber, API, Window);
+
+        //console.log(tuts.quickstart());
     };
 
     p.windowResized = function () {
@@ -148,7 +152,7 @@ export default function measure(p) {
         Window.panels = props.panels;
         Window.mode = props.mode;
         Window.insts = props.instruments.length;
-        API = props.API;
+        Object.assign(API, props.API);
         Window.CONSTANTS = props.CONSTANTS;
         core_buttons = [];
         core_buttons.push(() => {
@@ -512,7 +516,8 @@ export default function measure(p) {
         Mouse.pop();
 
         if (DEBUG) {
-            Debug.push(`location: ${cursor_loc}`);
+            Debug.push(`viewport: ${Window.viewport}`);
+            Debug.push(`scale: ${Window.scale}`);
             Debug.write({ x: 0, y: (instruments.length+1)*c.INST_HEIGHT + c.DEBUG_TEXT }, c.DEBUG_TEXT);
             Debug.frameRate();
             Debug.clear();
@@ -705,6 +710,7 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
+        p.mouseDown = { x: p.mouseX, y: p.mouseY };
         Mouse.updatePress(buttons);
         Mouse.updatePress(core_buttons);
         if (Mouse.outside_origin)
@@ -1273,6 +1279,7 @@ export default function measure(p) {
     };
 
     p.mouseReleased = function(event) {
+        p.mouseDown = false;
         if (Mouse.outside_origin) {
             Mouse.drag.mode = '';
             return;

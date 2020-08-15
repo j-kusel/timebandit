@@ -199,6 +199,11 @@ class App extends Component {
 
   initAPI() {
       var self = this;
+
+      var newFile = () =>
+          self.setState({
+              instruments: []
+          });
     
       var get = (name) => {
           if (name === 'isPlaying')
@@ -367,7 +372,25 @@ class App extends Component {
           edit_timesig: ts,
       });
 
-      return { toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      var newInstrument = (name) =>
+          this.setState(oldState => {
+              let instruments = oldState.instruments;
+              instruments.push({ name, measures: {}});
+              return ({ instruments });
+          });
+
+
+      var newMeasure = (inst, start, end, timesig, offset) => {
+          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+
+          this.setState(oldState => {
+              let instruments = oldState.instruments;
+              let id = uuidv4();
+              instruments[inst].measures[id] = { ...calc, id, inst };
+          });
+      };
+
+      return { newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   instOpen(e) {

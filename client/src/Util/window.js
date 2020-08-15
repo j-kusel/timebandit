@@ -132,6 +132,15 @@ export default (p) => {
         _scaleY(input, height, range) {
             return height - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*height;
         }
+
+        scaleX(input) {
+            return (input*this.scale + this.viewport);
+        }
+
+        focus({ scale, viewport }) {
+            this.viewport = viewport;
+            this.scale = scale;
+        }
            
         drawToolbar(tempoRange) { 
             p.push();

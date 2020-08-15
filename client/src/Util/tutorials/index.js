@@ -1,7 +1,6 @@
 import quickstart from './tuts/quickstart';
 
-export default (p, registration) => {
-    console.log(typeof(registration));
-    return ({
-    quickstart: () => quickstart(p, registration),
-})};
+export default (p, registration, API, Window) => 
+    ({ 
+        quickstart: quickstart(p, registration, API, Window),
+    });

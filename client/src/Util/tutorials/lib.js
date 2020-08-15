@@ -1,44 +1,19 @@
-import uuidv4 from 'uuid/v4';
+import handlers from '../handlers';
 // each step should have flags set for criteria to be met.
 //
 
-var init = (p, sub, unsub) => {
-    var displays = {};
-    var events = {};
-    var register = (type, callback) => {
-        let id = uuidv4();
-        if (type === 'display')
-            displays[id] = callback
-        else if (type === 'event')
-            events[id] = callback;
-        return id;
-    }
 
-    var unregister = (type, ID) => {
-        if (type === 'display')
-            delete displays[ID]
-        else if (type === 'event') 
-            delete events[ID];
-    }
-
-    // register draw loop
-    sub('draw', () => 
-        Object.keys(displays).some(key => 
-            displays[key]()
-        )
-    );
-
-    // register event listeners
-    sub('event', () =>
-        Object.keys(events).some(key =>
-            (events[key]) ? events[key]() : false
-        )
-    );
+var init = (p, hook) => {
+    var { register, unregister } = handlers(hook);
 
     class Button {
         constructor(text, coords, alt, callback) {
             // coords relative to window origin
-            this.coords = coords;
+            this.coords = Object.keys(coords).reduce((acc, key) =>
+                ({ ...acc, [key]: typeof(coords[key]) === 'function' ?
+                    coords[key] : () => coords[key]
+                }),
+            {});
             this.text = text;
             this.alt = alt;
             this.callback = callback;
@@ -48,11 +23,10 @@ var init = (p, sub, unsub) => {
 
         register() {
             this.eventID = register('event', () => {
-                if (p.mouseX > this.coords.x &&
-                    p.mouseX < this.coords.x + this.coords.width &&
-                    p.mouseY > this.coords.y &&
-                    p.mouseY < this.coords.y + this.coords.height &&
-                    events[this.eventID]
+                if (p.mouseX > this.coords.x() &&
+                    p.mouseX < this.coords.x() + this.coords.width() &&
+                    p.mouseY > this.coords.y() &&
+                    p.mouseY < this.coords.y() + this.coords.height()
                 ) {
                     this.callback();
                     return true;
@@ -67,13 +41,13 @@ var init = (p, sub, unsub) => {
             
         draw() {
             p.push();
-            p.translate(this.coords.x, this.coords.y);
+            p.translate(this.coords.x(), this.coords.y());
             p.stroke(0);
             p.fill(255);
-            p.rect(0, 0, this.coords.width, this.coords.height);
+            p.rect(0, 0, this.coords.width(), this.coords.height());
             p.fill(0);
             p.textSize(8);
-            p.text(this.text, 2, 2); 
+            p.text(this.text, 2, 8); 
             p.pop();
         }
     }
@@ -83,44 +57,65 @@ var init = (p, sub, unsub) => {
         constructor(options) {
             this.next = null;
             this.previous = null;
+            this.preparation = options.preparation || (() => null);
             this.highlight = options.highlight;
             this.coords = options.coords;
             this.criteria = options.criteria;
             this.text = options.text;
             this.drawID = '';
+            let { x, y, x2, y2 } = Object.keys(this.coords).reduce((acc, key) =>
+                ({ ...acc, [key]: typeof(this.coords[key]) === 'function' ?
+                    this.coords[key] : () => this.coords[key]
+                }),
+            {});
 
             this.buttons = [
                 new Button('X', {
-                    x: this.coords.x2 - 18, y: this.coords.y + 18,
+                    x: () => x2() - 18, y: () => y() + 18,
                     width: 10, height: 10,
                 }, 'exit tutorial', () => this.hide()),
                 new Button('next', {
-                    x: this.coords.x2 - 18, y: this.coords.y2 - 18,
+                    x: () => x2() - 18, y: () => y2() - 18,
                     width: 10, height: 10,
                 }, 'next window', () => this.forward()),
                 new Button('back', {
-                    x: this.coords.x + 8, y: this.coords.y2 - 18,
+                    x: () => x() + 8, y: () => y2() - 18,
                     width: 10, height: 10,
                 }, 'last window', () => this.backward())
             ];
         }
 
         show() {
+            this.preparation();
             var panel = () => {
                 p.push();
                 p.fill("rgba(140, 114, 114, 0.44)");
                 p.stroke("rgba(140, 114, 114, 0)");
                 // four boxes around 
-                let { x, y, x2, y2 } = this.highlight;
+                // initialize functions if need be
+                let { x, y, x2, y2 } = Object.keys(this.highlight).reduce((acc, key) =>
+                    ({ ...acc, [key]: typeof(this.highlight[key]) === 'function' ?
+                        this.highlight[key]() : this.highlight[key]
+                    }),
+                {});
                 p.rect(0, 0, p.width, y);
                 p.rect(0, y, x, y2-y);
                 p.rect(x2, y, p.width-x2, y2-y);
-                p.rect(0, y2, p.width, p.height-y2)
+                p.rect(0, y2, p.width, p.height-y2);
 
-                p.translate(this.coords.x, this.coords.y);
+                ({ x, y, x2, y2 } = Object.keys(this.coords).reduce((acc, key) =>
+                    ({ ...acc, [key]: typeof(this.coords[key]) === 'function' ?
+                        this.coords[key]() : this.coords[key]
+                    }),
+                {}));
+
+                p.translate(x, y);
                 p.fill(255);
                 p.stroke(0);
-                p.rect(0, 0, this.coords.x2 - this.coords.x, this.coords.y2 - this.coords.y);
+                p.rect(0, 0, x2 - x, y2 - y);
+                p.fill(0);
+                //p.textAlign(p.TOP, p.LEFT);
+                this.text.forEach((line, i) => p.text(line, 30, 60 + 12*i));
                 p.pop();
                 this.buttons.forEach(button => button.draw());
             }
@@ -158,7 +153,7 @@ var init = (p, sub, unsub) => {
     }
             
     class Tutorial {
-        constructor(steps) {
+        constructor() {
             this.steps = [];
         }
 
