@@ -137,7 +137,7 @@ export default function measure(p) {
         p.background(255);
         tuts = tutorials(p, subscriber, API, Window);
 
-        //console.log(tuts.quickstart());
+        //tuts.quickstart.begin();
     };
 
     p.windowResized = function () {
@@ -496,13 +496,31 @@ export default function measure(p) {
                 handle = [select.temp.beats[Mouse.drag.index]*Window.scale, Mouse.loc.y, 10, 10]; 
                 Mouse.cursor = 'ns-resize';
             } else if (Mouse.drag.mode !== 'tick') {
-                for (let i=0; i < select.beats.length; i++) {
-                    let xloc = select.beats[i]*Window.scale;
-                    let yloc = c.INST_HEIGHT - base - slope*i;
-                    if (Mouse.rolloverCheck([xloc, yloc], {
+                //Debug.push([Mouse.loc.x, Mouse.loc.y].join(' '));
+                Debug.push([p.mouseX, p.mouseY].join(' '));
+                for (let i=1; i < select.beats.length; i++) {
+                    
+                    let xloc = select.beats[i-1]*Window.scale;
+                    let xloc2 = select.beats[i]*Window.scale;
+                    let width = xloc2-xloc;
+                    let yloc = c.INST_HEIGHT - base - slope*(i-1);
+                    let yloc2 = c.INST_HEIGHT - base - slope*(i);
+                    let height = (yloc2-yloc)/-c.INST_HEIGHT;
+
+                    // THIS WORKS
+                    let tolerance = 5;
+
+                    let func = () => {
+                        let ytarget = (p.mouseX-c.PANES_WIDTH-x-xloc)/width*slope + slope*(i-1) + base;
+                        return (p.mouseY-c.PLAYBACK_HEIGHT < c.INST_HEIGHT*(Window.selected.inst+1)-ytarget + tolerance
+                        && (p.mouseY-c.PLAYBACK_HEIGHT > c.INST_HEIGHT*(Window.selected.inst+1)-ytarget - tolerance));
+                    };
+                    if (Mouse.rolloverCheck([xloc, 0, xloc2, c.INST_HEIGHT], {//, xloc2, yloc2], {
                         type: 'tempo',
-                        tempo: tempo_slope*i + select.start
-                    })) {
+                        tempo: tempo_slope*i + select.start,
+                        beat: i > select.beats.length/2 ? select.timesig-1 : 0
+                    },
+                    func)) {
                         handle = [xloc, yloc, 10, 10]; 
                         break;
                     }
@@ -711,6 +729,8 @@ export default function measure(p) {
 
     p.mousePressed = function(e) {
         p.mouseDown = { x: p.mouseX, y: p.mouseY };
+        if (!tuts.quickstart.mouseChecker())
+            return;
         Mouse.updatePress(buttons);
         Mouse.updatePress(core_buttons);
         if (Mouse.outside_origin)

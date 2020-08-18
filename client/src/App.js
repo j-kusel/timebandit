@@ -200,10 +200,6 @@ class App extends Component {
   initAPI() {
       var self = this;
 
-      var newFile = () =>
-          self.setState({
-              instruments: []
-          });
     
       var get = (name) => {
           if (name === 'isPlaying')
@@ -289,6 +285,12 @@ class App extends Component {
           self.setState(oldState => newState);
           
       };
+
+      var newFile = () =>
+          self.setState({
+              selected: { inst: -1, meas: undefined },
+              instruments: []
+          });
 
       var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
@@ -383,11 +385,14 @@ class App extends Component {
       var newMeasure = (inst, start, end, timesig, offset) => {
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
 
-          this.setState(oldState => {
-              let instruments = oldState.instruments;
-              let id = uuidv4();
-              instruments[inst].measures[id] = { ...calc, id, inst };
-          });
+          let id = uuidv4();
+          let measure = { ...calc, id, inst };
+          
+          let newState = { instruments: this.state.instruments };
+          newState.instruments[inst].measures[id] = measure;
+
+          this.setState(newState);
+          return measure;
       };
 
       return { newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
@@ -425,8 +430,15 @@ class App extends Component {
 
   handleMeasure(e) {
       e.preventDefault();
-      console.log(this.state.selected);
-      let inst = this.state.insertInst || this.state.selected.inst;
+      console.log(this.state.selected.inst);
+      console.log(this.state.insertInst);
+      if (this.state.selected.inst === undefined) {
+          alert('select an instrument first!');
+          return;
+      }
+           
+      let inst = (this.state.insertInst >= 0) ?
+          this.state.insertInst : this.state.selected.inst;
       
       let selected = this.state.selected.meas;
       let newMeasure = {

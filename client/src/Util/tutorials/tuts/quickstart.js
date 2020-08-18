@@ -8,6 +8,10 @@ export default (p, registration, API, Window) => {
     let tut = new Tutorial();
 
     let intro = new Step({
+        reporter: (id) => {
+            console.log(id);
+            tut.current = id;
+        },
         highlight: { x: () => p.width/3.0, y: () => p.height/3.0, x2: () => p.width*2.0/3.0, y2: () => p.height*2.0/3.0 },
         coords: { x: () => p.width/3, y: () => p.height/3, x2: () => p.width*2/3, y2: () => p.height*2/3 },
         preparation: () => {
@@ -20,9 +24,35 @@ export default (p, registration, API, Window) => {
         ]
     });
 
+    let selectInst = new Step({
+        reporter: (id) => tut.current = id,
+        highlight: {
+            x: () => c.PANES_WIDTH,
+            x2: () => p.width,
+            y: () => c.PLAYBACK_HEIGHT,
+            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT
+        },
+        coords: {
+            x: () => p.width/3,
+            y: () => p.height/3,
+            x2: () => p.width*2/3,
+            y2: () => p.height*2/3
+        },
+        preparation: () => {
+            Window.focus({ viewport: 180, scale: 0.2 });
+        },
+        criteria: [],
+        text: [
+            `To enter a new measure, first select the target instrument`,
+            `by clicking in the instrument row.`
+        ]
+    });
+
+
     let cMdimsX = 350;
     let cMdimsY = 200;
     let createMeasure = new Step({
+        reporter: (id) => tut.current = id,
         highlight: {
             x: () => (p.width - c.TOOLBAR_WIDTH) / 3.0,
             y: () => p.height - c.TRACKING_HEIGHT,
@@ -37,6 +67,8 @@ export default (p, registration, API, Window) => {
         },
         preparation: () => {
             API.updateMode(0);
+            Window.select({ inst: 0, meas: undefined });
+            API.displaySelected({ inst: 0, meas: undefined });
         },
         criteria: [
             /*() => ((p.mouseDown 
@@ -54,6 +86,7 @@ export default (p, registration, API, Window) => {
     });
 
     let newMeas = new Step({
+        reporter: (id) => tut.current = id,
         highlight: { 
             x: () => (p.width - c.TOOLBAR_WIDTH) / 3.0,
             y: () => p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT,
@@ -68,6 +101,10 @@ export default (p, registration, API, Window) => {
         },
 
         preparation: () => {
+            Window.select('clear');
+            API.newFile();
+            API.newInstrument('default2');
+            API.displaySelected({ inst: 0, meas: undefined });
             API.updateMode(1);
         },
         criteria: [],
@@ -83,6 +120,7 @@ export default (p, registration, API, Window) => {
     let fMdimX = 400;
     let fMdimY = 150;
     let finishedMeas = new Step({
+        reporter: (id) => tut.current = id,
         highlight: {
             x: () => Window.scaleX(offset) + c.PANES_WIDTH,
             x2: () => Window.scaleX(offset + 3529.02) + c.PANES_WIDTH,
@@ -96,6 +134,10 @@ export default (p, registration, API, Window) => {
             y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT + fMdimY,
         },
         preparation: () => {
+            Window.select('clear');
+            API.newFile();
+            API.newInstrument('default2');
+            API.displaySelected({ inst: 0, meas: undefined });
             Window.focus({ viewport: 180, scale: 0.2 });
             API.newMeasure(0, 60, 120, 5, offset);
             API.updateMode(0);
@@ -111,11 +153,12 @@ export default (p, registration, API, Window) => {
     });
 
     let zoom = new Step({
+        reporter: (id) => tut.current = id,
         highlight: {
-            x: c.PANES_WIDTH,
+            x: () => c.PANES_WIDTH,
             x2: () => p.width,
-            y: c.PLAYBACK_HEIGHT,
-            y2: c.PLAYBACK_HEIGHT + c.INST_HEIGHT
+            y: () => c.PLAYBACK_HEIGHT,
+            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT
         },
         coords: {
             x: () => p.width/3,
@@ -124,7 +167,13 @@ export default (p, registration, API, Window) => {
             y2: () => p.height*2/3
         },
         preparation: () => {
+            Window.select('clear');
+            API.newFile();
+            API.newInstrument('default2');
+            API.displaySelected({ inst: 0, meas: undefined });
             Window.focus({ viewport: 180, scale: 0.2 });
+            API.newMeasure(0, 60, 120, 5, offset);
+            API.updateMode(0);
         },
         criteria: [],
         text: [
@@ -134,6 +183,7 @@ export default (p, registration, API, Window) => {
     });
 
     let createInst = new Step({
+        reporter: (id) => tut.current = id,
         highlight: {
             x: () => c.PANES_WIDTH,
             x2: () => c.PANES_WIDTH + 100,
@@ -155,19 +205,21 @@ export default (p, registration, API, Window) => {
     });
 
     let moveMeasure = new Step({
+        reporter: (id) => tut.current = id,
         highlight: {
-            x: c.PANES_WIDTH,
+            x: () => c.PANES_WIDTH,
             x2: () => p.width,
-            y: c.PLAYBACK_HEIGHT,
-            y2: c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2
+            y: () => c.PLAYBACK_HEIGHT,
+            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2
         },
         coords: {
             x: () => p.width/3,
-            y: c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2,
+            y: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2,
             x2: () => p.width*2/3,
-            y2: c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2 + 200,
+            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2 + 200,
         },
         preparation: () => {
+            Window.select('clear');
             API.newFile();
             API.newInstrument('default');
             API.newInstrument('default2');
@@ -185,6 +237,7 @@ export default (p, registration, API, Window) => {
     });
 
     let editMeasure = new Step({
+        reporter: (id) => tut.current = id,
         highlight: {
             x: () => Window.scaleX(offset+100) + c.PANES_WIDTH,
             x2: () => Window.scaleX(offset + 3629.02) + c.PANES_WIDTH,
@@ -198,6 +251,7 @@ export default (p, registration, API, Window) => {
             y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
         },
         preparation: () => {
+            Window.select('clear');
             API.newFile();
             API.newInstrument('default');
             API.newInstrument('default2');
@@ -212,6 +266,7 @@ export default (p, registration, API, Window) => {
     });
 
     let tweakTempo = new Step({
+        reporter: (id) => tut.current = id,
         highlight: {
             x: () => Window.scaleX(offset+100) + c.PANES_WIDTH,
             x2: () => Window.scaleX(offset + 3629.02) + c.PANES_WIDTH,
@@ -225,7 +280,17 @@ export default (p, registration, API, Window) => {
             y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
         },
         preparation: () => {
-            //Window.select({ inst: 1, meas: Window.
+            Window.select('clear');
+            API.newFile();
+            API.newInstrument('default');
+            API.newInstrument('default2');
+            API.newMeasure(0, 60, 120, 5, offset-100);
+            let selected = {
+                inst: 1,
+                meas: API.newMeasure(1, 60, 120, 5, offset+100)
+            };
+            Window.select(selected);
+            API.displaySelected(selected);
             API.updateMode(2);
             Window.focus({ viewport: 180, scale: 0.2 });
         },
@@ -242,6 +307,7 @@ export default (p, registration, API, Window) => {
 
     tut
         .add(intro)
+        .add(selectInst)
         .add(createMeasure)
         .add(newMeas)
         .add(finishedMeas)
@@ -260,7 +326,6 @@ export default (p, registration, API, Window) => {
             text: ['window number 2']
         }));
         */
-    return tut
-        .begin();
+    return tut;
 };
 

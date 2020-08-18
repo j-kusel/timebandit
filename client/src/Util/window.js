@@ -58,7 +58,12 @@ export default (p) => {
 
 
         select(newSelected) {
-            console.log(newSelected);
+            if (newSelected === 'clear') {
+                if (this.selected.inst === -1)
+                    return false;
+                Object.assign(this.selected, { inst: -1, meas: undefined });
+                return true;
+            }
             if (this.selected.meas) {
                 if (newSelected.meas && (this.selected.meas.id === newSelected.meas.id))
                     return false;

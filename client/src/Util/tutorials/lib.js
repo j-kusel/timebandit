@@ -62,6 +62,7 @@ var init = (p, hook) => {
             this.coords = options.coords;
             this.criteria = options.criteria;
             this.text = options.text;
+            this.reporter = options.reporter;
             this.drawID = '';
             let { x, y, x2, y2 } = Object.keys(this.coords).reduce((acc, key) =>
                 ({ ...acc, [key]: typeof(this.coords[key]) === 'function' ?
@@ -87,6 +88,7 @@ var init = (p, hook) => {
 
         show() {
             this.preparation();
+            this.reporter(this);
             var panel = () => {
                 p.push();
                 p.fill("rgba(140, 114, 114, 0.44)");
@@ -125,6 +127,7 @@ var init = (p, hook) => {
         }
 
         hide() {
+            this.reporter(null);
             unregister('display', this.drawID);
             this.buttons.forEach(button => button.unregister());
             //this.eventIDs.forEach(id => unregister('event', id));
@@ -155,6 +158,7 @@ var init = (p, hook) => {
     class Tutorial {
         constructor() {
             this.steps = [];
+            this.current = null;
         }
 
         add(step) {
@@ -169,7 +173,23 @@ var init = (p, hook) => {
 
         begin() {
             this.steps[0].show();
+            return this;
         }
+
+        mouseChecker() {
+            return (!this.current) ||
+                (p.mouseX > this.current.highlight.x()
+                && p.mouseX < this.current.highlight.x2()
+                && p.mouseY > this.current.highlight.y()
+                && p.mouseY < this.current.highlight.y2()) ||
+                (p.mouseX > this.current.coords.x()
+                && p.mouseX < this.current.coords.x2()
+                && p.mouseY > this.current.coords.y()
+                && p.mouseY < this.current.coords.y2())
+        }
+
+
+
     }
 
 

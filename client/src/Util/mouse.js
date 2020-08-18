@@ -113,10 +113,13 @@ export default (p, Window) => {
             this.grabbed = this.rollover.beat;
         }
 
-        rolloverCheck(coords, meta) {
+        rolloverCheck(coords, meta, additional) {
             // a four-number array checks within a box,
             // a two-number array checks a point within tolerances
 
+            if (typeof(additional) !== 'function') {
+                additional = () => true;
+            }
             let tolerance = 0;
             if (coords.length === 2) {
                 coords.push(coords[0]);
@@ -124,6 +127,15 @@ export default (p, Window) => {
                 tolerance = 5;
             }
 
+
+            let add = additional();
+            if (meta.type === 'tempo') {
+                p.push();
+                p.fill(0);
+                //p.rect(coords[0],coords[1],coords[2],coords[3]);
+                //p.rect(this.loc.x+coords[0],this.loc.y+coords[1],coords[2]-coords[0],coords[3]-coords[1]);
+                p.pop();
+            }
             let xCheck = () =>
                 (coords[0] === null) ? true :
                     (p.mouseX >= this.loc.x + coords[0] - tolerance &&
@@ -134,7 +146,7 @@ export default (p, Window) => {
                     (p.mouseY >= this.loc.y + coords[1] - tolerance &&
                     p.mouseY < this.loc.y + coords[3] + tolerance); 
 
-            if (xCheck() && yCheck()) {
+            if (xCheck() && yCheck() && add) {
                 Object.assign(this._rollover, meta);
                 this.cursor = (meta.meas &&
                     Window.selected.meas &&
