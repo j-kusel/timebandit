@@ -20,7 +20,10 @@ export default (p, registration, API, Window) => {
         },
         criteria: [],
         text: [
-            "Here's a brief tutorial to walk you through some basic functions."
+            "Here's a brief tutorial to walk you through some basic functions.",
+            '',
+            "Exit the tutorial at any time by clicking the X in the corner.",
+            "Other tutorials are available from the menu at the bottom."
         ]
     });
 
@@ -204,6 +207,16 @@ export default (p, registration, API, Window) => {
         ]
     });
 
+    let _createTwo = () => {
+        Window.select('clear');
+        API.newFile();
+        API.newInstrument('default');
+        API.newInstrument('default2');
+        API.newMeasure(0, 60, 120, 5, offset-100);
+        API.newMeasure(1, 60, 120, 5, offset+100);
+        Window.focus({ viewport: 180, scale: 0.2 });
+    };
+
     let moveMeasure = new Step({
         reporter: (id) => tut.current = id,
         highlight: {
@@ -218,15 +231,7 @@ export default (p, registration, API, Window) => {
             x2: () => p.width*2/3,
             y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2 + 200,
         },
-        preparation: () => {
-            Window.select('clear');
-            API.newFile();
-            API.newInstrument('default');
-            API.newInstrument('default2');
-            API.newMeasure(0, 60, 120, 5, offset-100);
-            API.newMeasure(1, 60, 120, 5, offset+100);
-            Window.focus({ viewport: 180, scale: 0.2 });
-        },
+        preparation: _createTwo,
         criteria: [],
         text: [
             `We've made some measures to move around. Click a measure`,
@@ -250,20 +255,28 @@ export default (p, registration, API, Window) => {
             y: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28,
             y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
         },
-        preparation: () => {
-            Window.select('clear');
-            API.newFile();
-            API.newInstrument('default');
-            API.newInstrument('default2');
-            API.newMeasure(0, 60, 120, 5, offset-100);
-            API.newMeasure(1, 60, 120, 5, offset+100);
-            Window.focus({ viewport: 180, scale: 0.2 });
-        },
+        preparation: _createTwo,
         criteria: [],
         text: [
             `Let's edit a measure by selecting it and pressing the 'v' key.`
         ],
     });
+
+    let _createTwoSelectOne = () => {
+        Window.select('clear');
+        API.newFile();
+        API.newInstrument('default');
+        API.newInstrument('default2');
+        API.newMeasure(0, 60, 120, 5, offset-100);
+        let selected = {
+            inst: 1,
+            meas: API.newMeasure(1, 60, 120, 5, offset+100)
+        };
+        Window.select(selected);
+        API.displaySelected(selected);
+        API.updateMode(2);
+        Window.focus({ viewport: 180, scale: 0.2 });
+    }
 
     let tweakTempo = new Step({
         reporter: (id) => tut.current = id,
@@ -279,31 +292,86 @@ export default (p, registration, API, Window) => {
             y: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28,
             y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
         },
-        preparation: () => {
-            Window.select('clear');
-            API.newFile();
-            API.newInstrument('default');
-            API.newInstrument('default2');
-            API.newMeasure(0, 60, 120, 5, offset-100);
-            let selected = {
-                inst: 1,
-                meas: API.newMeasure(1, 60, 120, 5, offset+100)
-            };
-            Window.select(selected);
-            API.displaySelected(selected);
-            API.updateMode(2);
-            Window.focus({ viewport: 180, scale: 0.2 });
-        },
+        preparation: _createTwoSelectOne,
         criteria: [],
         text: [
             `Hover over a beat at the tempo graph line and drag to`,
             `adjust tempo while preserving slope. Hold ${mac ? 'CMD' : 'CTRL'} and click`,
             `a beat to lock it, then drag the tempo graph line to`,
-            `make adjustments to slope.`
+            `make adjustments to slope.`,
+            '',
+            `When you're finished making edits, hit ESC to exit Edit mode.`
         ],
     });
 
+    let tweakTick = new Step({
+        reporter: (id) => tut.current = id,
+        highlight: {
+            x: () => c.PANES_WIDTH,
+            x2: () => p.width,
+            y: () => c.PLAYBACK_HEIGHT,
+            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2
+        },
+        coords: {
+            x: () => p.width/3,
+            y: () => p.height/2.5,
+            x2: () => p.width*2/3,
+            y2: () => p.height/2.5 + 150
+        },
+        preparation: _createTwoSelectOne,
+        criteria: [],
+        text: [
+            `Beats may also be locked and dragged under different criteria.`,
+            `While in Edit mode, select a measure, hold ${mac ? 'CMD' : 'CTRL'} and click a beat to lock it,`,
+            `then hold ${mac ? 'CMD' : 'CTRL'} + SHIFT together to drag beats directly.`,
+            `The dragged beat will snap to events in adjacent instruments.`
+        ],
+    });
 
+    let lockModes = new Step({
+        reporter: (id) => tut.current = id,
+        highlight: {
+            x: () => c.PANES_WIDTH,
+            x2: () => p.width,
+            y: () => c.PLAYBACK_HEIGHT,
+            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2
+        },
+        coords: {
+            x: () => Window.scaleX(offset + 3629.02) - 88,
+            x2: () => Window.scaleX(offset + 3629.02) - 88 + fMdimX,
+            y: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28,
+            y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
+        },
+        preparation: _createTwoSelectOne,
+        criteria: [],
+        text: [
+            `You can add restrictions for editing measures by toggling`,
+            `the buttons in the bottom-right of the Editor frame.`,
+            `These buttons preserve the starting tempo, ending tempo,`,
+            `direction (accelerating or decelerating), slope (similar`,
+            `to dragging an unlocked tempo graph), and length, some of`,
+            `which may be mutually exclusive or usable in combination.`
+        ],
+    });
+
+    let final = new Step({
+        reporter: (id) => {
+            console.log(id);
+            tut.current = id;
+        },
+        highlight: { x: () => p.width/3.0, y: () => p.height/3.0, x2: () => p.width*2.0/3.0, y2: () => p.height*2.0/3.0 },
+        coords: { x: () => p.width/3, y: () => p.height/3, x2: () => p.width*2/3, y2: () => p.height*2/3 },
+        preparation: () => {
+            API.newFile();
+            API.newInstrument('default');
+        },
+        criteria: [],
+        text: [
+            `For more tutorials on playback, midi export, software`,
+            `integrations, using the Bandit hardware server, &c,`,
+            `look through the Tutorials menu at the bottom of the screen.`,
+        ]
+    });
 
     tut
         .add(intro)
@@ -315,17 +383,11 @@ export default (p, registration, API, Window) => {
         .add(createInst)
         .add(moveMeasure)
         .add(editMeasure)
-        .add(tweakTempo);
+        .add(tweakTempo)
+        .add(tweakTick)
+        .add(lockModes)
+        .add(final);
 
-
-
-        /*.add(new Step({
-            highlight: { x: 400, y: 200, x2: 800, y2: 350 },
-            coords: { x: 800, y: 200, x2: 1000, y2: 300 },
-            criteria: [],
-            text: ['window number 2']
-        }));
-        */
     return tut;
 };
 

@@ -137,7 +137,7 @@ export default function measure(p) {
         p.background(255);
         tuts = tutorials(p, subscriber, API, Window);
 
-        //tuts.quickstart.begin();
+        tuts.quickstart.begin();
     };
 
     p.windowResized = function () {
@@ -499,25 +499,25 @@ export default function measure(p) {
                 //Debug.push([Mouse.loc.x, Mouse.loc.y].join(' '));
                 Debug.push([p.mouseX, p.mouseY].join(' '));
                 for (let i=1; i < select.beats.length; i++) {
-                    
                     let xloc = select.beats[i-1]*Window.scale;
                     let xloc2 = select.beats[i]*Window.scale;
                     let width = xloc2-xloc;
                     let yloc = c.INST_HEIGHT - base - slope*(i-1);
-                    let yloc2 = c.INST_HEIGHT - base - slope*(i);
-                    let height = (yloc2-yloc)/-c.INST_HEIGHT;
 
-                    // THIS WORKS
                     let tolerance = 5;
 
                     let func = () => {
                         let ytarget = (p.mouseX-c.PANES_WIDTH-x-xloc)/width*slope + slope*(i-1) + base;
-                        return (p.mouseY-c.PLAYBACK_HEIGHT < c.INST_HEIGHT*(Window.selected.inst+1)-ytarget + tolerance
-                        && (p.mouseY-c.PLAYBACK_HEIGHT > c.INST_HEIGHT*(Window.selected.inst+1)-ytarget - tolerance));
+                        let mouseloc = p.mouseY-c.PLAYBACK_HEIGHT;
+                        let tempo_target = c.INST_HEIGHT*(Window.selected.inst+1)-ytarget;
+                        return (mouseloc < tempo_target + tolerance
+                        && mouseloc > tempo_target - tolerance);
                     };
-                    if (Mouse.rolloverCheck([xloc, 0, xloc2, c.INST_HEIGHT], {//, xloc2, yloc2], {
+
+                    if (Mouse.rolloverCheck([xloc, 0, xloc2, c.INST_HEIGHT], {
                         type: 'tempo',
                         tempo: tempo_slope*i + select.start,
+                        // this is a little sketchy but it works for now.
                         beat: i > select.beats.length/2 ? select.timesig-1 : 0
                     },
                     func)) {
