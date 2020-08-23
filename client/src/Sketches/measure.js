@@ -131,13 +131,11 @@ export default function measure(p) {
     };
 
 
-    var tuts;
+    var tuts = tutorials(p, subscriber, API, Window);
+
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
         p.background(255);
-        tuts = tutorials(p, subscriber, API, Window);
-
-        tuts.quickstart.begin();
     };
 
     p.windowResized = function () {
@@ -153,6 +151,13 @@ export default function measure(p) {
         Window.mode = props.mode;
         Window.insts = props.instruments.length;
         Object.assign(API, props.API);
+
+        // THIS SHOULD BE MOVED INTO APP.JS WITH DEPENDENCIES
+        // PASSED IN THE OTHER DIRECTION!
+        API.registerTuts(tuts);
+
+        
+
         Window.CONSTANTS = props.CONSTANTS;
         core_buttons = [];
         core_buttons.push(() => {
@@ -496,8 +501,6 @@ export default function measure(p) {
                 handle = [select.temp.beats[Mouse.drag.index]*Window.scale, Mouse.loc.y, 10, 10]; 
                 Mouse.cursor = 'ns-resize';
             } else if (Mouse.drag.mode !== 'tick') {
-                //Debug.push([Mouse.loc.x, Mouse.loc.y].join(' '));
-                Debug.push([p.mouseX, p.mouseY].join(' '));
                 for (let i=1; i < select.beats.length; i++) {
                     let xloc = select.beats[i-1]*Window.scale;
                     let xloc2 = select.beats[i]*Window.scale;

@@ -362,8 +362,10 @@ export default (p, registration, API, Window) => {
         highlight: { x: () => p.width/3.0, y: () => p.height/3.0, x2: () => p.width*2.0/3.0, y2: () => p.height*2.0/3.0 },
         coords: { x: () => p.width/3, y: () => p.height/3, x2: () => p.width*2/3, y2: () => p.height*2/3 },
         preparation: () => {
+            Window.select('clear');
             API.newFile();
             API.newInstrument('default');
+            API.updateMode(0);
         },
         criteria: [],
         text: [

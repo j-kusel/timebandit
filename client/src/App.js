@@ -15,7 +15,7 @@ import logger from './Util/logger';
 import UI from './Components/Canvas';
 import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
 //import { Log, Metadata, Rehearsal } from './Components/Styled';
-import { SettingsModal, WarningModal } from './Components/Modals';
+import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
 import socketIOClient from 'socket.io-client';
@@ -96,7 +96,8 @@ class App extends Component {
           locks: [],
           mode: 0,
           newInst: false,
-          PPQ: CONFIG.PPQ_default
+          PPQ: CONFIG.PPQ_default,
+          tutorial_triggers: {}
       };
 
       ['insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'instNameFocus'].forEach(ref => this[ref] = React.createRef());
@@ -169,6 +170,7 @@ class App extends Component {
 
       this.handleMeasure = this.handleMeasure.bind(this);
       this.handleInst = this.handleInst.bind(this);
+      this.handleTut = this.handleTut.bind(this);
       this.instOpen = this.instOpen.bind(this);
       this.instClose = this.instClose.bind(this);
       this.handleLock = this.handleLock.bind(this);
@@ -187,6 +189,7 @@ class App extends Component {
       this.upload = this.upload.bind(this);
       this.reset = this.reset.bind(this);
       this.settings = this.settings.bind(this);
+      this.tutorials = this.tutorials.bind(this);
       this.handleNew = this.handleNew.bind(this);
       this.handleOpen = this.handleOpen.bind(this);
       this.confirmEdit = this.confirmEdit.bind(this);
@@ -205,6 +208,14 @@ class App extends Component {
           if (name === 'isPlaying')
             return self.state.isPlaying;
       };
+
+      var registerTuts = (obj) => {
+          let tutorial_triggers = {}
+          Object.keys(obj).forEach(tut => 
+              tutorial_triggers[tut] = obj[tut]
+          );
+          this.setState({ tutorial_triggers });
+      }
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
           logger.log(`Updating measure ${id} in instrument ${inst}.`);  
@@ -395,7 +406,7 @@ class App extends Component {
           return measure;
       };
 
-      return { newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { registerTuts, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   instOpen(e) {
@@ -799,6 +810,24 @@ class App extends Component {
       this.setState(oldState => ({ settingsOpen: !oldState.settingsOpen }));
   }
 
+  tutorials(open) {
+      console.log(open);
+      this.setState(oldState => 
+          ({ tutorialsOpen: open === undefined ?
+              !oldState.tutorialsOpen :
+              open
+          })
+      );
+  }
+
+  handleTut(tut) {
+      if (this.state.tutorial_triggers[tut]) {
+          this.state.tutorial_triggers[tut].begin();
+          this.tutorials(false);
+      } else
+          alert("Not available in this version!");
+  }
+
   load(e) {
       let fileName = e.target.files[0].name;
       var reader = new FileReader();
@@ -985,6 +1014,16 @@ class App extends Component {
       </Metadata>);
       */
 
+    let welcome = false;
+
+    if (!window.localStorage.getItem('returning')) {
+        console.log('setting');
+        welcome = true;
+    }
+      
+
+    console.log(window.localStorage.getItem('returning'));
+    //window.localStorage.removeItem('returning');
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
         <Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
@@ -1072,6 +1111,7 @@ class App extends Component {
         
             <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
             <div style={{ position: 'relative', float: 'right', top: '32px' }}>
+                <Upload onClick={this.tutorials}>tutorials</Upload>
                 <Upload onClick={this.settings}>settings</Upload>
                 <Upload onClick={this.reset}>new</Upload>
                 <Upload onClick={this.upload}>open</Upload>
@@ -1116,7 +1156,20 @@ class App extends Component {
                 PPQ: this.state.PPQ,
             })}
         />
-
+        <TutorialsModal
+            show={this.state.tutorialsOpen}
+            onHideCallback={this.tutorials}
+            beginTut={this.handleTut}
+        />
+        <WelcomeModal
+            show={welcome}
+            onHide={() => window.localStorage.setItem('returning', 'true')}
+            quickstart={(e) => {
+                e.preventDefault();
+                window.localStorage.setItem('returning', 'true')
+                this.handleTut('quickstart');
+            }}
+        />
       </div>
     );
   }
