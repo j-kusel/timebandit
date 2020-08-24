@@ -1,5 +1,5 @@
 #include <avr/io.h>
-#include <avr/interrupts.h>
+//#include <avr/interrupts.h>
 #include <util/delay.h>
 #include "USART.h"
 
@@ -22,26 +22,33 @@ int trigger(char byte) {
     C_bank ^= ONBOARD_LED;
     PORTB = B_bank;
     PORTC = C_bank;
-    _delay_ms(sustain);
+    int sus = sustain;
+    while (sus--)
+        _delay_ms(1);
     PORTB = 0;
     PORTC = 0;
 }
 
 int param(char byte) {
+    // LED change
+    if (byte == 0b00000001) {
+        PORTC ^= ONBOARD_LED;
+        return 1;
+    }
     // sustain change
-    if (byte & (1 << 7)) {
+    if (byte & (1 << 6)) {
         int sus = 0;
-        for (int i=0; i<8; i++) {
+        for (int i=0; i<6; i++) {
             if (byte & (1 << i)) {
                 sus += pow(2, i);
             }
         }
-        if (sus == 0) {
-            sus = 150;
-        }
-        sustain = sus;
+        if (sus == 0)
+            sus = 15;
+        sustain = sus*10;
         return 1;
     }
+    return 0;
 }
 
 int main(void) {
@@ -60,11 +67,15 @@ int main(void) {
 
     while (1) {
         command = receiveByte();
-        if (command === 0) {
+        if (command == 0b00000000) {
+            // send back handshake to put in command mode
             transmitByte(1);
-            param(receiveByte());
+            int b = receiveByte();
+            char p = 0;
+            if (b != 0) 
+                p = param(b);
         } else {
-            trigger(receiveByte());
+            trigger(command);
         }
     }
     return 0;

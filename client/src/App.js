@@ -827,6 +827,7 @@ class App extends Component {
 
   command(sustain) {
       socket.emit('command', `sustain ${sustain}`);
+      //socket.emit('command', `LED`);
   }
 
   handleTut(tut) {
@@ -1120,7 +1121,7 @@ class App extends Component {
         
             <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
             <div style={{ position: 'relative', float: 'right', top: '32px' }}>
-                <Upload onClick={() => this.command(150)}>command</Upload>
+                <Upload onClick={() => this.command(50)}>command</Upload>
                 <Upload onClick={this.tutorials}>tutorials</Upload>
                 <Upload onClick={this.settings}>settings</Upload>
                 <Upload onClick={this.reset}>new</Upload>
