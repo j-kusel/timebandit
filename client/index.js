@@ -1,6 +1,7 @@
 const config = require('./config/config');
 const path = require('path');
 const express = require('express');
+const socketIo = require('socket.io');
 
 const configExpress = require('./config/express');
 
@@ -16,4 +17,6 @@ const app = configExpress();
 app.use(express.static('build'));
 app.use(express.static('public'));
 
-app.listen(config.port, () => console.log(`Server started at port ${config.port}.`));
+const server = app.listen(config.port, () => console.log(`Server started at port ${config.port}.`));
+
+const io = socketIo(server, { origins: '*:*' });

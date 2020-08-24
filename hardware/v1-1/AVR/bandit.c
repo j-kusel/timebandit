@@ -12,6 +12,8 @@
 /*int command(char byte) {
 */
 
+int sustain = 150;
+
 int trigger(char byte) {
     // store banks to turn off later
     char B_bank = 0b00000111 & byte;
@@ -20,9 +22,26 @@ int trigger(char byte) {
     C_bank ^= ONBOARD_LED;
     PORTB = B_bank;
     PORTC = C_bank;
-    _delay_ms(150);
+    _delay_ms(sustain);
     PORTB = 0;
     PORTC = 0;
+}
+
+int param(char byte) {
+    // sustain change
+    if (byte & (1 << 7)) {
+        int sus = 0;
+        for (int i=0; i<8; i++) {
+            if (byte & (1 << i)) {
+                sus += pow(2, i);
+            }
+        }
+        if (sus == 0) {
+            sus = 150;
+        }
+        sustain = sus;
+        return 1;
+    }
 }
 
 int main(void) {
@@ -41,8 +60,10 @@ int main(void) {
 
     while (1) {
         command = receiveByte();
-        if (command & 1) {
+        if (command === 0) {
             transmitByte(1);
+            param(receiveByte());
+        } else {
             trigger(receiveByte());
         }
     }

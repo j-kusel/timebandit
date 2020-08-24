@@ -28,6 +28,10 @@ socket.on('hello', (data) => {
     socket.emit('loopback', 'stfu');
 });
 
+socket.on('err', (err) => {
+    console.error(err);
+});
+
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 // later do custom PPQs
 
@@ -110,7 +114,7 @@ class App extends Component {
       audio.schedulerHook((data) => {
       });
       audio.triggerHook((inst) => {
-          socket.emit('schedule', inst.reduce((acc, i) => acc |= (1 << i), 0b00000000));
+          socket.emit('trigger', inst.reduce((acc, i) => acc |= (1 << i), 0b00000000));
       });
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
@@ -190,6 +194,7 @@ class App extends Component {
       this.reset = this.reset.bind(this);
       this.settings = this.settings.bind(this);
       this.tutorials = this.tutorials.bind(this);
+      this.command = this.command.bind(this);
       this.handleNew = this.handleNew.bind(this);
       this.handleOpen = this.handleOpen.bind(this);
       this.confirmEdit = this.confirmEdit.bind(this);
@@ -820,6 +825,10 @@ class App extends Component {
       );
   }
 
+  command(sustain) {
+      socket.emit('command', `sustain ${sustain}`);
+  }
+
   handleTut(tut) {
       if (this.state.tutorial_triggers[tut]) {
           this.state.tutorial_triggers[tut].begin();
@@ -1111,6 +1120,7 @@ class App extends Component {
         
             <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
             <div style={{ position: 'relative', float: 'right', top: '32px' }}>
+                <Upload onClick={() => this.command(150)}>command</Upload>
                 <Upload onClick={this.tutorials}>tutorials</Upload>
                 <Upload onClick={this.settings}>settings</Upload>
                 <Upload onClick={this.reset}>new</Upload>
