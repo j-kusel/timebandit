@@ -13,6 +13,7 @@ import { MeasureCalc, order_by_key } from './Util/index';
 import ordered from './Util/ordered';
 import logger from './Util/logger';
 import UI from './Components/Canvas';
+import Server from './Components/Server';
 import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
 //import { Log, Metadata, Rehearsal } from './Components/Styled';
 import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
@@ -21,11 +22,10 @@ import CONFIG from './config/CONFIG.json';
 import socketIOClient from 'socket.io-client';
 
 const DEBUG = process.env.NODE_ENV === 'development';
+var counter = 0;
 
 const socket = socketIOClient('http://localhost:3001');
 socket.on('hello', (data) => {
-    socket.emit('frame', 0b00000001);
-    socket.emit('loopback', 'stfu');
 });
 
 socket.on('err', (err) => {
@@ -114,6 +114,7 @@ class App extends Component {
       audio.schedulerHook((data) => {
       });
       audio.triggerHook((inst) => {
+          console.log(inst, counter++);
           socket.emit('trigger', inst.reduce((acc, i) => acc |= (1 << i), 0b00000000));
       });
 
@@ -1129,6 +1130,7 @@ class App extends Component {
                 <Upload onClick={this.save}>save</Upload>
                 <Upload onClick={this.midi}>export</Upload>
             </div>
+            <Server style={{ position: 'relative', float: 'right', width: '250px' }}/>
 
           </Footer>
         </div>
