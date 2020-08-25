@@ -432,7 +432,7 @@ class App extends Component {
       this.setState((oldState) => {
           // add after selected
           let selected = oldState.selected.inst;
-          let loc = (selected === -1) ?
+          let loc = ((!selected) || selected === -1) ?
               oldState.instruments.length :
               selected;
           oldState.instruments.splice(loc + 1, 0, newInst);

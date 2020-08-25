@@ -258,21 +258,6 @@ export default function measure(p) {
 
         Window.drawFrame();
 
-
-        // THIS IS IN A STRANGE SPOT
-        /*if (Window.selected.meas) {
-            let first = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
-            let last = first + Window.selected.meas.ms*Window.scale;
-            if (Window.mods.shift &&
-                (p.mouseX > first
-                    && p.mouseX < last
-                    && p.mouseY >= Window.selected.inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
-                    && p.mouseY < (Window.selected.inst + 1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
-                    && true))
-                Mouse.cursor = 'ew-resize';
-        }
-        */
-
         // push below playback bar
         p.push();
         Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
@@ -458,6 +443,11 @@ export default function measure(p) {
                     x, (Math.max(snaps.snapped_inst.origin, snaps.snapped_inst.inst) + 1)*c.INST_HEIGHT);
             };
 
+            let nameColor = p.color('rgba(0,0,0,0.25)');
+            p.stroke(nameColor);
+            p.fill(nameColor);
+            p.textAlign(p.LEFT, p.TOP);
+            p.text(inst.name, 10, c.INST_HEIGHT - 20);
             p.pop();
             Mouse.pop();
         });
