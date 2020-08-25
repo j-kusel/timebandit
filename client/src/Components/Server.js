@@ -5,6 +5,9 @@ import P5Wrapper from 'react-p5-wrapper';
 import measure from '../Sketches/measure';
 import c from '../config/CONFIG.json';
 import _ from 'lodash';
+import socketIOClient from 'socket.io-client';
+import { ServerModal } from './Modals';
+import { TBButton } from './Styled';
 
 var P5Container = styled.div`
     div {
@@ -13,21 +16,31 @@ var P5Container = styled.div`
     }
 `;
 
+var socket = null;
 
 class Server extends Component {
     constructor(props, context) {
         super(props, context);
 
         this.state = {
-            connected: false,
             domain: 'localhost',
-            port: 3001
+            port: 3001,
+            registerSocket: props.registerSocket,
+            commandStack: {},
+            sustain: 150,
+            showModal: false,
         }
 
+        
         this.handleDomain = this.handleDomain.bind(this);
         this.handlePort = this.handlePort.bind(this);
         this.handleNetworkChange = this.handleNetworkChange.bind(this);
+        this.handleCommand = this.handleCommand.bind(this);
+        this.handleSustain = this.handleSustain.bind(this);
+        this.handleNetworkChange(null);
     }
+
+    
 
     handleDomain(e) {
         this.setState({ domain: e.target.value });
@@ -40,9 +53,65 @@ class Server extends Component {
         this.setState({ port: e.target.value });
     }
 
+    handleSustain(e) {
+        let value = e.target.value;
+
+        if (value.length > 3 ||
+            !isFinite(value))
+            return;
+
+        // cache changed parameters
+        this.setState(oldState => {
+            let commandStack = Object.assign({}, oldState.commandStack);
+            if (value === this.state.sustain) 
+                delete commandStack.sustain
+            else
+                commandStack.sustain = value;
+            return ({ commandStack });
+        });
+    }
+
+    handleCommand(e, send, modal) {
+        if (e)
+            e.preventDefault();
+        let newState = {};
+        if (modal)
+            newState.showModal = false;
+        if (!send) {
+            newState.commandStack = {};
+            this.setState(newState);
+            return;
+        }
+
+        if (socket.disconnected)
+            alert('server not connected!')
+        else {
+            let newState = {};
+            Object.keys(this.state.commandStack).forEach((key) => {
+                socket.emit('command', [key, this.state.commandStack[key]].join(' '));
+                newState[key] = this.state.commandStack[key];
+            });
+            this.setState(newState);
+        }
+    }
+
     handleNetworkChange(e) {
-        e.preventDefault();
-        console.log(this.state.domain, this.state.port);
+        if (e)
+            e.preventDefault();
+        if (socket)
+            socket.close();
+        socket = socketIOClient(`http://${this.state.domain}:${this.state.port}`)
+
+        socket.on('connect', () => {
+        });
+        socket.on('disconnect', () => {
+        });
+
+        socket.on('err', (err) => {
+            console.error(err);
+        });
+
+        this.state.registerSocket(socket);
     }
         
        
@@ -84,13 +153,13 @@ class Server extends Component {
     render() {
 
         let style = {
-            color: this.state.connected ? 'green' : 'red',
+            color: socket.connected ? 'green' : 'red',
         }
-        let text = this.state.connected ? 'connected' : 'disconnected';
+        let text = socket.connected ? 'connected' : 'disconnected';
 
         return (
             <div style={this.props.style}>
-                <h3 style={{fontSize: '10px'}}>Server status: <span style={style}>{text}</span></h3>
+                <h3 style={{fontSize: '10px'}}>Hardware server: <span style={style}>{text}</span></h3>
                 <form onSubmit={this.handleNetworkChange} autoComplete="off">
                     <FormInput
                         type="text"
@@ -111,6 +180,29 @@ class Server extends Component {
                     
                     <button type="submit">&#x219D;</button>
                 </form>
+                <TBButton onClick={() => this.setState({ showModal: true })}>parameters...</TBButton>
+                <ServerModal
+                    show={this.state.showModal}
+                    onHide={() => this.handleCommand(null, false, true)}
+                >
+                    <form onSubmit={(e) => this.handleCommand(e, true)} autoComplete="off">
+                      <FormInput
+                        type="text"
+                        key="sustain"
+                        value={(this.state.commandStack.sustain === '') ? '' :
+                            (this.state.commandStack.sustain || this.state.sustain)
+                        }
+                        id="sustain"
+                        name="sustain"
+                        onChange={this.handleSustain}
+                      />
+                        <hr/>
+                        <button type="submit" disabled={socket.disconnected}>Transfer</button>
+                        <button type="button" onClick={() => this.handleCommand(null, false, true)}>Cancel</button>
+                    </form>
+                       
+                    
+                </ServerModal>
 
                 
             

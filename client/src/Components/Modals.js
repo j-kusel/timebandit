@@ -13,6 +13,28 @@ var ModalButton = props => (
     <TBButton onClick={props.onClick}>{props.children}</TBButton>
 );
 
+var ServerModal = (props) => (
+    <Modal 
+      show={ props.show }
+      size="md"
+      onHide={ props.onHide }
+      centered
+    >
+      <Modal.Header closeButton>
+        Hardware settings
+      </Modal.Header>
+      <Modal.Dialog 
+        style={{ height: '100px' }}
+        centered
+      >
+        <ModalBody>
+            {props.children}
+        </ModalBody>
+      </Modal.Dialog>
+    </Modal>
+);
+
+
 var WarningModal = (props) => (
     <Modal 
       show={ props.show }
@@ -146,4 +168,4 @@ var SettingsModal = (props) => {
     );
 };
 
-export { SettingsModal, WarningModal, TutorialsModal, WelcomeModal };
+export { ServerModal, SettingsModal, WarningModal, TutorialsModal, WelcomeModal };

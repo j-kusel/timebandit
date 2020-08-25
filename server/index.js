@@ -69,6 +69,7 @@ io.on('connection', (socket) => {
     //port.read();
 
     socket.on('command', data => {
+        console.log('command', data);
         // split into command and arguments list
         let parsed = data.split(' ');
         let [comm, args] = [parsed.shift(), parsed];

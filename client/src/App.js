@@ -19,18 +19,11 @@ import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Sub
 import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
-import socketIOClient from 'socket.io-client';
 
 const DEBUG = process.env.NODE_ENV === 'development';
 var counter = 0;
+var socket;
 
-const socket = socketIOClient('http://localhost:3001');
-socket.on('hello', (data) => {
-});
-
-socket.on('err', (err) => {
-    console.error(err);
-});
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 // later do custom PPQs
@@ -114,8 +107,8 @@ class App extends Component {
       audio.schedulerHook((data) => {
       });
       audio.triggerHook((inst) => {
-          console.log(inst, counter++);
-          socket.emit('trigger', inst.reduce((acc, i) => acc |= (1 << i), 0b00000000));
+          if (socket)
+              socket.emit('trigger', inst.reduce((acc, i) => acc |= (1 << i), 0b00000000));
       });
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
@@ -195,7 +188,6 @@ class App extends Component {
       this.reset = this.reset.bind(this);
       this.settings = this.settings.bind(this);
       this.tutorials = this.tutorials.bind(this);
-      this.command = this.command.bind(this);
       this.handleNew = this.handleNew.bind(this);
       this.handleOpen = this.handleOpen.bind(this);
       this.confirmEdit = this.confirmEdit.bind(this);
@@ -204,6 +196,12 @@ class App extends Component {
 
       this.API = this.initAPI()
 
+  }
+
+  registerSocket(s) {
+    if (socket)
+      socket.close();
+    socket = s;
   }
 
   initAPI() {
@@ -826,10 +824,6 @@ class App extends Component {
       );
   }
 
-  command(sustain) {
-      socket.emit('command', `sustain ${sustain}`);
-      //socket.emit('command', `LED`);
-  }
 
   handleTut(tut) {
       if (this.state.tutorial_triggers[tut]) {
@@ -1027,14 +1021,9 @@ class App extends Component {
 
     let welcome = false;
 
-    if (!window.localStorage.getItem('returning')) {
-        console.log('setting');
+    if (!window.localStorage.getItem('returning'))
         welcome = true;
-    }
-      
 
-    console.log(window.localStorage.getItem('returning'));
-    //window.localStorage.removeItem('returning');
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
         <Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
@@ -1122,7 +1111,6 @@ class App extends Component {
         
             <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
             <div style={{ position: 'relative', float: 'right', top: '32px' }}>
-                <Upload onClick={() => this.command(50)}>command</Upload>
                 <Upload onClick={this.tutorials}>tutorials</Upload>
                 <Upload onClick={this.settings}>settings</Upload>
                 <Upload onClick={this.reset}>new</Upload>
@@ -1130,7 +1118,7 @@ class App extends Component {
                 <Upload onClick={this.save}>save</Upload>
                 <Upload onClick={this.midi}>export</Upload>
             </div>
-            <Server style={{ position: 'relative', float: 'right', width: '250px' }}/>
+            <Server style={{ position: 'relative', float: 'right', width: '250px' }} registerSocket={this.registerSocket}/>
 
           </Footer>
         </div>
