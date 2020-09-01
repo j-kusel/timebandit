@@ -28,6 +28,9 @@ var socket;
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 // later do custom PPQs
 
+/**
+ * calculates range
+ */
 var calcRange = (measures) => {
     let tempo = [];
     let span = [];
@@ -57,6 +60,11 @@ var calcRange = (measures) => {
 
 
 
+/**
+ * Main React app component
+ *
+ * @component
+ */
 class App extends Component {
   constructor(props, context) {
       super(props, context);
@@ -283,22 +291,21 @@ class App extends Component {
           return ({ instruments: oldState.instruments, selected: {}, ordered: ordered_cpy });
       });
 
+      /**
+       * Updates React application state with the current selection
+       */
       var displaySelected = (selected) => {
           let newState = {
               selected,
               editMeas: {}
           };
-          
           if (selected.meas)
               Object.assign(newState, {
                   edit_start: selected.meas.start,
                   edit_end: selected.meas.end,
                   edit_timesig: selected.meas.timesig
               });
-
-          console.log(newState);
           self.setState(oldState => newState);
-          
       };
 
       var newFile = () =>
@@ -413,6 +420,10 @@ class App extends Component {
       return { registerTuts, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
+  /**
+   * Focuses instName input when new instrument tab is opened
+   * @public
+   */
   instOpen(e) {
       this.setState(() => ({ newInst: true }), () => this.instNameFocus.current.focus());
   };

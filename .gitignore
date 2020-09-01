@@ -3,6 +3,7 @@
 /junk
 # dependencies
 */node_modules
+*/docs
 /server/config/env
 
 # hardware build
