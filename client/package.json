@@ -39,7 +39,7 @@
     "dev": "NODE_ENV=development node index",
     "deploy": "NODE_ENV=deployment node index",
     "docs": "jsdoc -c jsdoc.conf.json",
-    "serveDocs": "python3 -m http.server 9602"
+    "serveDocs": "node docServer"
   },
   "browserslist": {
     "production": [
