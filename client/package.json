@@ -38,7 +38,8 @@
     "eject": "react-scripts eject",
     "dev": "NODE_ENV=development node index",
     "deploy": "NODE_ENV=deployment node index",
-    "docs": "jsdoc -c jsdoc.conf.json"
+    "docs": "jsdoc -c jsdoc.conf.json",
+    "serveDocs": "python3 -m http.server 9602"
   },
   "browserslist": {
     "production": [
