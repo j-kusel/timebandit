@@ -5,5 +5,5 @@ const port = 9602;
 app.use(express.static('docs'));
 
 app.listen(port, () => {
-    `Serving docs at http://docs.banditsound.com (port ${port})`
+    console.log(`Serving docs at http://docs.banditsound.com (port ${port})`);
 });

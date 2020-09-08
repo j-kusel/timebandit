@@ -18,15 +18,32 @@ var P5Container = styled.div`
 
 var socket = null;
 
+/**
+ * Component which connects to a bandit server, for external software/hardware integration
+ * @component
+ * @namespace
+ * @param props
+ * @param {function} props.registerSocket - Exposes a socket.io instance to {@link App}
+ */
 class Server extends Component {
     constructor(props, context) {
         super(props, context);
 
+        /**
+         * React state
+         * @name Server#state
+         * @property {string} domain - Hostname of server
+         * @property {number} port - Port of server
+         * @property {Object} registerSocket - Exposes a socket.io instance to {App}
+         * @property {Object} commandQueue - Queues commands for bandit hardware
+         * @property {number} sustain - Default buzzer length for bandit hardware
+         * @property {Boolean} showModal - Toggles modal for sending commands to server
+         */
         this.state = {
             domain: 'localhost',
             port: 3001,
             registerSocket: props.registerSocket,
-            commandStack: {},
+            commandQueue: {},
             sustain: 150,
             showModal: false,
         }
@@ -40,12 +57,20 @@ class Server extends Component {
         this.handleNetworkChange(null);
     }
 
-    
-
+    /**
+     * Change [this.state.domain]{@link Server#state.domain}
+     * @memberOf Server
+     * @param e - HTMLElement change event
+     */
     handleDomain(e) {
         this.setState({ domain: e.target.value });
     }
 
+    /**
+     * Change [this.state.port]{@link Server#state.port}
+     * @memberOf Server
+     * @param e - HTMLElement change event
+     */
     handlePort(e) {
         if (e.target.value.length > 4 ||
             !isFinite(e.target.value))
@@ -53,6 +78,11 @@ class Server extends Component {
         this.setState({ port: e.target.value });
     }
 
+    /**
+     * Change [this.state.commandQueue.sustain]{@link Server#state.commandQueue}
+     * @memberOf Server
+     * @param e - HTMLElement change event
+     */
     handleSustain(e) {
         let value = e.target.value;
 
@@ -62,15 +92,22 @@ class Server extends Component {
 
         // cache changed parameters
         this.setState(oldState => {
-            let commandStack = Object.assign({}, oldState.commandStack);
+            let commandQueue = Object.assign({}, oldState.commandQueue);
             if (value === this.state.sustain) 
-                delete commandStack.sustain
+                delete commandQueue.sustain
             else
-                commandStack.sustain = value;
-            return ({ commandStack });
+                commandQueue.sustain = value;
+            return ({ commandQueue });
         });
     }
 
+    /**
+     * Change [this.state.commandQueue.sustain]{@link Server#state.commandQueue}
+     * @memberOf Server
+     * @param e - HTMLElement change event
+     * @param send {Boolean} - Whether or not [this.state.commandQueue]{@link Server#state.commandQueue} will be sent to server or cleared
+     * @param modal {Boolean} - Whether or not the command modal will be shown
+     */
     handleCommand(e, send, modal) {
         if (e)
             e.preventDefault();
@@ -78,7 +115,7 @@ class Server extends Component {
         if (modal)
             newState.showModal = false;
         if (!send) {
-            newState.commandStack = {};
+            newState.commandQueue = {};
             this.setState(newState);
             return;
         }
@@ -87,14 +124,18 @@ class Server extends Component {
             alert('server not connected!')
         else {
             let newState = {};
-            Object.keys(this.state.commandStack).forEach((key) => {
-                socket.emit('command', [key, this.state.commandStack[key]].join(' '));
-                newState[key] = this.state.commandStack[key];
+            Object.keys(this.state.commandQueue).forEach((key) => {
+                socket.emit('command', [key, this.state.commandQueue[key]].join(' '));
+                newState[key] = this.state.commandQueue[key];
             });
             this.setState(newState);
         }
     }
 
+    /**
+     * Connects to server and registers socket to {@link App}
+     * @param e - HTMLFormElement submit event
+     */
     handleNetworkChange(e) {
         if (e)
             e.preventDefault();
@@ -113,45 +154,8 @@ class Server extends Component {
 
         this.state.registerSocket(socket);
     }
-        
-       
-
-    // NEVER UPDATE
-    shouldComponentUpdate(nextProps, nextState) {
-    /*
-        if (nextProps.mode !== this.props.mode ||
-            nextProps.panels !== this.props.panels ||
-            !_.isEqual(nextProps.insertMeas, this.props.insertMeas) ||
-            !_.isEqual(nextProps.editMeas, this.props.editMeas) ||
-            nextProps.locks.length !== this.props.locks.length ||
-            nextProps.instruments.length !== this.props.instruments.length ||
-            nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ) {
-            return true;
-        }
-
-        let flag = false;
-        nextProps.instruments.forEach((inst, index) => {
-            if (Object.keys(inst.measures).length !== Object.keys(this.props.instruments[index].measures).length)
-                flag = true;
-            Object.keys(inst.measures).forEach((key) => {
-                if (!(key in this.props.instruments[index].measures)) {
-                    flag = true;
-                } else {
-                    ['start', 'end', 'offset'].forEach((attr) => {
-                        if (inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr])
-                            flag = true;
-                    });
-                };
-            })
-        });
-        return flag;
-        */
-        return true;
-    };
-
 
     render() {
-
         let style = {
             color: socket.connected ? 'green' : 'red',
         }
@@ -189,8 +193,8 @@ class Server extends Component {
                       <FormInput
                         type="text"
                         key="sustain"
-                        value={(this.state.commandStack.sustain === '') ? '' :
-                            (this.state.commandStack.sustain || this.state.sustain)
+                        value={(this.state.commandQueue.sustain === '') ? '' :
+                            (this.state.commandQueue.sustain || this.state.sustain)
                         }
                         id="sustain"
                         name="sustain"

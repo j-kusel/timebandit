@@ -1,3 +1,8 @@
+/**
+ * P5js sketch for main display
+ * @module sketch
+ */
+
 import { order_by_key, check_proximity_by_key, parse_bits } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
@@ -8,7 +13,7 @@ import { primary, secondary_light2 } from '../config/CONFIG.json';
 import _Window from '../Util/window.js';
 import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
-import _Debugger from '../Util/debugger.js';
+import Debugger from '../Util/debugger.js';
 import keycodes from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
@@ -118,7 +123,7 @@ export default function measure(p) {
     var Keyboard = _Keyboard(p);
 
     // debugger
-    var Debug = _Debugger(p, Window, Mouse);
+    var Debug = Debugger(p, Window, Mouse);
 
     var subs = [];
     var buttons = [];

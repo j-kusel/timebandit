@@ -206,6 +206,10 @@ class App extends Component {
 
   }
 
+  /**
+   * Exposes a websocket from the {@link Server} component to the main App
+   * @param {Object} socket - An active socket.io client object
+   */
   registerSocket(s) {
     if (socket)
       socket.close();
@@ -422,7 +426,7 @@ class App extends Component {
 
   /**
    * Focuses instName input when new instrument tab is opened
-   * @public
+   *
    */
   instOpen(e) {
       this.setState(() => ({ newInst: true }), () => this.instNameFocus.current.focus());

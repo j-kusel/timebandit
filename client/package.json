@@ -54,7 +54,10 @@
     ]
   },
   "main": "index.js",
-  "devDependencies": {},
+  "devDependencies": {
+    "gulp": "^4.0.2",
+    "gulp-jsdoc3": "^3.0.0"
+  },
   "author": "",
   "license": "Unlicense",
   "description": ""

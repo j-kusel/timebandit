@@ -3,11 +3,6 @@
         "allowUnknownTags": true,
         "dictionaries": ["jsdoc", "closure"]
     },
-    "source": {
-        "include": ["src"],
-        "includePattern": ".+\\.js(doc|x)?$",
-        "excludePattern": "(^|\\/|\\\\)_"
-    },
     "sourceType": "module",
     "plugins": ["plugins/markdown", "better-docs"],
     "templates": {
