@@ -3,9 +3,9 @@ import c from '../../../config/CONFIG.json';
 
 let mac = window.navigator.platform.indexOf('Mac') >= 0;
 
-export default (p, registration, API, Window) => {
+export default (p, registration, API, Window, blockerSet) => {
     const { Tutorial, Step } = lib(p, registration);
-    let tut = new Tutorial();
+    let tut = new Tutorial(blockerSet);
 
     let intro = new Step({
         reporter: (id) => {
@@ -84,7 +84,7 @@ export default (p, registration, API, Window) => {
         text: [
             "To add a measure,",
             "first enter INSERT mode by clicking the bar or",
-            "pressing the 'i' key",
+            "pressing the 'i' key.",
         ]
     });
 
@@ -156,7 +156,7 @@ export default (p, registration, API, Window) => {
     });
 
     let zoom = new Step({
-        reporter: (id) => tut.current = id,
+        reporter: (id) => tut.current(id),
         highlight: {
             x: () => c.PANES_WIDTH,
             x2: () => p.width,

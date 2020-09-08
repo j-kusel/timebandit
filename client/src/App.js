@@ -102,7 +102,8 @@ class App extends Component {
           mode: 0,
           newInst: false,
           PPQ: CONFIG.PPQ_default,
-          tutorial_triggers: {}
+          tutorial_triggers: {},
+          mouseBlocker: () => false
       };
 
       ['insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'instNameFocus'].forEach(ref => this[ref] = React.createRef());
@@ -228,9 +229,10 @@ class App extends Component {
       var registerTuts = (obj) => {
           let tutorial_triggers = {}
           Object.keys(obj).forEach(tut => 
-              tutorial_triggers[tut] = obj[tut]
+              (tut !== 'mouseBlocker') ?
+                  tutorial_triggers[tut] = obj[tut] : null
           );
-          this.setState({ tutorial_triggers });
+          this.setState({ mouseBlocker: obj.mouseBlocker, tutorial_triggers });
       }
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
@@ -429,15 +431,21 @@ class App extends Component {
    *
    */
   instOpen(e) {
+      if (this.state.mouseBlocker())
+          return;
       this.setState(() => ({ newInst: true }), () => this.instNameFocus.current.focus());
   };
 
   instClose(e) {
+      if (this.state.mouseBlocker())
+          return;
       this.setState({ newInst: false });
   };
 
   handleInst(e) {
       e.preventDefault();
+      if (this.state.mouseBlocker())
+          return;
 
       let newInst = {
           name: this.state.instName,
@@ -460,8 +468,8 @@ class App extends Component {
 
   handleMeasure(e) {
       e.preventDefault();
-      console.log(this.state.selected.inst);
-      console.log(this.state.insertInst);
+      if (this.state.mouseBlocker())
+          return;
       if (this.state.selected.inst === undefined) {
           alert('select an instrument first!');
           return;
@@ -495,6 +503,8 @@ class App extends Component {
   };
 
   handleLock(val, e) {
+      if (this.state.mouseBlocker())
+          return;
       let oldLock = this.state.locks.indexOf(val);
 
       this.setState(oldState => {
@@ -508,6 +518,9 @@ class App extends Component {
   };
 
   handleMuting(val, e, ind) {
+      if (this.state.mouseBlocker())
+          return;
+
       (val.indexOf('mute') > -1) ?
           audio.mute(ind, true) : audio.mute(ind, false);
       if (val.indexOf('solo') > -1)
@@ -517,6 +530,9 @@ class App extends Component {
 
   // filter all non-numbers
   handleNumInput(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       if (e.target.value === '')
           this.setState({ [e.target.name]: '' })
       else if (/^[0-9\b]+$/.test(e.target.value)) {
@@ -544,6 +560,9 @@ class App extends Component {
   };
 
   handleNumEdit(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       if (e.target.value === '') {
           this.setState({ ['edit_'.concat(e.target.name)]: '' });
       }
@@ -582,6 +601,9 @@ class App extends Component {
   }
 
   confirmEdit(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       e.preventDefault();
       this.setState(oldState => {
           let instruments = oldState.instruments;
@@ -598,11 +620,17 @@ class App extends Component {
 
 
   handleNameInput(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       this.setState({ [e.target.name]: e.target.value })
   };
 
 
   handleOffset(focus, e) {
+      if (this.state.mouseBlocker())
+          return;
+
     this.setState({ temp_offset: focus });
   }
 
@@ -721,6 +749,8 @@ class App extends Component {
   };
 
   play(isPlaying, cursor) {
+      if (this.state.mouseBlocker())
+          return;
 
       let newState = {};
       if (!isPlaying) {
@@ -747,6 +777,8 @@ class App extends Component {
   }
 
   preview(isPreviewing) {
+      if (this.state.mouseBlocker())
+          return;
       if (this.state.previewTimeout)
           clearTimeout(this.state.previewTimeout);
       let kill = () => {
@@ -778,6 +810,9 @@ class App extends Component {
   }
 
   save() {
+      if (this.state.mouseBlocker())
+          return;
+
       let insts = this.state.instruments;
       let rows = [['inst', 'start', 'end', 'timesig', 'offset']];
 
@@ -799,6 +834,9 @@ class App extends Component {
   };
 
   upload(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       if (this.state.instruments.length > 1
           || Object.keys(this.state.instruments[0].measures).length)
           this.setState({ warningOpen: true })
@@ -807,6 +845,9 @@ class App extends Component {
   }
 
   handleNew(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       this.setState({ instruments:
           [{
               name: 'default',
@@ -817,20 +858,30 @@ class App extends Component {
   }
 
   handleOpen(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       document.getElementById('dummyLoad').click();
       this.setState({ warningOpen: false });
   }
 
   reset(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       this.setState({ warningNew: true });
   }
 
   settings(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       this.setState(oldState => ({ settingsOpen: !oldState.settingsOpen }));
   }
 
   tutorials(open) {
-      console.log(open);
+      if (open && this.state.mouseBlocker())
+          return;
       this.setState(oldState => 
           ({ tutorialsOpen: open === undefined ?
               !oldState.tutorialsOpen :
@@ -841,7 +892,9 @@ class App extends Component {
 
 
   handleTut(tut) {
-      if (this.state.tutorial_triggers[tut]) {
+     if (this.state.mouseBlocker())
+          return;
+     if (this.state.tutorial_triggers[tut]) {
           this.state.tutorial_triggers[tut].begin();
           this.tutorials(false);
       } else
@@ -849,6 +902,9 @@ class App extends Component {
   }
 
   load(e) {
+      if (this.state.mouseBlocker())
+          return;
+
       let fileName = e.target.files[0].name;
       var reader = new FileReader();
       reader.onload = (e) => {

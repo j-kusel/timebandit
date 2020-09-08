@@ -8,6 +8,8 @@ import { KeyC, KeyV, } from './keycodes.js';
 //import { KeyI, KeyH, KeyJ, KeyK, KeyL, KeyZ } from './keycodes.js';
 import { NUM } from './keycodes.js';
 
+var p;
+
 /**
  * A class for printing debugging text to the P5js Canvas
  */
@@ -18,7 +20,8 @@ export class Debugger {
      * @param {Window} - Instance of the {@link Window} class
      * @param {Mouse} - Instance of the {@link Mouse} class
      */
-    constructor(p, Window, Mouse) {
+    constructor(processing, Window, Mouse) {
+        p = processing;
         /** @private */
         this.lines = [];
         /** @private */

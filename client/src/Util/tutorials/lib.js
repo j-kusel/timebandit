@@ -63,6 +63,7 @@ var init = (p, hook) => {
             this.criteria = options.criteria;
             this.text = options.text;
             this.reporter = options.reporter;
+            this.parent = null;
             this.drawID = '';
             let { x, y, x2, y2 } = Object.keys(this.coords).reduce((acc, key) =>
                 ({ ...acc, [key]: typeof(this.coords[key]) === 'function' ?
@@ -89,6 +90,7 @@ var init = (p, hook) => {
         show() {
             this.preparation();
             this.reporter(this);
+            this.parent.blockerSet(this.coords);
             var panel = () => {
                 p.push();
                 p.fill("rgba(140, 114, 114, 0.44)");
@@ -137,7 +139,9 @@ var init = (p, hook) => {
         forward() {
             this.hide();
             if (this.next)
-                this.next.show();
+                this.next.show()
+            else
+                this.parent.end();
         }
 
         backward() {
@@ -156,12 +160,14 @@ var init = (p, hook) => {
     }
             
     class Tutorial {
-        constructor() {
+        constructor(blockerSet) {
             this.steps = [];
-            this.current = null;
+            this._current = null;
+            this.blockerSet = blockerSet;
         }
 
         add(step) {
+            step.parent = this;
             if (this.steps.length) {
                 let next = this.steps[this.steps.length-1];
                 next.append(step);
@@ -176,6 +182,13 @@ var init = (p, hook) => {
             return this;
         }
 
+        end() {
+            this.blockerSet(false);
+            this.steps = [];
+            this._current = null;
+        }
+
+        /* DEPRECATED
         mouseChecker() {
             return (!this.current) ||
                 (p.mouseX > this.current.highlight.x()
@@ -187,7 +200,7 @@ var init = (p, hook) => {
                 && p.mouseY > this.current.coords.y()
                 && p.mouseY < this.current.coords.y2())
         }
-
+        */
 
 
     }

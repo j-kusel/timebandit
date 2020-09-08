@@ -13,8 +13,9 @@ import { primary, secondary_light2 } from '../config/CONFIG.json';
 import _Window from '../Util/window.js';
 import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
-import Debugger from '../Util/debugger.js';
+import { Debugger } from '../Util/debugger.js';
 import keycodes from '../Util/keycodes.js';
+import { CTRL, MOD } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
 
@@ -26,9 +27,6 @@ var API = {};
 
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
 //const [SHIFT, ALT] = [16, 18];
-let mac = window.navigator.platform.indexOf('Mac') >= 0;
-const CTRL = mac ? 224 : 17;
-const MOD = mac ? 17 : 91;
 const [KeyC, KeyI, KeyV] = [67, 73, 86];
 //const [KeyH, KeyJ, KeyK, KeyL] = [72, 74, 75, 76];
 //const [KeyZ] = [90];
@@ -123,7 +121,7 @@ export default function measure(p) {
     var Keyboard = _Keyboard(p);
 
     // debugger
-    var Debug = Debugger(p, Window, Mouse);
+    var Debug = new Debugger(p, Window, Mouse);
 
     var subs = [];
     var buttons = [];
@@ -718,7 +716,7 @@ export default function measure(p) {
 
     p.mouseWheel = function(event) {
         event.preventDefault();
-        let zoom = p.keyIsDown(CTRL);
+        let zoom = p.keyIsDown(MOD);
         Window.updateView(event, { zoom });
         if (zoom)
             API.newScaling(Window.scale);
@@ -727,10 +725,13 @@ export default function measure(p) {
 
     p.mousePressed = function(e) {
         p.mouseDown = { x: p.mouseX, y: p.mouseY };
-        if (!tuts.quickstart.mouseChecker())
+        let block = tuts.mouseBlocker();
+        console.log(block);
+        if (block)
             return;
         Mouse.updatePress(buttons);
         Mouse.updatePress(core_buttons);
+
         if (Mouse.outside_origin)
             return;
 
