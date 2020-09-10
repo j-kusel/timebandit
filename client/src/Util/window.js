@@ -43,6 +43,66 @@ export default (p) => {
             this.viewport -= event.deltaX;
         }
 
+        drawPlayback() {
+            p.push();
+            p.translate(c.PANES_WIDTH, 0);
+            let zoom_thresholds = [0.0025, 0.01, 0.03, 0.1, 0.5, 1.0, 2.0];
+            let zoom_values = [30000, 5000, 1000, 500, 100, 20, 10];
+            let formats = [
+                (m, s, ms) => `${m}'${s}"`,
+                (m, s, ms) => `${m}.${s}:${ms}`,
+            ];
+            let zoom_formatting = [0,0,1,1,1,1,1];
+            zoom_thresholds.some((thresh, i) => {
+                if (this.scale > thresh)
+                    return false;
+                let inc = 0,
+                    loc = 0,
+                    bias = (((this.viewport/this.scale) % zoom_values[i]) - zoom_values[i])*this.scale,
+                    val = zoom_values[i]*this.scale,
+                    text = Math.round((-this.viewport-Math.abs(bias))/this.scale);
+                p.fill(0);
+
+                p.textAlign(p.LEFT, p.TOP);
+                while (loc < p.width) {
+                    p.stroke(120, 120, 120);
+                    loc = inc*val + bias;
+                    inc += 1;
+                    p.line(loc, 10, loc, 100);
+                    p.stroke(200, 200, 200);
+                    
+                    if (!(text % (zoom_values[i]*5))) {
+                        let abstext = Math.abs(text);
+                        let min = Math.floor(abstext/60000);
+                        let sec = ('0' + Math.floor((abstext-min*60000)/1000)).slice(-2);
+                        let ms = ('00' + (abstext % 1000)).slice(-3);
+                        let formatter = formats[zoom_formatting[i]];
+                        p.text((text >= 0 ? '' : '-') + formatter(min, sec, ms), loc, 10);
+                    }
+                    text += zoom_values[i];
+
+                    for (let v=1; v<5; v++) {
+                        let subloc = loc + v*(val/5);
+                        p.line(subloc, 20, subloc, c.PLAYBACK_HEIGHT);
+                    }
+                }
+                return true;
+            });
+            p.stroke(255, 0, 0);
+            p.line(this.viewport, 0, this.viewport, 200);
+            let gradient_width = 50;
+            p.pop();
+            while (gradient_width--) {
+                let start = p.color(secondary);
+                let end = p.color(secondary);
+                start.setAlpha(255);
+                end.setAlpha(0);
+                p.stroke(p.lerpColor(start, end, gradient_width/50))
+                p.line(gradient_width, 0, gradient_width, c.PLAYBACK_HEIGHT);
+                p.line(p.width - gradient_width, 0, p.width - gradient_width, c.PLAYBACK_HEIGHT);
+            }
+        }
+
         drawTimesig(numerator, denominator) {
             let denom = typeof denominator === 'string' ?
                 denominator : parseInt(denominator, 10);
@@ -55,7 +115,6 @@ export default (p) => {
             p.text([numerator, denom].join('\n'), 0, c.INST_HEIGHT/2);
             p.pop();
         }
-
 
         select(newSelected) {
             if (newSelected === 'clear') {

@@ -260,6 +260,7 @@ export default function measure(p) {
             Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
 
         Window.drawFrame();
+        Window.drawPlayback();
 
         // push below playback bar
         p.push();
@@ -724,9 +725,9 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
+        
         p.mouseDown = { x: p.mouseX, y: p.mouseY };
         let block = tuts.mouseBlocker();
-        console.log(block);
         if (block)
             return;
         Mouse.updatePress(buttons);
