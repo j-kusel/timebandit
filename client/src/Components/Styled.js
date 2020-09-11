@@ -31,6 +31,15 @@ var transition_mixin = ['transition', '-webkit-transition', '-moz-transition', '
     .reduce((acc, t) => `${acc}${t}: ${timing} ${change};\n`, '');
     */
 
+var Slider = styled.input`
+    -webkit-appearance: none;
+    appearance: none;
+    &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        background: pink;
+    }
+`;
 
 var Playback = styled.button`
     width: 50px;
@@ -325,4 +334,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { Slider, NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

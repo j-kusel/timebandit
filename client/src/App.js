@@ -14,6 +14,7 @@ import ordered from './Util/ordered';
 import logger from './Util/logger';
 import UI from './Components/Canvas';
 import Server from './Components/Server';
+import Mixer from './Components/Mixer';
 import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
 //import { Log, Metadata, Rehearsal } from './Components/Styled';
 import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
@@ -1190,7 +1191,7 @@ class App extends Component {
                 <Upload onClick={this.midi}>export</Upload>
             </div>
             <Server style={{ position: 'relative', float: 'right', width: '250px' }} registerSocket={this.registerSocket}/>
-
+            <Mixer style={{ position: 'relative', float: 'right', width: '250px' }} audio={audio} insts={this.state.instruments}/>
           </Footer>
         </div>
 

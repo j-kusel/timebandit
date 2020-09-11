@@ -273,7 +273,6 @@ export default function measure(p) {
         p.translate(c.PANES_WIDTH, 0);
 
 
-
         // update Mouse location
         let new_rollover = {};
         instruments.forEach((inst, i_ind) => {
@@ -1359,7 +1358,10 @@ export default function measure(p) {
     }
 
     p.mouseMoved = function(event) {
-        API.newCursor((p.mouseX - Window.viewport)/Window.scale);
+        if (p.mouseX > 0 && p.mouseX < p.width &&
+            p.mouseY > 0 && p.mouseY < p.height
+        )
+            API.newCursor((p.mouseX - Window.viewport)/Window.scale);
         return false;
     };
     

@@ -11,10 +11,18 @@ var trigger_hooks = [];
     */
 
 var gains = [];
+var volumes = [];
+var mutes = [];
 for (let i=0; i < 5; i++) {
     let gain = aC.createGain();
+    let muter = aC.createGain();
+    let vol = aC.createGain();
     gain.gain.setValueAtTime(0.0, aC.currentTime);
+    muter.gain.setValueAtTime(1.0, aC.currentTime);
+    vol.gain.setValueAtTime(0.8, aC.currentTime);
+    mutes.push(muter);
     gains.push(gain);
+    volumes.push(vol);
 };
 
 var oscs = [];
@@ -23,13 +31,14 @@ var oscs = [];
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, aC.currentTime);
 
-    console.log(gains[ind]);
     osc.connect(gains[ind]);
+    gains[ind].connect(mutes[ind]);
+    mutes[ind].connect(volumes[ind]);
     osc.start();
     oscs.push(osc);
 });
 
-gains.forEach(gain => gain.connect(aC.destination));
+volumes.forEach(vol => vol.connect(aC.destination));
 
 var PARAMS = {
     sustain: 50,
@@ -113,11 +122,34 @@ var playback = (isPlaying, score, tracking) => {
     }
 };
 
+var setVolume = (target, vol) => {
+    volumes[target].gain.cancelScheduledValues(aC.currentTime);
+    volumes[target].gain.linearRampToValueAtTime(vol, aC.currentTime + 0.1);
+}
+
+var mute = (target, bool) => {
+    mutes[target].gain.cancelScheduledValues(aC.currentTime);
+    mutes[target].gain.linearRampToValueAtTime(bool ? 0.0 : 1.0, aC.currentTime + 0.05);
+}
+
+var solo = (target, bool) => {
+    mutes.forEach((mute, i) => {
+        let vol = bool ? 
+            (i === target ? 1.0 : 0.0) :
+            1.0; 
+        mute.gain.cancelScheduledValues(aC.currentTime);
+        mute.gain.linearRampToValueAtTime(vol, aC.currentTime + 0.05);
+    });
+}
+
 var audio = {
     init: () => aC.resume().then(() => console.log('resumed')),
     play: playback, //compile(score), //score.forEach((inst, ind) =>
         //inst[1].forEach((beat) => trigger(ind, beat, adsr))),
     kill: () => playback(false),
+    setVolume,
+    mute,
+    solo,
     set: (param, val) => {
         PARAMS[param] = val;
     },
