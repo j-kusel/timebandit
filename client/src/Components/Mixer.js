@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { FormInput, Slider } from './Styled';
 import c from '../config/CONFIG.json';
 import _ from 'lodash';
-import { MixerButton, TBButton } from './Styled';
+import { MixerRow, MixerArrow, MixerButton, TBButton } from './Styled';
 
 /**
  * Component which connects to a bandit server, for external software/hardware integration
@@ -98,15 +98,20 @@ class Mixer extends Component {
         this.setState({ shows: this.props.insts.map(__ => false) });
     }
 
+
     render() {
         let insts = this.props.insts.map((inst, i) => (
-            <tr key={i} style={{ fontSize: '8px' }}>
+            <MixerRow key={i} style={{ fontSize: '8px' }}>
+                <td className="arrows" style={{ minWidth: '10px' }}>
+                    <MixerArrow onClick={() => this.props.instMove(i, 'up')}>&#9650;</MixerArrow>
+                    <MixerArrow onClick={() => this.props.instMove(i, 'down')}>&#9660;</MixerArrow>
+                </td>
                 <td>{inst.name}</td>
                 <td><MixerButton style={{color: this.state.mutes[i] ? 'red' : 'black' }} onClick={() => this.handleMute(i)}>M</MixerButton></td>
                 <td><MixerButton style={{color: this.state.solos[i] ? 'blue' : 'black' }} onClick={() => this.handleSolo(i)}>S</MixerButton></td>
                 <td><Slider type="range" min="0" max="100" value={this.state.volumes[i]} onChange={(e) => this.handleVolume(e, i)} onMouseUp={this.handleVolHide}/></td>
                 <td>{this.state.shows[i] ? this.state.volumes[i] : null}</td>
-            </tr>
+            </MixerRow>
         ));
             
         return (

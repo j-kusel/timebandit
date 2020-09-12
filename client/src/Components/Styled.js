@@ -69,6 +69,29 @@ var Slider = styled.input`
         .map(prefix => `&::${prefix} { ${sliderTrack} }`)}
 `;
 
+var MixerArrow = styled.button`
+    display: block;
+    margin: -2px 0px -4px 0px;
+    padding: 0px;
+    border: none;
+    text-decoration: none;
+`;
+
+var MixerRow = styled.tr`
+    .arrows {
+        visibility: hidden;
+        width: 6px;
+    }
+    &:hover {
+        .arrows {
+            visibility: visible;
+        }
+    }
+    .flip {
+        transform: rotate(180deg);
+    }
+`;
+
 var MixerButton = styled.button`
     box-sizing: border-box;
     border: 1px solid transparent;
@@ -378,4 +401,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Slider, MixerButton, NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { Slider, MixerButton, MixerArrow, MixerRow, NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

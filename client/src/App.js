@@ -188,6 +188,7 @@ class App extends Component {
       this.handleOffset = this.handleOffset.bind(this);
       this.handlePPQ = this.handlePPQ.bind(this);
       this.handleTempoPPQ = this.handleTempoPPQ.bind(this);
+      this.handleInstMove = this.handleInstMove.bind(this);
       this.midi = this.midi.bind(this);
       this.play = this.play.bind(this);
       this.preview = this.preview.bind(this);
@@ -464,6 +465,17 @@ class App extends Component {
           logger.log(`Adding new instrument in slot ${loc}.`);
           return oldState;
       });
+  }
+
+  handleInstMove(inst, dir) {
+      if ((dir === 'up' && inst === 0) ||
+          (dir === 'down' && inst === this.state.instruments.length-1)
+      )
+          return;
+      let instruments = [].concat(this.state.instruments);
+      let [moved] = instruments.splice(inst, 1);
+      instruments.splice(dir === 'up' ? inst-1 : inst+1, 0, moved);
+      this.setState({ instruments });
   }
 
 
@@ -1098,12 +1110,12 @@ class App extends Component {
 
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
-        <Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>
+        {/*<Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>*/}
         <div style={{ margin: '0px'}}>
 
           {/* left midi controls */}
           <Panel>
-              {panes}
+              {/*panes*/}
               <NewInst x={addPad} y={this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT} style={{ width: 'initial' }}>
 
               <button className={this.state.newInst ? "opened" : "closed"} onClick={(e) => this.state.newInst ? this.instClose(e) : this.instOpen(e) }>+</button>
@@ -1191,7 +1203,7 @@ class App extends Component {
                 <Upload onClick={this.midi}>export</Upload>
             </div>
             <Server style={{ position: 'relative', float: 'right', width: '250px' }} registerSocket={this.registerSocket}/>
-            <Mixer style={{ position: 'relative', float: 'right', width: '250px' }} audio={audio} insts={this.state.instruments}/>
+            <Mixer style={{ position: 'relative', float: 'right', width: '250px' }} audio={audio} insts={this.state.instruments} instMove={this.handleInstMove}/>
           </Footer>
         </div>
 
