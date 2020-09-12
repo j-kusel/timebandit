@@ -60,7 +60,7 @@ class Server extends Component {
     /**
      * Change [this.state.domain]{@link Server#state.domain}
      * @memberOf Server
-     * @param e - HTMLElement change event
+     * @param e - [HTMLElement change event]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event}
      */
     handleDomain(e) {
         this.setState({ domain: e.target.value });
@@ -69,7 +69,7 @@ class Server extends Component {
     /**
      * Change [this.state.port]{@link Server#state.port}
      * @memberOf Server
-     * @param e - HTMLElement change event
+     * @param e - [HTMLElement change event]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event}
      */
     handlePort(e) {
         if (e.target.value.length > 4 ||
@@ -81,7 +81,7 @@ class Server extends Component {
     /**
      * Change [this.state.commandQueue.sustain]{@link Server#state.commandQueue}
      * @memberOf Server
-     * @param e - HTMLElement change event
+     * @param e - [HTMLElement change event]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event}
      */
     handleSustain(e) {
         let value = e.target.value;
@@ -104,7 +104,7 @@ class Server extends Component {
     /**
      * Change [this.state.commandQueue.sustain]{@link Server#state.commandQueue}
      * @memberOf Server
-     * @param e - HTMLElement change event
+     * @param e - [HTMLElement change event]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event}
      * @param send {Boolean} - Whether or not [this.state.commandQueue]{@link Server#state.commandQueue} will be sent to server or cleared
      * @param modal {Boolean} - Whether or not the command modal will be shown
      */
@@ -134,7 +134,7 @@ class Server extends Component {
 
     /**
      * Connects to server and registers socket to {@link App}
-     * @param e - HTMLFormElement submit event
+     * @param e - [HTMLElement change event]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event}
      */
     handleNetworkChange(e) {
         if (e)

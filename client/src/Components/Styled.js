@@ -57,6 +57,7 @@ var Slider = styled.input`
     -moz-appearance: none;
     -ms-appearance: none;
     appearance: none;
+    background: transparent;
     margin-left: 10px;
     outline: none;
     &:focus {

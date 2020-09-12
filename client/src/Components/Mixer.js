@@ -19,28 +19,25 @@ class Mixer extends Component {
         /**
          * React state
          * @name Mixer#state
-         * @property {string} domain - Hostname of server
-         * @property {number} port - Port of server
-         * @property {Object} registerSocket - Exposes a socket.io instance to {App}
-         * @property {Object} commandQueue - Queues commands for bandit hardware
-         * @property {number} sustain - Default buzzer length for bandit hardware
-         * @property {Boolean} showModal - Toggles modal for sending commands to server
+         * @property {Boolean[]} mutes - Whether or not an indexed instrument is muted
+         * @property {Boolean[]} solos - Whether or not an indexed instrument is soloed
+         * @property {Number[]} volumes - Volumes of indexed instruments (0-100)
+         * @property {Number} volShows - Which volume indicator is displayed, -1 if none
          */
         this.state = {
             mutes: props.insts.map(__ => false),
             solos: props.insts.map(__ => false),
             volumes: props.insts.map(__ => 80),
-            shows: props.insts.map(__ => false)
+            volShows: -1
         }
         
         this.handleMute = this.handleMute.bind(this);
         this.handleSolo = this.handleSolo.bind(this);
         this.handleVolume = this.handleVolume.bind(this);
-        this.handleVolHide = this.handleVolHide.bind(this);
     }
 
     static getDerivedStateFromProps(props, state) {
-        let defaults = { mutes: false, solos: false, volumes: 80, shows: false };
+        let defaults = { mutes: false, solos: false, volumes: 80 };
         let newState = Object.keys(defaults).reduce((acc, key) =>
             Object.assign(acc, {[key]: props.insts.map((__, i) =>
                 (i < state[key].length) ?
@@ -70,7 +67,7 @@ class Mixer extends Component {
     }
 
     /**
-     * Solos playback of items by index in [this.state.mutes]{@link Mixer#state.mutes}
+     * Solos playback of items by index in [this.state.mutes]{@link Mixer#state}
      * @memberOf Mixer 
      * @param {Number} index - index of target instrument
      */
@@ -82,22 +79,22 @@ class Mixer extends Component {
         }));
     }
 
+    /**
+     * Changes instrument metronome volume via [audio.setVolume]{@link audio#setVolume}
+     * @memberOf Mixer
+     * @param e - [HTMLElement change event]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event}
+     * @param {Number} index - Index of target instrument
+     */
     handleVolume(e, index) {
         let vol = parseInt(e.target.value, 10);
         this.props.audio.setVolume(index, vol/100.0);
         this.setState(oldState => {
             let volumes = oldState.volumes;
-            let shows = oldState.shows;
-            shows[index] = true;
+            let volShows = index;
             volumes[index] = vol;
-            return ({ volumes, shows });
+            return ({ volumes, volShows });
         });
     }
-
-    handleVolHide(e) {
-        this.setState({ shows: this.props.insts.map(__ => false) });
-    }
-
 
     render() {
         let insts = this.props.insts.map((inst, i) => (
@@ -109,8 +106,9 @@ class Mixer extends Component {
                 <td>{inst.name}</td>
                 <td><MixerButton style={{color: this.state.mutes[i] ? 'red' : 'black' }} onClick={() => this.handleMute(i)}>M</MixerButton></td>
                 <td><MixerButton style={{color: this.state.solos[i] ? 'blue' : 'black' }} onClick={() => this.handleSolo(i)}>S</MixerButton></td>
-                <td><Slider type="range" min="0" max="100" value={this.state.volumes[i]} onChange={(e) => this.handleVolume(e, i)} onMouseUp={this.handleVolHide}/></td>
-                <td>{this.state.shows[i] ? this.state.volumes[i] : null}</td>
+                <td><Slider type="range" min="0" max="100" value={this.state.volumes[i]} onChange={(e) => this.handleVolume(e, i)} onMouseUp={() => this.setState({ volShows: -1 })}/></td>
+        
+                <td>{this.state.volShows === i ? this.state.volumes[i] : null}</td>
             </MixerRow>
         ));
             

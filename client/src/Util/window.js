@@ -64,12 +64,12 @@ export default (p) => {
                 p.fill(0);
 
                 p.textAlign(p.LEFT, p.TOP);
+                p.textSize(10);
                 while (loc < p.width) {
-                    p.stroke(120, 120, 120);
+                    p.stroke(120);
+                    p.fill(60);
                     loc = inc*val + bias;
                     inc += 1;
-                    p.line(loc, 10, loc, 100);
-                    p.stroke(200, 200, 200);
                     
                     if (!(text % (zoom_values[i]*5))) {
                         let abstext = Math.abs(text);
@@ -77,10 +77,13 @@ export default (p) => {
                         let sec = ('0' + Math.floor((abstext-min*60000)/1000)).slice(-2);
                         let ms = ('00' + (abstext % 1000)).slice(-3);
                         let formatter = formats[zoom_formatting[i]];
-                        p.text((text >= 0 ? '' : '-') + formatter(min, sec, ms), loc, 10);
-                    }
+                        p.text((text >= 0 ? '' : '-') + formatter(min, sec, ms), loc+3, 4);
+                        p.line(loc, 10, loc, c.PLAYBACK_HEIGHT);
+                    } else
+                        p.line(loc, 15, loc, c.PLAYBACK_HEIGHT);
                     text += zoom_values[i];
 
+                    p.stroke(200, 200, 200);
                     for (let v=1; v<5; v++) {
                         let subloc = loc + v*(val/5);
                         p.line(subloc, 20, subloc, c.PLAYBACK_HEIGHT);
