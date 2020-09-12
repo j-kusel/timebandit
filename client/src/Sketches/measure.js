@@ -715,6 +715,10 @@ export default function measure(p) {
     };
 
     p.mouseWheel = function(event) {
+        if (p.mouseX < 0 || p.mouseX > p.width ||
+            p.mouseY < 0 || p.mouseY > p.height
+        )
+            return;
         event.preventDefault();
         let zoom = p.keyIsDown(MOD);
         Window.updateView(event, { zoom });

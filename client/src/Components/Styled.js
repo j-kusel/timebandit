@@ -31,15 +31,59 @@ var transition_mixin = ['transition', '-webkit-transition', '-moz-transition', '
     .reduce((acc, t) => `${acc}${t}: ${timing} ${change};\n`, '');
     */
 
+let sliderThumb = `
+    -webkit-appearance: none;
+    border-radius: 1.3px 1.3px 0.5px 0.5px;
+    appearance: none;
+    height: 10px;
+    width: 3px;
+    cursor: pointer;
+    margin-top: -8px;
+    box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
+    background: pink;
+`;
+
+let sliderTrack = `
+    width: 100%;
+    height: 2px;
+    cursor: pointer;
+    box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
+    background: white;
+    border-radius: 1.3px;
+`;
+
 var Slider = styled.input`
     -webkit-appearance: none;
+    -moz-appearance: none;
+    -ms-appearance: none;
     appearance: none;
-    &::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        background: pink;
+    margin-left: 10px;
+    outline: none;
+    &:focus {
+        outline: none;
     }
+
+    ${['-webkit-slider-thumb', '-moz-range-thumb', '-ms-thumb']
+        .map(prefix => `&::${prefix} { ${sliderThumb} }`)}
+    ${['-webkit-slider-runnable-track', '-moz-range-track', '-ms-track']
+        .map(prefix => `&::${prefix} { ${sliderTrack} }`)}
 `;
+
+var MixerButton = styled.button`
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    background-color: transparent;
+    padding: 0px;
+    min-width: 10px;
+    width: 15px;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+    cursor: pointer;
+    &:hover {
+        border: 1px solid black;
+    }
+`
 
 var Playback = styled.button`
     width: 50px;
@@ -334,4 +378,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Slider, NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { Slider, MixerButton, NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

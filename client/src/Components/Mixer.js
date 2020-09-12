@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { FormInput, Slider } from './Styled';
 import c from '../config/CONFIG.json';
 import _ from 'lodash';
-import { TBButton } from './Styled';
+import { MixerButton, TBButton } from './Styled';
 
 /**
  * Component which connects to a bandit server, for external software/hardware integration
@@ -27,21 +27,31 @@ class Mixer extends Component {
          * @property {Boolean} showModal - Toggles modal for sending commands to server
          */
         this.state = {
-            audio: props.audio,
-            insts: props.insts,
             mutes: props.insts.map(__ => false),
             solos: props.insts.map(__ => false),
-            volumes: props.insts.map(__ => 80)
+            volumes: props.insts.map(__ => 80),
+            shows: props.insts.map(__ => false)
         }
-
         
         this.handleMute = this.handleMute.bind(this);
         this.handleSolo = this.handleSolo.bind(this);
         this.handleVolume = this.handleVolume.bind(this);
+        this.handleVolHide = this.handleVolHide.bind(this);
     }
 
-    shouldComponentUpdate(nextProps, nextState) {
-        console.log(nextState.volumes);
+    static getDerivedStateFromProps(props, state) {
+        let defaults = { mutes: false, solos: false, volumes: 80, shows: false };
+        let newState = Object.keys(defaults).reduce((acc, key) =>
+            Object.assign(acc, {[key]: props.insts.map((__, i) =>
+                (i < state[key].length) ?
+                    state[key][i] : defaults[key]
+            )}), {}
+        );
+
+        return newState;
+    }
+
+    componentWillUpdate(nextProps, nextState) {
         return true;
     }
 
@@ -51,7 +61,7 @@ class Mixer extends Component {
      * @param {Number} index - index of target instrument
      */
     handleMute(index) {
-        this.state.audio.mute(index, !this.state.mutes[index]);
+        this.props.audio.mute(index, !this.state.mutes[index]);
         this.setState(oldState => {
             let mutes = oldState.mutes;
             mutes[index] = !oldState.mutes[index];
@@ -65,7 +75,7 @@ class Mixer extends Component {
      * @param {Number} index - index of target instrument
      */
     handleSolo(index) {
-        this.state.audio.solo(index, !this.state.solos[index]);
+        this.props.audio.solo(index, !this.state.solos[index]);
         this.setState(oldState => ({
             mutes: oldState.mutes.map(__ => false),
             solos: oldState.solos.map((solo, i) => !solo && i === index)
@@ -74,32 +84,39 @@ class Mixer extends Component {
 
     handleVolume(e, index) {
         let vol = parseInt(e.target.value, 10);
-        this.state.audio.setVolume(index, vol/100.0);
+        this.props.audio.setVolume(index, vol/100.0);
         this.setState(oldState => {
             let volumes = oldState.volumes;
+            let shows = oldState.shows;
+            shows[index] = true;
             volumes[index] = vol;
-            return ({ volumes });
+            return ({ volumes, shows });
         });
     }
 
+    handleVolHide(e) {
+        this.setState({ shows: this.props.insts.map(__ => false) });
+    }
+
     render() {
-        let insts = this.state.insts.map((inst, i) => (
+        let insts = this.props.insts.map((inst, i) => (
             <tr key={i} style={{ fontSize: '8px' }}>
                 <td>{inst.name}</td>
-                <td><button style={{color: this.state.mutes[i] ? 'red' : 'black' }} onClick={() => this.handleMute(i)}>M</button></td>
-                <td><button style={{color: this.state.solos[i] ? 'blue' : 'black' }} onClick={() => this.handleSolo(i)}>S</button></td>
-                <td><Slider type="range" min="0" max="100" value={this.state.volumes[i]} onChange={(e) => this.handleVolume(e, i)}/></td>
-                <td>{this.state.volumes[i]}</td>
+                <td><MixerButton style={{color: this.state.mutes[i] ? 'red' : 'black' }} onClick={() => this.handleMute(i)}>M</MixerButton></td>
+                <td><MixerButton style={{color: this.state.solos[i] ? 'blue' : 'black' }} onClick={() => this.handleSolo(i)}>S</MixerButton></td>
+                <td><Slider type="range" min="0" max="100" value={this.state.volumes[i]} onChange={(e) => this.handleVolume(e, i)} onMouseUp={this.handleVolHide}/></td>
+                <td>{this.state.shows[i] ? this.state.volumes[i] : null}</td>
             </tr>
         ));
             
         return (
             <div style={this.props.style}>
                 <h3 style={{fontSize: '10px'}}>Hello</h3>
-                <table>
-                    {insts}
-                </table>
-           
+                <div style={{ overflow: 'scroll', height: '60px' }}>
+                    <table>
+                        {insts}
+                    </table>
+                </div>
             </div>
         );
     };

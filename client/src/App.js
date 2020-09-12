@@ -1177,7 +1177,7 @@ class App extends Component {
 
 
           {/* footer */}
-          <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px` }}>
+          <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px`, height: '100px' }}>
             <h1 className="flavor" style={{ display: 'inline-block' }}>BANDIT</h1>
             <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" alt="Github link" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
         
