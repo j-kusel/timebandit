@@ -75,7 +75,7 @@ var init = (p, hook) => {
                 new Button('X', {
                     x: () => x2() - 18, y: () => y() + 18,
                     width: 10, height: 10,
-                }, 'exit tutorial', () => this.hide()),
+                }, 'exit tutorial', () => this.parent.end()),
                 new Button('next', {
                     x: () => x2() - 18, y: () => y2() - 18,
                     width: 10, height: 10,
@@ -138,16 +138,19 @@ var init = (p, hook) => {
 
         forward() {
             this.hide();
-            if (this.next)
-                this.next.show()
-            else
+            if (this.next) {
+                this.parent._current = this.next;
+                this.next.show();
+            } else
                 this.parent.end();
         }
 
         backward() {
-            this.hide();
-            if (this.previous)
+            if (this.previous) {
+                this.hide();
+                this.parent._current = this.previous;
                 this.previous.show();
+            }
         }
 
         append(step) {
@@ -164,6 +167,7 @@ var init = (p, hook) => {
             this.steps = [];
             this._current = null;
             this.blockerSet = blockerSet;
+            this.description = '';
         }
 
         add(step) {
@@ -172,7 +176,8 @@ var init = (p, hook) => {
                 let next = this.steps[this.steps.length-1];
                 next.append(step);
                 step.preclude(next);
-            }
+            } else
+                this._current = step;
             this.steps.push(step);
             return this;
         }
@@ -185,7 +190,13 @@ var init = (p, hook) => {
         end() {
             this.blockerSet(false);
             this.steps = [];
+            this._current.hide();
             this._current = null;
+        }
+
+        describe(desc) {
+            this.description = desc;
+            return this;
         }
 
         /* DEPRECATED

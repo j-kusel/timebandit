@@ -156,7 +156,7 @@ export default (p, registration, API, Window, blockerSet) => {
     });
 
     let zoom = new Step({
-        reporter: (id) => tut.current(id),
+        reporter: (id) => tut.current = id,
         highlight: {
             x: () => c.PANES_WIDTH,
             x2: () => p.width,
@@ -376,6 +376,7 @@ export default (p, registration, API, Window, blockerSet) => {
     });
 
     tut
+        .describe(`A preliminary guide for Bandit's basic functions.`)
         .add(intro)
         .add(selectInst)
         .add(createMeasure)

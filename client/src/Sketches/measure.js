@@ -127,7 +127,6 @@ export default function measure(p) {
     var buttons = [];
     var core_buttons = [];
     var subscriber = (type, func) => {
-        console.log('subscribing');
         return (type === 'draw') ?
             subs.push(func) :
             buttons.push(func);
@@ -730,7 +729,7 @@ export default function measure(p) {
     p.mousePressed = function(e) {
         
         p.mouseDown = { x: p.mouseX, y: p.mouseY };
-        let block = tuts.mouseBlocker();
+        let block = tuts._mouseBlocker();
         if (block)
             return;
         Mouse.updatePress(buttons);

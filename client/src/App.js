@@ -103,7 +103,7 @@ class App extends Component {
           mode: 0,
           newInst: false,
           PPQ: CONFIG.PPQ_default,
-          tutorial_triggers: {},
+          tutorials: {},
           mouseBlocker: () => false
       };
 
@@ -198,7 +198,7 @@ class App extends Component {
       this.upload = this.upload.bind(this);
       this.reset = this.reset.bind(this);
       this.settings = this.settings.bind(this);
-      this.tutorials = this.tutorials.bind(this);
+      this.toggleTutorials = this.toggleTutorials.bind(this);
       this.handleNew = this.handleNew.bind(this);
       this.handleOpen = this.handleOpen.bind(this);
       this.confirmEdit = this.confirmEdit.bind(this);
@@ -229,12 +229,12 @@ class App extends Component {
       };
 
       var registerTuts = (obj) => {
-          let tutorial_triggers = {}
+          let tutorials = {}
           Object.keys(obj).forEach(tut => 
-              (tut !== 'mouseBlocker') ?
-                  tutorial_triggers[tut] = obj[tut] : null
+              (tut.indexOf('_') !== 0) ?
+                  tutorials[tut] = obj[tut] : null
           );
-          this.setState({ mouseBlocker: obj.mouseBlocker, tutorial_triggers });
+          this.setState({ mouseBlocker: obj._mouseBlocker, tutorials });
       }
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
@@ -892,7 +892,9 @@ class App extends Component {
       this.setState(oldState => ({ settingsOpen: !oldState.settingsOpen }));
   }
 
-  tutorials(open) {
+  toggleTutorials(open) {
+      console.log('toggling');
+      console.log(open);
       if (open && this.state.mouseBlocker())
           return;
       this.setState(oldState => 
@@ -905,13 +907,16 @@ class App extends Component {
 
 
   handleTut(tut) {
-     if (this.state.mouseBlocker())
-          return;
-     if (this.state.tutorial_triggers[tut]) {
-          this.state.tutorial_triggers[tut].begin();
-          this.tutorials(false);
+      console.log('is this getting blocked');
+      if (this.state.mouseBlocker())
+           return;
+      console.log(this.state.tutorials[tut]);
+    
+      if (this.state.tutorials[tut]) {
+           this.state.tutorials[tut].begin();
+           this.toggleTutorials(false);
       } else
-          alert("Not available in this version!");
+           alert("Not available in this version!");
   }
 
   load(e) {
@@ -993,7 +998,6 @@ class App extends Component {
           this.state.instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {})
       )
     };
-
 
     var newInstruments = this.state.instruments.map((inst) => ({ 
         measures: Object.assign({}, inst.measures), 
@@ -1195,7 +1199,7 @@ class App extends Component {
         
             <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
             <div style={{ position: 'relative', float: 'right', top: '32px' }}>
-                <Upload onClick={this.tutorials}>tutorials</Upload>
+                <Upload onClick={(e) => this.toggleTutorials()}>tutorials</Upload>
                 <Upload onClick={this.settings}>settings</Upload>
                 <Upload onClick={this.reset}>new</Upload>
                 <Upload onClick={this.upload}>open</Upload>
@@ -1243,7 +1247,7 @@ class App extends Component {
         />
         <TutorialsModal
             show={this.state.tutorialsOpen}
-            onHideCallback={this.tutorials}
+            onHideCallback={this.toggleTutorials}
             beginTut={this.handleTut}
         />
         <WelcomeModal

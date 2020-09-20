@@ -92,7 +92,7 @@ export default (p) => {
                 return true;
             });
             p.stroke(255, 0, 0);
-            p.line(this.viewport, 0, this.viewport, 200);
+            p.line(this.viewport, 0, this.viewport, c.PLAYBACK_HEIGHT);
             let gradient_width = 50;
             p.pop();
             while (gradient_width--) {

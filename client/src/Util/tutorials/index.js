@@ -11,7 +11,7 @@ export default (p, registration, API, Window) => {
      * @returns {Boolean}
      * @public
      */
-    var mouseBlocker = () => {
+    var _mouseBlocker = () => {
         if (typeof(blocker) === 'boolean')
             return blocker;
         if (blocker &&
@@ -27,6 +27,6 @@ export default (p, registration, API, Window) => {
 
     return ({ 
         quickstart: quickstart(p, registration, API, Window, blockerSet),
-        mouseBlocker
+        _mouseBlocker
     });
 }
