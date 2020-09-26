@@ -228,6 +228,9 @@ class App extends Component {
             return self.state.isPlaying;
       };
 
+      var modalCheck = () => 
+          ['warningNew', 'warningOpen', 'settingsOpen', 'tutorialsOpen'].some(o => this.state[o]);
+
       var registerTuts = (obj) => {
           let tutorials = {}
           Object.keys(obj).forEach(tut => 
@@ -425,7 +428,7 @@ class App extends Component {
           return measure;
       };
 
-      return { registerTuts, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -690,8 +693,7 @@ class App extends Component {
           let rest = `T${this.state.PPQ - 1}`;
 
           let beats = [];
-          let tempi = order_by_key(inst.measures, 'offset').reduce((acc, key, ind) => {
-              let meas = inst.measures[key];
+          let tempi = order_by_key(inst.measures, 'offset').reduce((acc, meas, ind) => {
               // push empty message if within delta threshold
               let delta = this.state.PPQ - 1;
               if (last) {

@@ -617,6 +617,8 @@ export default function measure(p) {
     }
 
     p.keyPressed = function(e) {
+        if (API.modalCheck())
+            return;
         if (API.disableKeys())
             return;
         if (!API.checkFocus() && Keyboard.checkNumPress())
@@ -714,6 +716,8 @@ export default function measure(p) {
     };
 
     p.mouseWheel = function(event) {
+        if (API.modalCheck())
+            return;
         if (p.mouseX < 0 || p.mouseX > p.width ||
             p.mouseY < 0 || p.mouseY > p.height
         )
@@ -727,7 +731,8 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
-        
+        if (API.modalCheck())
+            return;
         p.mouseDown = { x: p.mouseX, y: p.mouseY };
         let block = tuts._mouseBlocker();
         if (block)
