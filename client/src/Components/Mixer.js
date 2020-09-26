@@ -1,9 +1,7 @@
 import React, { Component } from 'react';
 import styled from 'styled-components';
 import { FormInput, Slider } from './Styled';
-import c from '../config/CONFIG.json';
-import _ from 'lodash';
-import { MixerRow, MixerArrow, MixerButton, TBButton } from './Styled';
+import { MixerRow, MixerArrow, MixerButton } from './Styled';
 
 /**
  * Component which connects to a bandit server, for external software/hardware integration

@@ -376,7 +376,7 @@ export default (p, registration, API, Window, blockerSet) => {
     });
 
     tut
-        .describe(`A preliminary guide for Bandit's basic functions.`)
+        .describe(`A preliminary guide to Bandit's basic functions.`)
         .add(intro)
         .add(selectInst)
         .add(createMeasure)

@@ -1,20 +1,10 @@
 import React, { Component } from 'react';
-import styled from 'styled-components';
-import { FormInput } from './Styled';
-import P5Wrapper from 'react-p5-wrapper';
-import measure from '../Sketches/measure';
-import c from '../config/CONFIG.json';
 import _ from 'lodash';
+import { Container, Col, Row } from 'react-bootstrap';
+import { FormInput, FormLabel } from './Styled';
 import socketIOClient from 'socket.io-client';
 import { ServerModal } from './Modals';
 import { TBButton } from './Styled';
-
-var P5Container = styled.div`
-    div {
-        padding-left: ${c.CANVAS_PADDING}px;
-        z-index: -100;
-    }
-`;
 
 var socket = null;
 
@@ -190,19 +180,26 @@ class Server extends Component {
                     onHide={() => this.handleCommand(null, false, true)}
                 >
                     <form onSubmit={(e) => this.handleCommand(e, true)} autoComplete="off">
-                      <FormInput
-                        type="text"
-                        key="sustain"
-                        value={(this.state.commandQueue.sustain === '') ? '' :
-                            (this.state.commandQueue.sustain || this.state.sustain)
-                        }
-                        id="sustain"
-                        name="sustain"
-                        onChange={this.handleSustain}
-                      />
-                        <hr/>
-                        <button type="submit" disabled={socket.disconnected}>Transfer</button>
-                        <button type="button" onClick={() => this.handleCommand(null, false, true)}>Cancel</button>
+                      <Container>
+                        <Row>
+                            <Col xl={6}><FormLabel>sustain (ms)</FormLabel></Col>
+                            <Col xl={6}>
+                               <FormInput
+                                type="text"
+                                key="sustain"
+                                value={(this.state.commandQueue.sustain === '') ? '' :
+                                    (this.state.commandQueue.sustain || this.state.sustain)
+                                }
+                                id="sustain"
+                                name="sustain"
+                                onChange={this.handleSustain}
+                              />
+                            </Col>
+                        </Row>
+                      </Container>
+                      <hr/>
+                      <button type="submit" disabled={socket.disconnected}>Transfer</button>
+                      <button type="button" onClick={() => this.handleCommand(null, false, true)}>Cancel</button>
                     </form>
                        
                     

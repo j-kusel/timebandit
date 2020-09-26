@@ -286,6 +286,14 @@ const StyledLink = styled(Link)`
     font-weight: bold;
 `;
 
+const FormLabel = styled.label`
+    color: black;
+    ${form_mixin}
+    font-size: 0.75em;
+    font-weight: bold;
+    width: 100px;
+`;
+
 const FormInput = styled.input`
     ${form_mixin}
     padding: 2px 4px;
@@ -343,7 +351,7 @@ var Lock = styled.button`
 `;
 
 
-var TBddtoggle = styled.div`
+var TBddtoggle = styled(Dropdown.Toggle)`
     height: 40px;
     &.dropdown-toggle {
         ${button_mixin}
@@ -353,25 +361,21 @@ var TBddtoggle = styled.div`
         ${button_mixin}
         color: ${primary};
         background-color: ${secondary};
-        ${transitions('none')}
     };
 
     &.btn.btn-primary.dropdown-toggle:focus {
         ${button_mixin}
         color: ${secondary};
         background-color: ${primary};
-        ${transitions('none')}
     };
 
     &.btn.btn-primary.dropdown-toggle:hover {
-        ${transitions('none')}
     };
 
     &.btn.btn-primary.dropdown-toggle:active {
         ${button_mixin}
         color: ${secondary};
         background-color: ${primary};
-        ${transitions('none')}
     };
 `;
 
@@ -382,7 +386,8 @@ var TBDropdown = styled(props => (
         {props.toggle}  
       </TBddtoggle>
       <Dropdown.Menu>
-        { props.menuItems.map(drop => (<Dropdown.Item key={drop.eventKey} eventKey={drop.eventKey}>{drop.text}</Dropdown.Item>)) }
+        {/* props.menuItems.map(drop => (<Dropdown.Item key={drop.eventKey} eventKey={drop.eventKey}>{drop.text}</Dropdown.Item>))*/ }
+        <Dropdown.Item>hello</Dropdown.Item>
       </Dropdown.Menu>
     </Dropdown>
 ))`
@@ -402,4 +407,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Slider, MixerButton, MixerArrow, MixerRow, NewInst, Link, StyledLink, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { Slider, MixerButton, MixerArrow, MixerRow, NewInst, Link, StyledLink, FormInput, FormLabel, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

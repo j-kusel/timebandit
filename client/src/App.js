@@ -1218,7 +1218,7 @@ class App extends Component {
         <WarningModal
           show={this.state.warningNew}
           onHide={() => this.setState({ warningNew: false })}
-          body={<p>Close without saving?</p>}
+          header={"Close without saving?"}
           buttons={[
               { onClick: this.save, text: 'save' },
               { onClick: this.handleNew, text: 'new file' }
@@ -1227,7 +1227,7 @@ class App extends Component {
         <WarningModal
           show={this.state.warningOpen}
           onHide={() => this.setState({ warningOpen: false })}
-          body={<p>Close without saving?</p>}
+          header={"Close without saving?"}
           buttons={[
               { onClick: this.open, text: 'save' },
               { onClick: this.handleOpen, text: 'open file...' }
@@ -1248,6 +1248,7 @@ class App extends Component {
         <TutorialsModal
             show={this.state.tutorialsOpen}
             onHideCallback={this.toggleTutorials}
+            tuts={this.state.tutorials}
             beginTut={this.handleTut}
         />
         <WelcomeModal

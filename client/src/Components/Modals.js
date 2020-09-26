@@ -1,71 +1,94 @@
 import React from 'react';
 import { Container, Row, Col, Modal } from 'react-bootstrap';
-import { TBButton, TBDropdown } from './Styled';
+import { FormLabel, TBButton, TBDropdown } from './Styled';
 import styled from 'styled-components';
-import { PPQ_OPTIONS } from '../config/CONFIG.json';
+import { primary, secondary, PPQ_OPTIONS } from '../config/CONFIG.json';
 
-var ModalBody = styled(Modal.Body)`
-    border: none;
-    color: red;
+var StyledModal = styled(Modal)`
+    .modal-content {
+        border: none;
+        border-radius: 0em;
+    }
 `;
 
-var ModalButton = props => (
-    <TBButton onClick={props.onClick}>{props.children}</TBButton>
-);
+var ModalHeader = styled(Modal.Header)`
+    color: ${secondary}
+    background-color: ${primary}
+    border-radius: 0px;;
+    font-size: 8pt;
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    padding: 2px 10px;
+    padding-right: 4px;
+    .close, span {
+        font-size: 8pt;
+        text-shadow: none;
+        color: ${secondary};
+    }
+`
+    
+var ModalBody = styled(Modal.Body)`
+    border: none;
+    background-color: ${secondary};
+    padding: 4px 10px;
+`;
+
+var ModalButton = styled(TBButton)`
+    padding: 2px 6px;
+    margin: 0px 6px;
+`;
 
 var ServerModal = (props) => (
-    <Modal 
+    <StyledModal 
       show={ props.show }
       size="md"
       onHide={ props.onHide }
       centered
     >
-      <Modal.Header closeButton>
-        Hardware settings
-      </Modal.Header>
+      <ModalHeader closeButton>
+        - HARDWARE SETTINGS
+      </ModalHeader>
       <Modal.Dialog 
-        style={{ height: '100px' }}
+        style={{ height: '100px', width: '300px' }}
         centered
       >
         <ModalBody>
             {props.children}
         </ModalBody>
       </Modal.Dialog>
-    </Modal>
+    </StyledModal>
 );
 
 
 var WarningModal = (props) => (
-    <Modal 
+    <StyledModal 
       show={ props.show }
       size="sm"
       onHide={ props.onHide }
       centered
     >
-      <Modal.Header closeButton>
-          { props.body }
-      </Modal.Header>
-      <Modal.Dialog 
-        style={{ height: '100px' }}
-        centered
-      >
-        <ModalBody>
-          { props.buttons.map((b, i) => (<ModalButton key={i} onClick={b.onClick}>{b.text}</ModalButton>)) }
-        </ModalBody>
-      </Modal.Dialog>
-    </Modal>
+      <ModalHeader closeButton>
+          { props.header }
+      </ModalHeader>
+      <ModalBody>
+        <Container>
+          <Row>
+            { props.buttons.map((b, i) => (<Col className="text-center"><ModalButton key={i} onClick={b.onClick}>{b.text}</ModalButton></Col>)) }
+          </Row>
+        </Container>
+      </ModalBody>
+    </StyledModal>
 ); // unmounting bootstrap modals mean we can't use styled-components
 
 var WelcomeModal = (props) => 
-    (<Modal 
+    (<StyledModal 
       show={ props.show }
       size="md"
       onHide={ props.onHide }
       centered
     >
-      <Modal.Header closeButton>
+      <ModalHeader closeButton>
         <h3>Welcome to Bandit</h3>
-      </Modal.Header>
+      </ModalHeader>
       <Modal.Dialog 
         style={{ height: '100px' }}
         centered
@@ -74,42 +97,42 @@ var WelcomeModal = (props) =>
             <p style={{color: 'black'}}>Bandit is a software/hardware ecosystem for managing complex time in music and sound design. If this is your first time, consider trying a brief tutorial on basic functions available <a style={{color: 'red'}} onClick={props.quickstart}>here</a>. This and other tutorials can be launched from the menu at the bottom of the screen.</p>
         </ModalBody>
       </Modal.Dialog>
-    </Modal>);
+    </StyledModal>);
 
 
 
 var TutorialsModal = (props) => {
 
-    let tuts = [
-        'quickstart',
-        'other',
-    ].map((t, i) => (
-        <ModalButton
-            key={i}
-            onClick={() => props.beginTut(t)}
-        >{t}</ModalButton>
+    let tuts = Object.keys(props.tuts).map((t, i) => (
+        <Row key={i}>
+            <Col xl={4}>
+                <ModalButton
+                    onClick={() => props.beginTut(t)}
+                >{t}</ModalButton>
+            </Col>
+            <Col xl={8}>
+                <p>{props.tuts[t].description}</p>
+            </Col>
+        </Row>
     ));
             
     return (
-        <Modal
+        <StyledModal
           show={ props.show }
           size="md"
           style={{ width: '100%' }}
           onHide={ props.onHideCallback }
           centered
         >
-          <Modal.Header closeButton>
-            Tutorials
-          </Modal.Header>
-          <Modal.Dialog 
-            style={{ height: '100px' }}
-            centered
-          >
-            <ModalBody>
-                {tuts}    
-            </ModalBody>
-          </Modal.Dialog>
-        </Modal>
+          <ModalHeader className="modalHeader" closeButton>
+            - TUTORIALS
+          </ModalHeader>
+          <ModalBody>
+              <Container>
+                  {tuts}    
+              </Container>
+          </ModalBody>
+        </StyledModal>
     );
 };
 
@@ -140,31 +163,25 @@ var SettingsModal = (props) => {
     ].map((setting, ind) => (
         <div key={ind}>
             <Row>
-                <Col xs={4}><span>{setting.name}</span></Col>
+                <Col xs={4}><FormLabel>{setting.name}</FormLabel></Col>
                 <Col xs={8}>{setting.body}</Col>
             </Row>
         </div>
     ));
     return (
-        <Modal 
+        <StyledModal 
           show={ props.show }
-          size="lg"
-          style={{ width: '100%' }}
+          size="sm"
           onHide={ props.onHideCallback }
           centered
         >
-          <Modal.Header closeButton>
+          <ModalHeader closeButton>
             Preferences
-          </Modal.Header>
-          <Modal.Dialog 
-            style={{ height: '100px' }}
-            centered
-          >
-            <ModalBody>
-              <Container>{ settings }</Container>
-            </ModalBody>
-          </Modal.Dialog>
-        </Modal>
+          </ModalHeader>
+          <ModalBody>
+            <Container style={{ width: '300px' }}>{ settings }</Container>
+          </ModalBody>
+        </StyledModal>
     );
 };
 
