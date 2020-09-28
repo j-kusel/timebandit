@@ -6,6 +6,7 @@ export default (p) => {
         constructor() {
             this.scale = 1.0;
             this.viewport = 0;
+            this.scroll = 0;
             this.span = [Infinity, -Infinity];
 
             // modes: ESC, INS, EDITOR
@@ -21,6 +22,7 @@ export default (p) => {
             this.insertMeas = {};
             this.editMeas = {};
 
+            this.updateViewCallback = () => null;
         }
 
         initialize_temp() {
@@ -34,6 +36,10 @@ export default (p) => {
             };
         }
 
+        setUpdateViewCallback(cb) {
+            this.updateViewCallback = cb;
+        }
+
         updateView(event, { zoom }) {
             if (zoom) {
                 let change = 1.0-event.delta/c.SCROLL_SENSITIVITY;
@@ -41,9 +47,28 @@ export default (p) => {
                 this.viewport = p.mouseX - change*(p.mouseX - this.viewport);
             };
             this.viewport -= event.deltaX;
+
+            let frame_height = (p.height - c.PLAYBACK_HEIGHT - c.TRACKING_HEIGHT);
+            if (frame_height > this.insts*c.INST_HEIGHT) {
+                this.scroll = 0;
+                return;
+            } else {
+                this.scroll += event.deltaY;
+                if (this.scroll < 0)
+                    this.scroll = 0;
+                if (this.scroll > this.insts*c.INST_HEIGHT - frame_height + 28 + (this.panels ? c.INST_HEIGHT : 0))
+                    this.scroll = this.insts*c.INST_HEIGHT - frame_height + 28 + (this.panels ? c.INST_HEIGHT : 0);
+            }
+
+            this.updateViewCallback(this.viewport, this.scale, this.scroll);
         }
 
         drawPlayback() {
+            // DRAW TOP BAR
+            p.stroke(secondary);
+            p.fill(secondary);
+            p.rect(0, 0, p.width, c.PLAYBACK_HEIGHT);
+
             p.push();
             p.translate(c.PANES_WIDTH, 0);
             let zoom_thresholds = [0.0025, 0.01, 0.03, 0.1, 0.5, 1.0, 2.0];
@@ -91,6 +116,8 @@ export default (p) => {
                 }
                 return true;
             });
+
+            p.line(0, c.PLAYBACK_HEIGHT, p.width, c.PLAYBACK_HEIGHT);
             p.stroke(255, 0, 0);
             p.line(this.viewport, 0, this.viewport, c.PLAYBACK_HEIGHT);
             let gradient_width = 50;
@@ -104,18 +131,41 @@ export default (p) => {
                 p.line(gradient_width, 0, gradient_width, c.PLAYBACK_HEIGHT);
                 p.line(p.width - gradient_width, 0, p.width - gradient_width, c.PLAYBACK_HEIGHT);
             }
+            // DROP SHADOW
+            p.rect(c.PANES_WIDTH, c.PLAYBACK_HEIGHT + 1, p.width, 1);
+            let shadow_start = p.color(0);
+            let shadow_end = p.color(20);
+            shadow_start.setAlpha(200);
+            shadow_end.setAlpha(0);
+            let depth = 5;
+            while (depth--) {
+                let s = p.lerpColor(shadow_start, shadow_end, depth/5);
+                p.stroke(s);
+                p.fill(s);
+                p.line(c.PANES_WIDTH, c.PLAYBACK_HEIGHT + depth + 1, p.width, c.PLAYBACK_HEIGHT + depth + 1);
+            }
         }
 
         drawTimesig(numerator, denominator) {
             let denom = typeof denominator === 'string' ?
                 denominator : parseInt(denominator, 10);
             p.push();
-            p.translate(c.TIMESIG_PADDING, c.TIMESIG_PADDING);
             p.fill(100);
-            p.textSize(c.INST_HEIGHT*0.25);
-            p.textLeading(c.INST_HEIGHT*0.20);
-            p.textAlign(p.LEFT, p.CENTER);
-            p.text([numerator, denom].join('\n'), 0, c.INST_HEIGHT/2);
+            if (this.scale > 0.03) {
+                p.translate(c.TIMESIG_PADDING, c.TIMESIG_PADDING);
+                p.textSize(c.INST_HEIGHT*0.25);
+                p.textLeading(c.INST_HEIGHT*0.20);
+                p.textAlign(p.LEFT, p.CENTER);
+                p.text([numerator, denom].join('\n'), 0, c.INST_HEIGHT/2);
+            } else {
+                p.translate(c.TIMESIG_PADDING/2, c.TIMESIG_PADDING/2);
+                p.textSize(c.INST_HEIGHT*0.1);
+                p.textAlign(p.LEFT, p.TOP);
+                if (this.scale > 0.02)
+                    p.text([numerator, denom].join('/'), 0, 0)
+                else 
+                    p.text(numerator, 0, 0);
+            }
             p.pop();
         }
 
@@ -142,11 +192,7 @@ export default (p) => {
             p.fill(secondary_light);
             p.rect(0, 0, p.width, p.height);
            
-            // DRAW TOP BAR
-            p.stroke(secondary);
-            p.fill(secondary);
-            p.rect(0, 0, p.width, c.PLAYBACK_HEIGHT);
-
+        
             // DRAW BOTTOM BAR
             p.stroke(secondary);
             p.fill(secondary);
@@ -172,7 +218,7 @@ export default (p) => {
             p.fill(secondary);
             p.textAlign(p.LEFT, p.TOP);
             p.textSize(10);
-            p.text(isPlaying ? `LOCATION: ${locator}` : `CURSOR: ${cursor_loc}`,
+            p.text(isPlaying ? `LOCATION: ${Math.round(locator)}` : `CURSOR: ${cursor_loc}`,
                 c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
             // right
             p.textAlign(p.RIGHT, p.TOP);
@@ -314,7 +360,7 @@ export default (p) => {
             p.pop();
         }
     };
-    return new _Window()
+    return new _Window();
 
 }
 

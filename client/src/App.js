@@ -12,14 +12,17 @@ import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
 import { MeasureCalc, order_by_key } from './Util/index';
 import ordered from './Util/ordered';
 import logger from './Util/logger';
+import { Parser } from './Util/parser';
 import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
-import { NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
+import { InputGroup, FormControl } from 'react-bootstrap';
+import { InstInput, InstButton, ArrowButton, NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
 //import { Log, Metadata, Rehearsal } from './Components/Styled';
 import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
+import debug from './Util/debug.json';
 
 const DEBUG = process.env.NODE_ENV === 'development';
 var counter = 0;
@@ -59,6 +62,11 @@ var calcRange = (measures) => {
     return chrono;
 };*/
 
+if (process.env.NODE_ENV !== 'development')
+    window.onbeforeunload = (e) => {
+        e.preventDefault();
+        return 'Are you sure? Any unsaved work will be lost.';
+    }
 
 
 /**
@@ -71,6 +79,7 @@ class App extends Component {
       super(props, context);
 
       this.state = {
+          filename: 'untitled',
           instruments: [/*{
               name: 'default',
               measures: {}
@@ -104,6 +113,7 @@ class App extends Component {
           newInst: false,
           PPQ: CONFIG.PPQ_default,
           tutorials: {},
+          scrollY: 0,
           mouseBlocker: () => false
       };
 
@@ -124,54 +134,10 @@ class App extends Component {
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
 
       let ids = [uuidv4(), uuidv4(), uuidv4(), uuidv4(), uuidv4()];
-      this.state.instruments.push(DEBUG ?
-          {
-              name: 'default',
-              measures: {
-                  [ids[0]]: { ...MeasureCalc({ 
-                      start: 60,
-                      end: 120,
-                      timesig: 5,
-                      offset: 12000
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[0], inst: this.state.instruments.length },
+      let parser = new Parser(this.state.PPQ, this.state.PPQ_tempo);
 
-                  [ids[1]]: { ...MeasureCalc({ 
-                      start: 60,
-                      end: 120,
-                      timesig: 6,
-                      offset: 500
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[1], inst: this.state.instruments.length },
-                  [ids[2]]: { ...MeasureCalc({ 
-                      start: 60,
-                      end: 120,
-                      timesig: 5,
-                      offset: 4722
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[2], inst: this.state.instruments.length },
-              }
-          } :
-          { name: 'default', measures: {} });
-          
-      if (DEBUG)
-          this.state.instruments.push({
-              name: 'asdf',
-              measures: {
-                  [ids[3]]: { ...MeasureCalc({ 
-                      start: 60,
-                      end: 120,
-                      timesig: 5,
-                      offset: 12000
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[3], inst: this.state.instruments.length },
-
-                  /*[ids[4]]: { ...MeasureCalc({ 
-                      start: 144,
-                      end: 72,
-                      timesig: 7,
-                      offset: 300
-                  }, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }), id: ids[4] },
-                  */
-              }
-          });
-
+      // load DEBUG script
+      this.state.instruments = DEBUG ? parser.parse(debug) : [{ name: 'default', measures: {} }];
       
       this.sizing = 600.0;
       this.location = 0.0;
@@ -205,7 +171,7 @@ class App extends Component {
       this.inputs = {};
 
 
-      this.API = this.initAPI()
+      this.API = this.initAPI();
 
   }
 
@@ -397,7 +363,7 @@ class App extends Component {
           return this.state.cursor;
       };
 
-      var reportWindow = (viewport, scale) => this.setState({ viewport, scale });
+      var reportWindow = (viewport, scale, scrollY) => this.setState({ viewport, scale, scrollY });
 
       var disableKeys = () => this.state.keysDisabled;
 
@@ -444,7 +410,7 @@ class App extends Component {
   instClose(e) {
       if (this.state.mouseBlocker())
           return;
-      this.setState({ newInst: false });
+      this.setState({ newInst: false, instName: '' });
   };
 
   handleInst(e) {
@@ -464,6 +430,7 @@ class App extends Component {
               oldState.instruments.length :
               selected;
           oldState.instruments.splice(loc + 1, 0, newInst);
+          oldState.instName = '';
           oldState.newInst = false;
           logger.log(`Adding new instrument in slot ${loc}.`);
           return oldState;
@@ -842,7 +809,7 @@ class App extends Component {
       
       var downloadLink = document.createElement('a');
       downloadLink.href = encodeURI(`data:text/csv;utf-8,`.concat(rows.join('\n')));
-      downloadLink.download = 'filename.csv';
+      downloadLink.download = this.state.filename + '.csv';
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
@@ -1061,16 +1028,21 @@ class App extends Component {
 
 
     let newPane = <form onSubmit={this.handleInst} className="inst-form" autoComplete="off">
-        <FormInput
+          {/*
+        */}
+        <InstInput>
+          <FormInput
             ref={this.instNameFocus}
             type="text"
             name="instName"
             value={this.state.instName}
             placeholder="NAME"
             onChange={this.handleNameInput}
-        ></FormInput>
-
-        <button type="submit" disabled={!this.state.instName}>&#x219D;</button>
+          />
+          <InputGroup.Append>
+            <ArrowButton type="submit" disabled={!this.state.instName}>&#x25BA;</ArrowButton>
+          </InputGroup.Append>
+        </InstInput>
     </form>
 
     let panes = this.state.instruments.map((inst, ind) => {
@@ -1113,6 +1085,8 @@ class App extends Component {
 
     if (!window.localStorage.getItem('returning'))
         welcome = true;
+    let newInstHeight = this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT - this.state.scrollY;
+      console.log(newInstHeight);
 
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
@@ -1122,11 +1096,12 @@ class App extends Component {
           {/* left midi controls */}
           <Panel>
               {/*panes*/}
-              <NewInst x={addPad} y={this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT} style={{ width: 'initial' }}>
+              {(newInstHeight < window.innerHeight - CONFIG.FOOTER_HEIGHT - CONFIG.TRACKING_HEIGHT*2) && <NewInst x={addPad} y={this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT - this.state.scrollY} style={{ width: 'initial' }}>
 
-              <button className={this.state.newInst ? "opened" : "closed"} onClick={(e) => this.state.newInst ? this.instClose(e) : this.instOpen(e) }>+</button>
+                <InstButton className={this.state.newInst ? "opened" : "closed"} onClick={(e) => this.state.newInst ? this.instClose(e) : this.instOpen(e) }>+</InstButton>
               {this.state.newInst && newPane}
               </NewInst>
+        }
           </Panel>
           
           { (this.state.mode === 2 && this.state.selected.meas) ?
@@ -1200,6 +1175,7 @@ class App extends Component {
             <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" alt="Github link" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
         
             <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
+        {/*<span style={{ position: 'relative', float: 'right' }}>{this.state.filename}</span>*/}
             <div style={{ position: 'relative', float: 'right', top: '32px' }}>
                 <Upload onClick={(e) => this.toggleTutorials()}>tutorials</Upload>
                 <Upload onClick={this.settings}>settings</Upload>
@@ -1231,7 +1207,7 @@ class App extends Component {
           onHide={() => this.setState({ warningOpen: false })}
           header={"Close without saving?"}
           buttons={[
-              { onClick: this.open, text: 'save' },
+              { onClick: this.save, text: 'save' },
               { onClick: this.handleOpen, text: 'open file...' }
           ]}
 

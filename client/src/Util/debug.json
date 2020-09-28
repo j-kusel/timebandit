@@ -1,0 +1,42 @@
+[
+    {
+      "name": "default",
+      "measures": [
+          {  
+              "start": 60,
+              "end": 120,
+              "timesig": 5,
+              "offset": 12000
+          }, 
+          { 
+              "start": 60,
+              "end": 120,
+              "timesig": 6,
+              "offset": 500
+          }, 
+          { 
+              "start": 60,
+              "end": 120,
+              "timesig": 5,
+              "offset": 4722
+          }
+      ]
+    },
+    {
+        "name": "asdf",
+        "measures": [
+            {
+              "start": 60,
+              "end": 120,
+              "timesig": 5,
+              "offset": 12000
+            },
+            {
+              "start": 60,
+              "end": 120,
+              "timesig": 5,
+              "offset": 300 
+            }
+        ]
+    }
+]

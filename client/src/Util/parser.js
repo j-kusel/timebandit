@@ -14,16 +14,7 @@ import { MeasureCalc } from './index';
 
 var p;
 
-/**
- * A class for printing debugging text to the P5js Canvas
- */
 export class Debugger {
-    /**
-     * Spawns a block of text for monitoring standard and custom variables during debugging
-     * @param {Object} p - P5js object
-     * @param {Window} - Instance of the {@link Window} class
-     * @param {Mouse} - Instance of the {@link Mouse} class
-     */
     constructor(processing, Window, Mouse) {
         p = processing;
         /** @private */
@@ -71,13 +62,6 @@ export class Debugger {
             this.lines.push(line);
     }
 
-    /**
-     * Write all lines to the P5js Canvas
-     * @param {Object} coords - Coordinate information for the text block
-     * @param {number} coords.x - x coordinate relative to Canvas translation
-     * @param {number} coords.y - y coordinate relative to Canvas translation
-     * @param {number} fontSize - Size of font in points
-     */
     write(coords, fontSize) {
         let font = fontSize || c.FONT_DEFAULT_SIZE;
         let lineY = (y) => font*y + coords.y;
@@ -130,3 +114,37 @@ export class Debugger {
     }
 };
 
+/**
+ * A class for parsing debugging text to the P5js Canvas
+ */
+export class Parser {
+    /**
+     * Spawns a block of text for monitoring standard and custom variables during debugging
+     * @param {PPQ} - Parts Per Quaver used by the App
+     * @param {PPQ_tempo} - Tempo Parts Per Quaver used by the App
+     */
+    constructor(PPQ, PPQ_tempo) {
+        this.PPQs = { PPQ, PPQ_tempo };
+    }
+
+    /**
+     * Parse an input JSON file into instruments and measures 
+     * @param {Object} input - JSON object containing score information
+     * @returns {Array} Array of instruments
+     */
+    parse(input) {
+        // add meta section for manually overriding PPQ etc.
+        return input.map((inst, ind) => {
+            let measures = inst.measures.reduce((acc, meas) => {
+                let id = uuidv4();
+                return Object.assign(acc, {
+                    [id]: {
+                        ...MeasureCalc(meas, this.PPQs),
+                        id, inst: ind
+                    }
+                });
+            }, {});
+            return ({ name: inst.name, measures });
+        });
+    }
+}

@@ -15,7 +15,6 @@ export default (p) => {
             if (numpress >= 0) {
                 this.held_nums.push(numpress);
                 this.num_counter++;
-                console.log(this.held_nums, this.num_counter);
                 return true;
             }
             return false;

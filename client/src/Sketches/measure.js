@@ -142,6 +142,8 @@ export default function measure(p) {
 
     p.windowResized = function () {
         p.resizeCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
+        // override Y scroll
+        Window.updateView({ deltaX: 0, deltaY: 0 }, {});
     }
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
@@ -153,6 +155,7 @@ export default function measure(p) {
         Window.mode = props.mode;
         Window.insts = props.instruments.length;
         Object.assign(API, props.API);
+        Window.setUpdateViewCallback(API.reportWindow);
 
         // THIS SHOULD BE MOVED INTO APP.JS WITH DEPENDENCIES
         // PASSED IN THE OTHER DIRECTION!
@@ -259,7 +262,6 @@ export default function measure(p) {
             Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
 
         Window.drawFrame();
-        Window.drawPlayback();
 
         // push below playback bar
         p.push();
@@ -275,7 +277,7 @@ export default function measure(p) {
         // update Mouse location
         let new_rollover = {};
         instruments.forEach((inst, i_ind) => {
-            var yloc = i_ind*c.INST_HEIGHT;
+            var yloc = i_ind*c.INST_HEIGHT - Window.scroll;
 
             p.push();
             p.translate(0, yloc);
@@ -412,6 +414,7 @@ export default function measure(p) {
                 // draw tempo markings
                 p.fill(100);
                 p.textSize(c.TEMPO_PT);
+                let sigfig = Window.scale > 0.05 ? 2 : 0;
                 let tempo_loc = { x: position(0) + c.TEMPO_PADDING };
                 if (ystart > c.TEMPO_PT + c.TEMPO_PADDING) {
                     p.textAlign(p.LEFT, p.BOTTOM);
@@ -420,7 +423,7 @@ export default function measure(p) {
                     p.textAlign(p.LEFT, p.TOP);
                     tempo_loc.y = ystart + c.TEMPO_PADDING;
                 };
-                p.text(start.toFixed(2), c.TEMPO_PADDING, tempo_loc.y);
+                p.text(start.toFixed(sigfig), c.TEMPO_PADDING, tempo_loc.y);
 
                 tempo_loc = { x: position(ms) - c.TEMPO_PADDING };
                 if (yend > c.TEMPO_PT + c.TEMPO_PADDING) {
@@ -430,7 +433,7 @@ export default function measure(p) {
                     p.textAlign(p.RIGHT, p.TOP);
                     tempo_loc.y = yend + c.TEMPO_PADDING;
                 };
-                p.text(end.toFixed(2), ms*Window.scale - c.TEMPO_PADDING, tempo_loc.y);
+                p.text(end.toFixed(sigfig), ms*Window.scale - c.TEMPO_PADDING, tempo_loc.y);
 
                 // return from measure translate
                 p.pop();
@@ -460,7 +463,7 @@ export default function measure(p) {
             Object.keys(snaps.divs[snaps.div_index]).forEach(key => {
                 let inst = snaps.divs[snaps.div_index][key][0].inst;
                 let xloc = key*Window.scale + Window.viewport;
-                let yloc = inst * c.INST_HEIGHT;
+                let yloc = inst * c.INST_HEIGHT - Window.scroll;
                 p.line(xloc, yloc, xloc, yloc + c.INST_HEIGHT);
             });
 
@@ -478,7 +481,7 @@ export default function measure(p) {
             
             let select = Window.selected.meas;
             let x = select.offset * Window.scale + Window.viewport;
-            let y = Window.selected.inst*c.INST_HEIGHT;
+            let y = Window.selected.inst*c.INST_HEIGHT - Window.scroll;
             Mouse.push({ x, y });
 
             let spread = Math.abs(range.tempo[1] - range.tempo[0]);
@@ -531,6 +534,7 @@ export default function measure(p) {
         if (DEBUG) {
             Debug.push(`viewport: ${Window.viewport}`);
             Debug.push(`scale: ${Window.scale}`);
+            Debug.push(`scroll: ${Window.scroll}`);
             Debug.write({ x: 0, y: (instruments.length+1)*c.INST_HEIGHT + c.DEBUG_TEXT }, c.DEBUG_TEXT);
             Debug.frameRate();
             Debug.clear();
@@ -550,8 +554,8 @@ export default function measure(p) {
                 (Window.insertMeas.temp_offset + beat) * Window.scale :
                 t_mouseX + beat*Window.scale;
             let y = ('inst' in Window.insertMeas) ?
-                Window.insertMeas.inst * c.INST_HEIGHT :
-                Math.floor(0.01*t_mouseY)*c.INST_HEIGHT;
+                Window.insertMeas.inst * c.INST_HEIGHT - Window.scroll :
+                Math.floor(0.01*t_mouseY)*c.INST_HEIGHT - Window.scroll;
             p.line(x, y, x, y + c.INST_HEIGHT);
         };
         Mouse.pop();
@@ -598,13 +602,15 @@ export default function measure(p) {
 
         p.pop();
         
+
+        Window.drawPlayback();
         Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc, isPlaying });
         Window.drawToolbar(range);
         Mouse.updateRollover();
 
         if (Window.panels) {
             p.fill(255, 0, 0, 10);
-            p.rect(0, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length, p.width, c.INST_HEIGHT);
+            p.rect(0, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length - Window.scroll, p.width, c.INST_HEIGHT);
         };
             
         subs.forEach(sub => sub());
@@ -621,7 +627,7 @@ export default function measure(p) {
             return;
         if (API.disableKeys())
             return;
-        if (!API.checkFocus() && Keyboard.checkNumPress())
+        if (!API.checkFocus())// && Keyboard.checkNumPress())
             return;
 
         let dir = Keyboard.checkDirection();
@@ -727,7 +733,7 @@ export default function measure(p) {
         Window.updateView(event, { zoom });
         if (zoom)
             API.newScaling(Window.scale);
-        API.reportWindow(Window.viewport, Window.scale);
+        //API.reportWindow(Window.viewport, Window.scale, Window.scroll);
     };
 
     p.mousePressed = function(e) {

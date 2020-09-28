@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Dropdown } from 'react-bootstrap';
+import { Dropdown, InputGroup } from 'react-bootstrap';
 
 import { primary, primary_shadow, secondary } from '../config/CONFIG.json';
 import c from '../config/CONFIG.json';
@@ -70,11 +70,37 @@ var Slider = styled.input`
         .map(prefix => `&::${prefix} { ${sliderTrack} }`)}
 `;
 
+var PanelHeader = styled.h3`
+    font-size: 10px;
+    border-bottom: 1px solid ${primary};
+    width: 80%;
+    margin-bottom: 4px;
+`;
+
+var InstInput = styled(InputGroup)`
+    height: 20px;
+    margin: 4px;
+`;
+
+var ArrowButton = styled.button`
+    font-size: 8pt;
+    background-color: ${secondary};
+    border: 1px solid ${primary};
+    padding: 0px 4px;
+    height: 100%;
+`;
+
+var InstButton = styled.button`
+    background: transparent;
+    border: 0;
+`;
+
 var MixerArrow = styled.button`
     display: block;
     margin: -2px 0px -4px 0px;
     padding: 0px;
     border: none;
+    background: transparent;
     text-decoration: none;
 `;
 
@@ -140,8 +166,6 @@ var Pane = styled.div`
 
     button {
         color: ${primary};
-        background-color: initial;
-        border: 0;
     }
 
     .closed {
@@ -165,6 +189,9 @@ var NewInst = styled(Pane)`
     background-color: none;
     font-size: 10pt;
     color: ${secondary};
+    input {
+        border-bottom: 1px solid black;
+    }
 `;
 
 var toolbar = styled(Pane)`
@@ -224,16 +251,13 @@ var Ext = styled.a`
 let form_mixin = [
     font_mixin,
     `border: none;
-    border-bottom: solid 1px ${secondary};
     width: 48px;
     padding: 2px;
-    margin: 4px;
     font-size: 8pt;
 
     &:focus {
         outline: none;
         border: none;
-        border-bottom: solid 1px ${secondary};
     }
 
 `].join('\n');
@@ -407,4 +431,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { Slider, MixerButton, MixerArrow, MixerRow, NewInst, Link, StyledLink, FormInput, FormLabel, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { PanelHeader, Slider, MixerButton, ArrowButton, InstInput, InstButton, MixerArrow, MixerRow, NewInst, Link, StyledLink, FormInput, FormLabel, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

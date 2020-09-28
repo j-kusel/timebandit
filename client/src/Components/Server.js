@@ -1,10 +1,11 @@
 import React, { Component } from 'react';
 import _ from 'lodash';
-import { Container, Col, Row } from 'react-bootstrap';
-import { FormInput, FormLabel } from './Styled';
+import c from '../config/CONFIG.json';
+import { Container, Col, Row, InputGroup } from 'react-bootstrap';
+import { ArrowButton, FormInput, FormLabel } from './Styled';
 import socketIOClient from 'socket.io-client';
 import { ServerModal } from './Modals';
-import { TBButton } from './Styled';
+import { PanelHeader, TBButton, InstInput } from './Styled';
 
 var socket = null;
 
@@ -62,7 +63,7 @@ class Server extends Component {
      * @param e - [HTMLElement change event]{@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/change_event}
      */
     handlePort(e) {
-        if (e.target.value.length > 4 ||
+        if (e.target.value.length > 5 ||
             !isFinite(e.target.value))
             return;
         this.setState({ port: e.target.value });
@@ -153,28 +154,33 @@ class Server extends Component {
 
         return (
             <div style={this.props.style}>
-                <h3 style={{fontSize: '10px'}}>Hardware server: <span style={style}>{text}</span></h3>
+                <PanelHeader>Hardware server: <span style={style}>{text}</span></PanelHeader>
                 <form onSubmit={this.handleNetworkChange} autoComplete="off">
-                    <FormInput
-                        type="text"
-                        key="domain"
-                        value={this.state.domain}
-                        id="domain"
-                        name="domain"
-                        onChange={this.handleDomain}
-                    />:
-                    <FormInput
-                        type="text"
-                        key="port"
-                        value={this.state.port}
-                        id="port"
-                        name="port"
-                        onChange={this.handlePort}
-                    />
-                    
-                    <button type="submit">&#x219D;</button>
+                    <InstInput>
+                        <FormInput
+                            type="text"
+                            key="domain"
+                            value={this.state.domain}
+                            id="domain"
+                            name="domain"
+                            onChange={this.handleDomain}
+                            style={{ width: '98px', textAlign: 'right' }}
+                        />
+                            <span style={{ fontSize: '8pt', paddingTop: '1px', color: c.secondary, backgroundColor: c.primary, borderTop: '1px solid black', borderBottom: '1px solid black' }}>:</span>
+                        <FormInput
+                            type="text"
+                            key="port"
+                            value={this.state.port}
+                            id="port"
+                            name="port"
+                            onChange={this.handlePort}
+                        />
+                        <InputGroup.Append>
+                            <ArrowButton type="submit" disabled={!this.state.instName}>&#x25BA;</ArrowButton>
+                        </InputGroup.Append>
+                    </InstInput>
                 </form>
-                <TBButton onClick={() => this.setState({ showModal: true })}>parameters...</TBButton>
+                <TBButton style={{ marginLeft: '4px' }} onClick={() => this.setState({ showModal: true })}>parameters...</TBButton>
                 <ServerModal
                     show={this.state.showModal}
                     onHide={() => this.handleCommand(null, false, true)}
