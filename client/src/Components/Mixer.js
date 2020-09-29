@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { primary } from '../config/CONFIG.json';
 import { FormInput, Slider } from './Styled';
 import { MixerRow, MixerArrow, MixerButton } from './Styled';
-import { PanelHeader } from './Styled';
+import { Module, PanelHeader } from './Styled';
 
 /**
  * Component which connects to a bandit server, for external software/hardware integration
@@ -113,14 +113,14 @@ class Mixer extends Component {
         ));
             
         return (
-            <div style={this.props.style}>
+            <Module style={this.props.style}>
                 <PanelHeader>Mixer</PanelHeader>
                 <div style={{ overflow: 'auto', scrollbarWidth: 'none', height: '60px' }}>
                     <table>
                         {insts}
                     </table>
                 </div>
-            </div>
+            </Module>
         );
     };
 };

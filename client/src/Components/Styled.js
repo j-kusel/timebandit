@@ -338,9 +338,17 @@ var TBButton = styled.button`
     padding: 0px;
 `;
 
+var Module = styled.div`
+    display: block;
+    float: left;
+    width: 250px;
+    height: 100%;
+`;
+
 var Upload = styled(TBButton)`
-    height: 40px;
-    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 10px;
+    height: 100%;
     &:focus {
         outline: none;
     }
@@ -431,4 +439,4 @@ var TBDropdown = styled(props => (
 
 
 
-export { PanelHeader, Slider, MixerButton, ArrowButton, InstInput, InstButton, MixerArrow, MixerRow, NewInst, Link, StyledLink, FormInput, FormLabel, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };
+export { Module, PanelHeader, Slider, MixerButton, ArrowButton, InstInput, InstButton, MixerArrow, MixerRow, NewInst, Link, StyledLink, FormInput, FormLabel, TrackingBar, Insert, Edit, Ext, Footer, Log, Rehearsal, Metadata, Upload, Submit, Playback, Panel, Pane, TBButton, AudioButton, InstName, Lock, TBDropdown };

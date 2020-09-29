@@ -17,7 +17,7 @@ import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
 import { InputGroup, FormControl } from 'react-bootstrap';
-import { InstInput, InstButton, ArrowButton, NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
+import { Module, InstInput, InstButton, ArrowButton, NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
 //import { Log, Metadata, Rehearsal } from './Components/Styled';
 import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
@@ -1169,23 +1169,27 @@ class App extends Component {
         : null }
 
 
-          {/* footer */}
+          {/* footer with modules */}
           <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px`, height: '100px' }}>
-            <h1 className="flavor" style={{ display: 'inline-block' }}>BANDIT</h1>
-            <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" alt="Github link" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
-        
-            <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
-        {/*<span style={{ position: 'relative', float: 'right' }}>{this.state.filename}</span>*/}
-            <div style={{ position: 'relative', float: 'right', top: '32px' }}>
-                <Upload onClick={(e) => this.toggleTutorials()}>tutorials</Upload>
-                <Upload onClick={this.settings}>settings</Upload>
-                <Upload onClick={this.reset}>new</Upload>
-                <Upload onClick={this.upload}>open</Upload>
-                <Upload onClick={this.save}>save</Upload>
-                <Upload onClick={this.midi}>export</Upload>
+            <div style={{ height: '100%', display: 'block', float: 'left' }}>
+                <h1 className="flavor" style={{ display: 'inline-block', margin: '0px', lineHeight: '52px' }}>BANDIT</h1>
+                <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" alt="Github link" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
+                <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
+
+                <div style={{ position: 'relative', width: '100%', height: '20px', paddingLeft: '6px', marginTop: '-10px' }}>
+                    <Upload onClick={(e) => this.toggleTutorials()}>tutorials</Upload>
+                    <Upload onClick={this.settings}>settings</Upload>
+                    <Upload onClick={this.reset}>new</Upload>
+                    <Upload onClick={this.upload}>open</Upload>
+                    <Upload onClick={this.save}>save</Upload>
+                    <Upload onClick={this.midi}>export</Upload>
+                </div>
             </div>
-            <Server style={{ position: 'relative', float: 'right', width: '250px' }} registerSocket={this.registerSocket}/>
-            <Mixer style={{ position: 'relative', float: 'right', width: '250px' }} audio={audio} insts={this.state.instruments} instMove={this.handleInstMove}/>
+
+                    {/*<span style={{ position: 'relative', float: 'right' }}>{this.state.filename}</span>*/}
+            <Server registerSocket={this.registerSocket}/>
+            <Mixer audio={audio} insts={this.state.instruments} instMove={this.handleInstMove}/>
+        {/*<Logger>*/}
           </Footer>
         </div>
 

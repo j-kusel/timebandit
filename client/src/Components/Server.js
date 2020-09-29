@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { Container, Col, Row, InputGroup } from 'react-bootstrap';
-import { ArrowButton, FormInput, FormLabel } from './Styled';
+import { Module, ArrowButton, FormInput, FormLabel } from './Styled';
 import socketIOClient from 'socket.io-client';
 import { ServerModal } from './Modals';
 import { PanelHeader, TBButton, InstInput } from './Styled';
@@ -153,7 +153,7 @@ class Server extends Component {
         let text = socket.connected ? 'connected' : 'disconnected';
 
         return (
-            <div style={this.props.style}>
+            <Module>
                 <PanelHeader>Hardware server: <span style={style}>{text}</span></PanelHeader>
                 <form onSubmit={this.handleNetworkChange} autoComplete="off">
                     <InstInput>
@@ -210,10 +210,8 @@ class Server extends Component {
                        
                     
                 </ServerModal>
-
-                
             
-            </div>
+            </Module>
         );
     };
 };
