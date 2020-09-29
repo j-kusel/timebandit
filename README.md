@@ -3,6 +3,7 @@ Bandit is a software/hardware ecosystem and standardization proposal for sketchi
 
 - [Stealing Time - a conceptual introduction](#stealing-time-a-conceptual-introduction)
     - [How do we define time?](#how-do-we-define-time) 
+- [A supplement to existing tools](#a-supplement-to-existing-tools)
 
 ### Stealing Time - a conceptual introduction
 For all intents and purposes, support for multiple tempi in contemporary DAWs and notation software is nonexistent. After sections are notated in conventional software, scores may be painfully cobbled together from vector file exports, but this destructive editing process makes mistakes tedious and costly to fix. Handwritten or CAD approaches can keep composers from fighting with opinionated software alignment when working with asynchronous time, but calculating rhythms by hand is a drudgery to which few would voluntarily commit. Timing compatibility between software for even as simple an example as an ensemble accelerando becomes a feat, much less dealing with tempo changes in performance between musicians or MIDI devices. What if these deterrents were removed?<br>
@@ -25,3 +26,11 @@ The result is around 3466ms. This can be said to be the __true time__ of the mea
 In quavered time at a PPQ of 4, the sum of 3529ms exceeds the comparable true time by 63ms. Higher PPQs allow a tradeoff between computational cost and greater fidelity with respect to true time, but compatibility with other software and devices should always be considered.
 
 >Note that the summation formula for quavered time results in some peculiarities: in true time, our 60-120 BPM example from above could be reversed and would last the same duration. At 4 PPQ, the same reversed example would take 3404ms, over a tenth of a second faster.
+
+### A supplement to existing tools
+
+***Bandit*** is not intended as a replacement for the well-supported tools that composers already use, so (for now) you won't find pitched materials, noteheads, a substantive audio engine, etc. Its scope is intentionally limited to an abstraction of time neglected by other systems, and as such cannot perfectly integrate with protocols such as MIDI, MusicXML, SMPTE Timecode, etc. Consider it a layer of stability when coercing Sibelius, Ableton, etc. beyond their normative capacities. If you have a particular workflow or soft/hardware that doesn't play well with ***Bandit***, contact me and let's get that remedied.
+
+### Hardware
+
+The ***Bandit*** device is an open-hardware USB board for triggering events on peripherals. Currently its main application is geared towards wearable vibrating metronomes, but headphone clicks and CV triggers are in the works. Check out the [hardware](https://github.com/ultraturtle0/timebandit/hardware) for more information.
