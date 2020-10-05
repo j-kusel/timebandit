@@ -17,7 +17,7 @@ import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
 import { InputGroup, FormControl } from 'react-bootstrap';
-import { Module, InstInput, InstButton, ArrowButton, NewInst, FormInput, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, Panel, Pane, AudioButton, Lock } from './Components/Styled';
+import { FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
 //import { Log, Metadata, Rehearsal } from './Components/Styled';
 import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
@@ -142,37 +142,30 @@ class App extends Component {
       this.sizing = 600.0;
       this.location = 0.0;
 
-      this.handleMeasure = this.handleMeasure.bind(this);
-      this.handleInst = this.handleInst.bind(this);
-      this.handleTut = this.handleTut.bind(this);
-      this.instOpen = this.instOpen.bind(this);
-      this.instClose = this.instClose.bind(this);
-      this.handleLock = this.handleLock.bind(this);
-      this.handleNumInput = this.handleNumInput.bind(this);
-      this.handleNumEdit = this.handleNumEdit.bind(this);
-      this.handleNameInput = this.handleNameInput.bind(this);
-      this.handleOffset = this.handleOffset.bind(this);
-      this.handlePPQ = this.handlePPQ.bind(this);
-      this.handleTempoPPQ = this.handleTempoPPQ.bind(this);
-      this.handleInstMove = this.handleInstMove.bind(this);
-      this.midi = this.midi.bind(this);
-      this.play = this.play.bind(this);
-      this.preview = this.preview.bind(this);
-      this.kill = this.kill.bind(this);
-      this.save = this.save.bind(this);
-      this.load = this.load.bind(this);
-      this.upload = this.upload.bind(this);
-      this.reset = this.reset.bind(this);
-      this.settings = this.settings.bind(this);
-      this.toggleTutorials = this.toggleTutorials.bind(this);
-      this.handleNew = this.handleNew.bind(this);
-      this.handleOpen = this.handleOpen.bind(this);
-      this.confirmEdit = this.confirmEdit.bind(this);
-      this.inputs = {};
+	  let self = this;
+	  [
+		  'handleMeasure',
+		  'handleInst',
+		  'handleTut',
+		  'handleLock',
+		  'handleNumInput',
+		  'handleNumEdit',
+		  'handleNameInput',
+		  'handleOffset',
+		  'handlePPQ',
+		  'handleTempoPPQ',
+		  'handleInstMove',
 
-
+		  'instToggle',
+		  
+		  'midi', 'play', 'preview', 'kill',
+		  'save', 'load', 'upload', 'reset', 'settings',
+		  'handleNew', 'handleOpen',
+		  'confirmEdit',
+		  'toggleTutorials'
+	  ].forEach(func => self[func] = self[func].bind(this));
+      
       this.API = this.initAPI();
-
   }
 
   /**
@@ -329,10 +322,7 @@ class App extends Component {
                   return (acc || ref.current.id === document.activeElement.id);
               }, false); 
 
-      var toggleInst = (open) =>
-          open ?
-              this.instClose() :
-              this.instOpen();
+      var toggleInst = (open) => this.instToggle(!open);
               
       var updateMode = (mode, options) => {
           logger.log(`Entering mode ${mode}.`);
@@ -401,17 +391,16 @@ class App extends Component {
    * Focuses instName input when new instrument tab is opened
    *
    */
-  instOpen(e) {
+  instToggle(open) {
       if (this.state.mouseBlocker())
           return;
-      this.setState(() => ({ newInst: true }), () => this.instNameFocus.current.focus());
-  };
 
-  instClose(e) {
-      if (this.state.mouseBlocker())
-          return;
-      this.setState({ newInst: false, instName: '' });
-  };
+      let _open = (typeof open === 'undefined') ?
+          !this.state.newInst : open;
+      _open ?
+        this.setState(() => ({ newInst: true }), () => this.instNameFocus.current.focus()) :
+        this.setState({ newInst: false, instName: '' });
+  }
 
   handleInst(e) {
       e.preventDefault();
@@ -447,7 +436,6 @@ class App extends Component {
       instruments.splice(dir === 'up' ? inst-1 : inst+1, 0, moved);
       this.setState({ instruments });
   }
-
 
   handleMeasure(e) {
       e.preventDefault();
@@ -600,8 +588,6 @@ class App extends Component {
       });
   }
 
-
-
   handleNameInput(e) {
       if (this.state.mouseBlocker())
           return;
@@ -616,9 +602,6 @@ class App extends Component {
 
     this.setState({ temp_offset: focus });
   }
-
-      
-
 
   handleTempoPPQ(eventKey) {
       document.activeElement.blur();
@@ -643,7 +626,6 @@ class App extends Component {
 
   midi() {
       let tracks = this.state.instruments.map((inst, i_ind) => {
-
 
           // this would be solved by sorting measures on entry
           // looking for gaps between measures
@@ -695,28 +677,6 @@ class App extends Component {
                       ticks.push({ ...new_tick, tempo: meas.start + i * slope });
                   };
               });
-
-
-              // OLD, WORKING
-              /*meas.ticks.forEach((_, i) => {
-                  // check for tempo change
-                  if (!(i % this.state.PPQ_mod)) {
-                      let tick = { ...new_tick, tempo: meas.start + i * slope };
-                      // check for metronome tick
-                      if (!(i % (meas.ticks.length / meas.timesig))) {
-                          if (i == 0)
-                              tick.timesig = meas.timesig;
-                          beats.push({ 
-                              ...new_beat, 
-                              wait: (i === 0) ? offset : rest
-                          });
-                      };
-                      ticks.push(tick);
-                  };
-              });
-              */
-              
-              // get this a little more foolproof later
 
               return acc.concat(ticks);
           }, []);
@@ -850,20 +810,16 @@ class App extends Component {
   reset(e) {
       if (this.state.mouseBlocker())
           return;
-
       this.setState({ warningNew: true });
   }
 
   settings(e) {
       if (this.state.mouseBlocker())
           return;
-
       this.setState(oldState => ({ settingsOpen: !oldState.settingsOpen }));
   }
 
   toggleTutorials(open) {
-      console.log('toggling');
-      console.log(open);
       if (open && this.state.mouseBlocker())
           return;
       this.setState(oldState => 
@@ -876,10 +832,8 @@ class App extends Component {
 
 
   handleTut(tut) {
-      console.log('is this getting blocked');
       if (this.state.mouseBlocker())
            return;
-      console.log(this.state.tutorials[tut]);
     
       if (this.state.tutorials[tut]) {
            this.state.tutorials[tut].begin();
@@ -959,24 +913,10 @@ class App extends Component {
 
 
   render() {
-    let CONSTANTS = {
-      PPQ: this.state.PPQ,
-      PPQ_tempo: this.state.PPQ_tempo,
-      PPQ_mod: this.state.PPQ / this.state.PPQ_tempo,
-      range: calcRange(
-          this.state.instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {})
-      )
-    };
-
-    var newInstruments = this.state.instruments.map((inst) => ({ 
-        measures: Object.assign({}, inst.measures), 
-        name: inst.name
-    }));
-
     //var cursor = timeToChrono(this.state.cursor);
     
     let measure_inputs = [
-        <FormInput
+        <StyledInputGroup
             type="text"
             key="start"
             value={this.state.start}
@@ -986,7 +926,7 @@ class App extends Component {
             name="start"
             onChange={this.handleNumInput}
         />, 
-        <FormInput
+        <StyledInputGroup
             type="text"
             key="end"
             value={this.state.end}
@@ -996,7 +936,7 @@ class App extends Component {
             name="end"
             onChange={this.handleNumInput}
         />,
-        <FormInput
+        <StyledInputGroup
             type="text"
             key="timesig"
             value={this.state.timesig}
@@ -1009,7 +949,7 @@ class App extends Component {
     ];
 
     let edit_inputs = ['start', 'end', 'timesig'].map((name) => 
-        <FormInput
+        <StyledInputGroup
             id={name}
             type="text"
             key={name}
@@ -1021,37 +961,21 @@ class App extends Component {
         />
     );
 
-
-    let pad = CONFIG.CANVAS_PADDING;
-    let addPad = pad + CONFIG.PANES_WIDTH;
-
-
-
-    let newPane = <form onSubmit={this.handleInst} className="inst-form" autoComplete="off">
-          {/*
-        */}
-        <InstInput>
-          <FormInput
-            ref={this.instNameFocus}
-            type="text"
-            name="instName"
-            value={this.state.instName}
-            placeholder="NAME"
-            onChange={this.handleNameInput}
-          />
-          <InputGroup.Append>
-            <ArrowButton type="submit" disabled={!this.state.instName}>&#x25BA;</ArrowButton>
-          </InputGroup.Append>
-        </InstInput>
-    </form>
-
-    let panes = this.state.instruments.map((inst, ind) => {
-        let top = ind*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT;
-        return (<Pane className="pane" key={ind} x={pad} y={top} height={CONFIG.TRACK_HEIGHT}>
-            <AudioButton x={0} y={0} onClick={(val, e) => this.handleMuting(val, e, ind)} value="true">mute</AudioButton>
-            <AudioButton x={0} y={CONFIG.INST_HEIGHT/3} onChange={(val, e) => this.handleMuting(val, e, ind)} value="false">solo</AudioButton>
-        </Pane>
-    )});
+    let instPane = <form onSubmit={this.handleInst} className="inst-form" autoComplete="off">
+			<StyledInputGroup>
+			  <FormInput
+				ref={this.instNameFocus}
+				type="text"
+				name="instName"
+				value={this.state.instName}
+				placeholder="NAME"
+				onChange={this.handleNameInput}
+			  />
+			  <InputGroup.Append>
+				<ArrowButton type="submit" disabled={!this.state.instName}>&#x25BA;</ArrowButton>
+			  </InputGroup.Append>
+			</StyledInputGroup>
+		</form>
         
     //tempo_ppqs.forEach((p) => console.log(p));
       //
@@ -1086,23 +1010,40 @@ class App extends Component {
     if (!window.localStorage.getItem('returning'))
         welcome = true;
     let newInstHeight = this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT - this.state.scrollY;
-      console.log(newInstHeight);
+
+	let propsUI = {
+		mode: this.state.mode, 
+		locks: this.state.locks,
+	    instruments: this.state.instruments.map((inst) => ({ 
+			measures: Object.assign({}, inst.measures), 
+			name: inst.name
+		})),
+		panels: this.state.newInst,
+	  editMeas: this.state.editMeas,
+	  insertMeas: this.state.insertMeas,
+	  API: this.API,
+	  CONSTANTS: {
+		  PPQ: this.state.PPQ,
+		  PPQ_tempo: this.state.PPQ_tempo,
+		  PPQ_mod: this.state.PPQ / this.state.PPQ_tempo,
+		  range: calcRange(
+			  this.state.instruments.reduce((acc, inst) => ({ ...acc, ...(inst.measures) }), {})
+		  )
+	  }
+	};
 
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
         {/*<Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>*/}
         <div style={{ margin: '0px'}}>
-
-          {/* left midi controls */}
-          <Panel>
-              {/*panes*/}
-              {(newInstHeight < window.innerHeight - CONFIG.FOOTER_HEIGHT - CONFIG.TRACKING_HEIGHT*2) && <NewInst x={addPad} y={this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT - this.state.scrollY} style={{ width: 'initial' }}>
-
-                <InstButton className={this.state.newInst ? "opened" : "closed"} onClick={(e) => this.state.newInst ? this.instClose(e) : this.instOpen(e) }>+</InstButton>
-              {this.state.newInst && newPane}
-              </NewInst>
-        }
-          </Panel>
+          <div style={{ position: 'absolute', width: '100%' }}>
+              {(newInstHeight < window.innerHeight - CONFIG.FOOTER_HEIGHT - CONFIG.TRACKING_HEIGHT*2) &&
+                  <NewInst x={CONFIG.CANVAS_PADDING + CONFIG.PANES_WIDTH} y={this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT - this.state.scrollY} style={{ width: 'initial' }}>
+                    <PlusButton open={this.state.newInst} onClick={() => this.instToggle()}>+</PlusButton>
+                    {this.state.newInst && instPane}
+                  </NewInst>
+              }
+          </div>
           
           { (this.state.mode === 2 && this.state.selected.meas) ?
               <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset}
@@ -1128,7 +1069,8 @@ class App extends Component {
               </Edit> : null
           }
 
-          <UI mode={this.state.mode} locks={this.state.locks} instruments={newInstruments} panels={this.state.newInst} editMeas={this.state.editMeas} insertMeas={this.state.insertMeas} API={this.API} CONSTANTS={CONSTANTS}/>
+		  {/* PROCESSING COMPONENT */}
+          <UI {...propsUI} />
 
           {/* right toolbar controls */}
         {/*<Rehearsal x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={CONFIG.PLAYBACK_HEIGHT}>
@@ -1145,7 +1087,7 @@ class App extends Component {
                 <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
                     <form onSubmit={this.handleMeasure} className="measure-form" autoComplete="off">
                         {measure_inputs}
-                        <FormInput
+                        <StyledInputGroup
                             type="text"
                             key="offset"
                             value={this.state.offset}

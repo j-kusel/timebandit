@@ -1,9 +1,6 @@
 import React, { Component } from 'react';
-import styled from 'styled-components';
-import { primary } from '../config/CONFIG.json';
-import { FormInput, Slider } from './Styled';
-import { MixerRow, MixerArrow, MixerButton } from './Styled';
-import { Module, PanelHeader } from './Styled';
+import { MixerRow, MixerArrow, MixerButton, Slider } from 'bandit-lib';
+import { Module, PanelHeader } from 'bandit-lib';
 
 /**
  * Component which connects to a bandit server, for external software/hardware integration
@@ -113,6 +110,7 @@ class Mixer extends Component {
         ));
             
         return (
+            <div>
             <Module style={this.props.style}>
                 <PanelHeader>Mixer</PanelHeader>
                 <div style={{ overflow: 'auto', scrollbarWidth: 'none', height: '60px' }}>
@@ -121,6 +119,8 @@ class Mixer extends Component {
                     </table>
                 </div>
             </Module>
+
+            </div>
         );
     };
 };

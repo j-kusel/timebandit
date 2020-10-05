@@ -1,11 +1,10 @@
 import React, { Component } from 'react';
-import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { Container, Col, Row, InputGroup } from 'react-bootstrap';
-import { Module, ArrowButton, FormInput, FormLabel } from './Styled';
+import { Module, ArrowButton, FormInput, FormLabel } from 'bandit-lib';
 import socketIOClient from 'socket.io-client';
 import { ServerModal } from './Modals';
-import { PanelHeader, TBButton, InstInput } from './Styled';
+import { PanelHeader, TBButton, StyledInputGroup } from 'bandit-lib';
 
 var socket = null;
 
@@ -156,7 +155,7 @@ class Server extends Component {
             <Module>
                 <PanelHeader>Hardware server: <span style={style}>{text}</span></PanelHeader>
                 <form onSubmit={this.handleNetworkChange} autoComplete="off">
-                    <InstInput>
+                    <StyledInputGroup>
                         <FormInput
                             type="text"
                             key="domain"
@@ -178,7 +177,7 @@ class Server extends Component {
                         <InputGroup.Append>
                             <ArrowButton type="submit" disabled={!this.state.instName}>&#x25BA;</ArrowButton>
                         </InputGroup.Append>
-                    </InstInput>
+                    </StyledInputGroup>
                 </form>
                 <TBButton style={{ marginLeft: '4px' }} onClick={() => this.setState({ showModal: true })}>parameters...</TBButton>
                 <ServerModal
