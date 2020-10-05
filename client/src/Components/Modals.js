@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container, Row, Col, Modal } from 'react-bootstrap';
-import { FormLabel, TBButton, TBDropdown } from './Styled';
+import { FormLabel, TBButton, TBDropdown } from 'bandit-lib';
 import styled from 'styled-components';
 import { primary, secondary, PPQ_OPTIONS } from '../config/CONFIG.json';
 
