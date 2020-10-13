@@ -17,8 +17,7 @@ import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
 import { InputGroup, FormControl } from 'react-bootstrap';
-import { FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
-//import { Log, Metadata, Rehearsal } from './Components/Styled';
+import { Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
 import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -1114,7 +1113,7 @@ class App extends Component {
           {/* footer with modules */}
           <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px`, height: '100px' }}>
             <div style={{ height: '100%', display: 'block', float: 'left' }}>
-                <h1 className="flavor" style={{ display: 'inline-block', margin: '0px', lineHeight: '52px' }}>BANDIT</h1>
+                <Splash style={{ display: 'inline-block', margin: '0px', lineHeight: '52px' }}>BANDIT</Splash>
                 <Ext target="_blank" href="https://github.com/ultraturtle0/timebandit"><img className="qlink" alt="Github link" style={{ position: 'relative', bottom: '5px', width: '16px' }} src={github}/></Ext>
                 <Ext target="_blank" href="https://twitter.com/j_kusel"><img className="qlink" alt="Twitter link" style={{ position: 'relative', bottom: '5px', width: '22px' }} src={twitter}/></Ext>
 
