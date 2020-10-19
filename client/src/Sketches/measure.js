@@ -8,6 +8,7 @@ import { order_by_key, check_proximity_by_key, parse_bits } from '../Util/index.
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
 import { primary, secondary_light2 } from '../config/CONFIG.json';
+import { colors } from 'bandit-lib';
 //import { secondary, secondary_light, } from '../config/CONFIG.json';
 //import _ from 'lodash';
 import _Window from '../Util/window.js';
@@ -289,7 +290,7 @@ export default function measure(p) {
                 });
 
             // push into instrument channel
-            p.stroke(255, 0, 0);
+            p.stroke(colors.accent);
             p.fill(secondary_light2);
 
             // handle inst selection
@@ -360,7 +361,7 @@ export default function measure(p) {
                     let coord = beat*Window.scale;
                     let alpha = 255;
                     let color = (key in locked && (locked[key].beats & (1 << index))) ?
-                        [0, 0, 255] : [255, 0, 0];
+                        p.color(0, 0, 255) : p.color(colors.accent);
 
                     // try Mouse.rollover
                     if (!temp && Mouse.rolloverCheck( 
@@ -383,7 +384,8 @@ export default function measure(p) {
                         } 
                     }
 
-                    p.stroke(...color, alpha);
+                    color.setAlpha(alpha);
+                    p.stroke(color);
                     p.line(coord, 0, coord, c.INST_HEIGHT);
                 });
                 Mouse.pop();
@@ -467,7 +469,7 @@ export default function measure(p) {
                 p.line(xloc, yloc, xloc, yloc + c.INST_HEIGHT);
             });
 
-        let mouse = (p.mouseX - Window.viewport)/Window.scale;
+        let mouse = (p.mouseX - Window.viewport)/Window.scale - c.PANES_WIDTH;
         let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
         cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
             parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
@@ -551,7 +553,7 @@ export default function measure(p) {
         p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
         let draw_beats = beat => {
             let x = ('inst' in Window.insertMeas) ? 
-                (Window.insertMeas.temp_offset + beat) * Window.scale :
+                (Window.insertMeas.temp_offset + beat) * Window.scale + Window.viewport :
                 t_mouseX + beat*Window.scale;
             let y = ('inst' in Window.insertMeas) ?
                 Window.insertMeas.inst * c.INST_HEIGHT - Window.scroll :
@@ -570,7 +572,7 @@ export default function measure(p) {
                         Window.insertMeas.beats.forEach(draw_beats);
                 }
             } else if ('temp_offset' in Window.insertMeas) {
-                p.rect(Window.insertMeas.temp_offset*Window.scale, Window.selected.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
+                p.rect(Window.insertMeas.temp_offset*Window.scale + Window.viewport, Window.selected.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
                 p.stroke(255, 0, 0);
                 Window.insertMeas.beats.forEach(draw_beats);
             };
@@ -625,9 +627,20 @@ export default function measure(p) {
     p.keyPressed = function(e) {
         if (API.modalCheck())
             return;
-        if (API.disableKeys())
+
+        if (p.keyCode === ESC) {
+            if (Window.mode === 0)
+                API.toggleInst(true);
+            else {
+                Window.mode = 0;
+                API.updateMode(Window.mode);
+            }
             return;
-        if (!API.checkFocus())// && Keyboard.checkNumPress())
+        };
+
+        if (API.disableKeys()) 
+            return;
+        if (API.checkFocus()) // && Keyboard.checkNumPress())
             return;
 
         let dir = Keyboard.checkDirection();
@@ -664,15 +677,6 @@ export default function measure(p) {
             return;
         }
 
-        if (p.keyCode === ESC) {
-            if (Window.mode === 0)
-                API.toggleInst(true);
-            else {
-                Window.mode = 0;
-                API.updateMode(Window.mode);
-            }
-            return;
-        };
 
         if (p.keyCode === KeyI) {
             Window.mode = 1;
@@ -731,9 +735,9 @@ export default function measure(p) {
         event.preventDefault();
         let zoom = p.keyIsDown(MOD);
         Window.updateView(event, { zoom });
-        if (zoom)
-            API.newScaling(Window.scale);
-        //API.reportWindow(Window.viewport, Window.scale, Window.scroll);
+        /*if (zoom)
+            API.newScaling(Window.scale);*/
+        API.reportWindow(Window.viewport, Window.scale, Window.scroll);
     };
 
     p.mousePressed = function(e) {
@@ -755,6 +759,7 @@ export default function measure(p) {
 
         if (API.pollSelecting()) {
             Window.insertMeas.temp_offset = API.confirmSelecting(inst);
+            e.preventDefault();
             Window.insertMeas.inst = inst;
             return;
         }
@@ -1347,7 +1352,6 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'tempo') {
             API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.temp.start, measure.temp.end, measure.beats.length - 1, measure.temp.offset);
-            console.log(measure.temp);
             delete Window.selected.meas.temp;
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
@@ -1355,7 +1359,6 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'measure') {
             API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.start, measure.end, measure.beats.length - 1, measure.temp.offset);
-
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
         };
@@ -1375,7 +1378,8 @@ export default function measure(p) {
         if (p.mouseX > 0 && p.mouseX < p.width &&
             p.mouseY > 0 && p.mouseY < p.height
         )
-            API.newCursor((p.mouseX - Window.viewport)/Window.scale);
+            //////////////////////////////////////
+            API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale);
         return false;
     };
     

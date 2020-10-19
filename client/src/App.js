@@ -8,6 +8,7 @@ import audio from './Audio/audio';
 // logos
 import github from './static/GitHub-Mark-32px.png';
 import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
+import styled from 'styled-components';
 
 import { MeasureCalc, order_by_key } from './Util/index';
 import ordered from './Util/ordered';
@@ -84,7 +85,6 @@ class App extends Component {
               measures: {}
           }*/],
           ordered: {},
-          sizing: 600.0,
           cursor: 0.0,
           start: '',
           end: '',
@@ -116,7 +116,11 @@ class App extends Component {
           mouseBlocker: () => false
       };
 
-      ['insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'instNameFocus'].forEach(ref => this[ref] = React.createRef());
+      [
+        'insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'insertSubmitFocus',
+        'instNameFocus',
+        'editFocusStart', 'editFocusEnd', 'editFocusTimesig'
+      ].forEach(ref => this[ref] = React.createRef());
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
 
@@ -138,7 +142,6 @@ class App extends Component {
       // load DEBUG script
       this.state.instruments = DEBUG ? parser.parse(debug) : [{ name: 'default', measures: {} }];
       
-      this.sizing = 600.0;
       this.location = 0.0;
 
 	  let self = this;
@@ -161,7 +164,8 @@ class App extends Component {
 		  'save', 'load', 'upload', 'reset', 'settings',
 		  'handleNew', 'handleOpen',
 		  'confirmEdit',
-		  'toggleTutorials'
+		  'toggleTutorials',
+          'focusInsertSubmit'
 	  ].forEach(func => self[func] = self[func].bind(this));
       
       this.API = this.initAPI();
@@ -176,6 +180,16 @@ class App extends Component {
       socket.close();
     socket = s;
   }
+
+  componentWillUpdate() {
+      console.log('updating');
+  }
+
+  focusInsertSubmit() {
+      console.log('getting here');
+      this.insertSubmitFocus.current.focus();
+  }
+
 
   initAPI() {
       var self = this;
@@ -283,7 +297,6 @@ class App extends Component {
               instruments: []
           });
 
-      var newScaling = (scale) => self.setState(oldState => ({sizing: 600.0 / scale}));
       var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
 
       var paste = (inst, measure, offset) => {
@@ -314,9 +327,9 @@ class App extends Component {
 
       // makes sure menus aren't in use when pressing keys
       var checkFocus = () =>
-          [this.insertFocusStart, this.insertFocusEnd, this.insertFocusTimesig]
+          [this.insertFocusStart, this.insertFocusEnd, this.insertFocusTimesig, this.instNameFocus, this.editFocusStart, this.editFocusEnd, this.editFocusTimesig]
               .reduce((acc, ref) => {
-                  if (!document.activeElement || !ref.current)
+                  if (/*!document.activeElement || */!ref.current)
                       return acc;
                   return (acc || ref.current.id === document.activeElement.id);
               }, false); 
@@ -348,7 +361,10 @@ class App extends Component {
 
       var pollSelecting = () => (!!this.state.temp_offset);
       var confirmSelecting = (inst) => {
-          this.setState({ offset: this.state.cursor, temp_offset: false, insertInst: inst });
+          this.setState(
+              (oldState) => ({ offset: oldState.cursor, temp_offset: false, insertInst: inst }),
+              () => this.insertSubmitFocus.current.focus()
+          );
           return this.state.cursor;
       };
 
@@ -383,7 +399,7 @@ class App extends Component {
           return measure;
       };
 
-      return { registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newScaling, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -522,10 +538,17 @@ class App extends Component {
               ) :
               {};
 
-          this.setState({
+          let newState = {
               [e.target.name]: intVal,
               insertMeas
-          });
+          };
+
+          if (e.target.name === 'start' 
+              && (!this.state.end || this.state.start === this.state.end)
+          )
+              newState.end = intVal;
+
+          this.setState(newState);
       };
   };
 
@@ -913,46 +936,28 @@ class App extends Component {
 
   render() {
     //var cursor = timeToChrono(this.state.cursor);
+
     
-    let measure_inputs = [
-        <StyledInputGroup
+    let measure_inputs = ['start', 'end', 'timesig'].map(name => (
+        <FormInput
             type="text"
-            key="start"
-            value={this.state.start}
-            ref={this.insertFocusStart}
-            id="startInsert"
-            placeholder="start"
-            name="start"
-            onChange={this.handleNumInput}
-        />, 
-        <StyledInputGroup
-            type="text"
-            key="end"
-            value={this.state.end}
-            ref={this.insertFocusEnd}
-            id="endInsert"
-            placeholder="end"
-            name="end"
-            onChange={this.handleNumInput}
-        />,
-        <StyledInputGroup
-            type="text"
-            key="timesig"
-            value={this.state.timesig}
-            ref={this.insertFocusTimesig}
-            id="timesigInsert"
-            placeholder="timesig"
-            name="timesig"
+            key={name}
+            value={this.state[name]}
+            ref={this['insertFocus' + name.charAt(0).toUpperCase() + name.slice(1)]}
+            id={name + 'Insert'}
+            placeholder={name}
+            name={name}
             onChange={this.handleNumInput}
         />
-    ];
+    ));
 
     let edit_inputs = ['start', 'end', 'timesig'].map((name) => 
-        <StyledInputGroup
+        <FormInput
             id={name}
             type="text"
             key={name}
             value={this.state['edit_' + name]}
+            ref={this['editFocus' + name.charAt(0).toUpperCase() + name.slice(1)]}
             placeholder={name}
             name={name}
             style={{ float: 'left' }}
@@ -1000,7 +1005,6 @@ class App extends Component {
     // add later
     /*let metadata = (<Metadata x={window.innerWidth - CONFIG.CANVAS_PADDING - CONFIG.TOOLBAR_WIDTH} y={window.innerHeight - CONFIG.META_HEIGHT - CONFIG.LOG_HEIGHT}>
         { data }
-        <p id="sizing">View: {(this.state.sizing/1000).toFixed(2)}"</p>
       </Metadata>);
       */
 
@@ -1031,6 +1035,9 @@ class App extends Component {
 	  }
 	};
 
+    if (this.state.selected.meas)
+        console.log(this.state.selected.meas.ms * this.state.scale);
+
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
         {/*<Playback x={600} y={0} status={this.state.isPlaying.toString()} onClick={() => this.play(!this.state.isPlaying, 0)}>&#x262D;</Playback>*/}
@@ -1044,16 +1051,18 @@ class App extends Component {
               }
           </div>
           
-          { (this.state.mode === 2 && this.state.selected.meas) ?
+          { (this.state.mode === 2 && this.state.selected.meas) &&
               <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset}
                 top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}
                 width={this.state.selected.meas.ms * this.state.scale}
               >
                 <form onSubmit={this.confirmEdit} className="measure-form" autoComplete="off">
-                    <div style={{ maxWidth: '150px', float: 'left' }}>
-                        { edit_inputs }
-                        <Submit type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</Submit>
-                    </div>
+                    <StyledInputGroup style={{ maxWidth: '150px', float: 'left', marginTop: '0px' }}>
+                      { edit_inputs }
+                      <InputGroup.Append>
+                        <ArrowButton type="submit" disabled={this.state.selected.inst === -1}>&#x25BA;</ArrowButton>
+                      </InputGroup.Append>
+                    </StyledInputGroup>
                     <div style={{ float: 'right' }}>
                         { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
                             <Lock 
@@ -1065,7 +1074,7 @@ class App extends Component {
                             >{button}</Lock>) }
                     </div>
                 </form>
-              </Edit> : null
+              </Edit>
           }
 
 		  {/* PROCESSING COMPONENT */}
@@ -1082,11 +1091,12 @@ class App extends Component {
           </Log>*/}
 
           {/* modes */}
-            { this.state.mode === 1 ? 
+            { this.state.mode === 1 &&
                 <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
                     <form onSubmit={this.handleMeasure} className="measure-form" autoComplete="off">
+                      <StyledInputGroup>
                         {measure_inputs}
-                        <StyledInputGroup
+                        <FormInput
                             type="text"
                             key="offset"
                             value={this.state.offset}
@@ -1096,18 +1106,19 @@ class App extends Component {
                             onBlur={(e) => this.handleOffset(false, e)}
                             onChange={this.handleNumInput}
                         />
-                        <button type="submit" disabled={this.state.selected.inst === -1}>&#x219D;</button>
+                        <InputGroup.Append>
+                            <ArrowButton type="submit" ref={this.insertSubmitFocus} disabled={this.state.selected.inst === -1}>&#x25BA;</ArrowButton>
+                        </InputGroup.Append>
+                      </StyledInputGroup>
                     </form>
                 </Insert>
-            : null }
+            }
         <TrackingBar className="tracking" left={(window.innerWidth - CONFIG.CANVAS_PADDING*2 - CONFIG.TOOLBAR_WIDTH) / 3.0 + CONFIG.CANVAS_PADDING}>
         </TrackingBar>
 
-        { this.state.mode === 2 ?
-            <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
-            </Insert>
-
-        : null }
+        { this.state.mode === 2 &&
+            <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }/>
+        }
 
 
           {/* footer with modules */}

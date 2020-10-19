@@ -2,11 +2,17 @@ import React, { Component } from 'react';
 import c from '../config/CONFIG.json';
 import { Container, Col, Row, InputGroup } from 'react-bootstrap';
 import { Module, ArrowButton, FormInput, FormLabel } from 'bandit-lib';
+import styled from 'styled-components';
 import socketIOClient from 'socket.io-client';
 import { ServerModal } from './Modals';
 import { PanelHeader, TBButton, StyledInputGroup } from 'bandit-lib';
+import { colors } from 'bandit-lib';
 
 var socket = null;
+
+const Indicator = styled.span`
+    color: ${props => props.connected ? 'green' : colors.accent};
+`;
 
 /**
  * Component which connects to a bandit server, for external software/hardware integration
@@ -146,14 +152,9 @@ class Server extends Component {
     }
 
     render() {
-        let style = {
-            color: socket.connected ? 'green' : 'red',
-        }
-        let text = socket.connected ? 'connected' : 'disconnected';
-
         return (
             <Module>
-                <PanelHeader>Hardware server: <span style={style}>{text}</span></PanelHeader>
+                <PanelHeader>Hardware server: <Indicator connected={socket.connected}>{socket.connected ? 'connected' : 'disconnected'}</Indicator></PanelHeader>
                 <form onSubmit={this.handleNetworkChange} autoComplete="off">
                     <StyledInputGroup>
                         <FormInput

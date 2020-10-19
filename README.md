@@ -33,4 +33,4 @@ In quavered time at a PPQ of 4, the sum of 3529ms exceeds the comparable true ti
 
 ### Hardware
 
-The ***Bandit*** device is an open-hardware USB board for triggering events on peripherals. Currently its main application is geared towards wearable vibrating metronomes, but headphone clicks and CV triggers are in the works. Check out the [hardware](https://github.com/ultraturtle0/timebandit/hardware) for more information.
+The ***Bandit*** device is an open-hardware USB board for triggering events on peripherals. Currently its main application is geared towards wearable vibrating metronomes, but headphone clicks and CV triggers are in the works. Check out the [hardware](https://github.com/ultraturtle0/timebandit/tree/deploy/hardware) for more information.

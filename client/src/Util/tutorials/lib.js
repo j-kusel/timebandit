@@ -46,8 +46,9 @@ var init = (p, hook) => {
             p.fill(255);
             p.rect(0, 0, this.coords.width(), this.coords.height());
             p.fill(0);
-            p.textSize(8);
-            p.text(this.text, 2, 8); 
+            p.textSize(12);
+            p.textAlign(p.CENTER, p.CENTER);
+            p.text(this.text, this.coords.width()/2, this.coords.height()/2); 
             p.pop();
         }
     }
@@ -73,16 +74,16 @@ var init = (p, hook) => {
 
             this.buttons = [
                 new Button('X', {
-                    x: () => x2() - 18, y: () => y() + 18,
-                    width: 10, height: 10,
+                    x: () => x2() - 28, y: () => y() + 8,
+                    width: 20, height: 20,
                 }, 'exit tutorial', () => this.parent.end()),
                 new Button('next', {
-                    x: () => x2() - 18, y: () => y2() - 18,
-                    width: 10, height: 10,
+                    x: () => x2() - 48, y: () => y2() - 28,
+                    width: 40, height: 20,
                 }, 'next window', () => this.forward()),
                 new Button('back', {
-                    x: () => x() + 8, y: () => y2() - 18,
-                    width: 10, height: 10,
+                    x: () => x() + 8, y: () => y2() - 28,
+                    width: 40, height: 20,
                 }, 'last window', () => this.backward())
             ];
         }
