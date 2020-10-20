@@ -363,6 +363,10 @@ export default function measure(p) {
                     let color = (key in locked && (locked[key].beats & (1 << index))) ?
                         p.color(0, 0, 255) : p.color(colors.accent);
 
+                    // bypass first beat when fading
+                    if (Window.scale < 0.05 && (index !== 0))
+                        alpha = Math.max(60, 255*(Window.scale/0.05));
+
                     // try Mouse.rollover
                     if (!temp && Mouse.rolloverCheck( 
                         [coord-c.ROLLOVER_TOLERANCE, 0, coord+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
@@ -643,6 +647,27 @@ export default function measure(p) {
         if (API.checkFocus()) // && Keyboard.checkNumPress())
             return;
 
+
+        // CTRL/MOD functions
+        if (p.keyIsDown(MOD)) {
+            if (p.keyCode === KeyC
+                && Window.selected.meas
+            ) {
+
+                logger.log(`Copying measure ${Window.selected.meas.id}.`);
+                copied = Window.selected.meas; //instruments[Window.selected.inst].measures[Window.selected.meas];
+                return;
+            } else if (p.keyCode === KeyV && copied) {
+                API.paste(Window.selected.inst, copied, (p.mouseX-Window.viewport-c.PANES_WIDTH)/Window.scale);
+                return;
+            }
+            /* ADD UNDO HISTORY HERE
+            else if (p.keyCode === KeyZ)
+                p.keyIsDown(SHIFT) ?
+                    API.redo() : API.undo();
+            */
+        };
+
         let dir = Keyboard.checkDirection();
         if (Window.selected.meas && dir) {
             if (dir === 'DOWN') {
@@ -708,20 +733,6 @@ export default function measure(p) {
             return;
         }
 
-        // CTRL/MOD functions
-        if (p.keyIsDown(MOD)) {
-            if (p.keyCode === KeyC
-                && Window.selected.meas
-            )
-                copied = instruments[Window.selected.inst].measures[Window.selected.meas];
-            else if (p.keyCode === KeyV && copied)
-                API.paste(Window.selected.inst, copied, (p.mouseX-Window.viewport)/Window.scale);
-            /* ADD UNDO HISTORY HERE
-            else if (p.keyCode === KeyZ)
-                p.keyIsDown(SHIFT) ?
-                    API.redo() : API.undo();
-            */
-        };
         return true;
     };
 
@@ -916,13 +927,17 @@ export default function measure(p) {
                     start *= (gap > c.NUDGE_THRESHOLD) ?
                         (1 + alpha) : (1 - alpha);
                 // else change alpha multiplier based on start or slope lock
-                } else
+                } else {
+                    // this wasn't halving the effort between start and end before...
                     slope *= (gap > c.NUDGE_THRESHOLD) ?
                         (1 + alpha*delta) : (1 - alpha*delta);
+                    start *= (gap > c.NUDGE_THRESHOLD) ?
+                        (1 + alpha*delta) : (1 - alpha*delta);
+                }
 
                 let locked, snapped;
                 [ms, locked, snapped] = quickCalc(start, slope, measure.timesig, anchor, _snapper);
-                console.log(ms, locked, snapped);
+                console.log(start, slope);
                 if (locked)
                     offset = measure.offset + measure.beats[beat_lock[0]] - locked;
 
@@ -938,7 +953,6 @@ export default function measure(p) {
         // y-drag
         if (Mouse.drag.mode === 'tempo') {
             Mouse.drag.y += event.movementY;
-            console.log(Window.selected.meas.temp);
             let spread = range.tempo[1] - range.tempo[0];
             let change = Mouse.drag.y / c.INST_HEIGHT * spread;
             let locked_beat = beat_lock.length ?
@@ -992,7 +1006,6 @@ export default function measure(p) {
 
                         
                     if (cumulative > crowd.end[0] - crowd.start[0]) {
-                            console.log('jump'); 
                             update.offset = crowd.start[0];
                             if (!nudge_cache) {
                                 measure.temp.offset = update.offset;
@@ -1058,6 +1071,15 @@ export default function measure(p) {
                     offset: temp_offset
                 };
 
+                // skip if not dragged far enough or already in conflict with adjacent measures
+                if (Math.abs(temp_offset - measure.offset) < 5.0 ||
+                    (!nudge_cache && (crowd.start[1] < 0 || crowd.end[1] < 0))
+                ) {
+                    Object.assign(measure.temp, measure);
+                    delete range.temprange;
+                    return;
+                }
+                
                 if (measure.offset > (crowd.start[0] + c.NUDGE_THRESHOLD)
                     && crowd.start[1] < c.SNAP_THRESHOLD
                 ) {
@@ -1140,15 +1162,21 @@ export default function measure(p) {
                 offset: position
             };
 
+            // initialize flag to prevent snapping when there's no space anyways
+            let check_snap = true;
             if (Math.abs(crowd.start[1]) < Math.abs(crowd.end[1])) {
-                if (crowd.start[1] - c.SNAP_THRESHOLD*2 < 0)
+                if (crowd.start[1] - c.SNAP_THRESHOLD*2 < 0) {
                     update.offset = crowd.start[0];
+                    check_snap = false;
+                }
             } else {
-                if (crowd.end[1] - c.SNAP_THRESHOLD*2 < 0)
+                if (crowd.end[1] - c.SNAP_THRESHOLD*2 < 0) {
                     update.offset = crowd.end[0] - measure.ms;
+                    check_snap = false;
+                }
             }
 
-            if (close.index !== -1) {
+            if (check_snap && close.index !== -1) {
                 let gap = close.target - (measure.beats[close.index] + position);
                 if (Math.abs(gap) < 50) {
                     snaps.snapped_inst = { ...close, origin: Window.selected.inst };

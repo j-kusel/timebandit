@@ -1,4 +1,5 @@
 import handlers from '../handlers';
+import { colors } from 'bandit-lib';
 // each step should have flags set for criteria to be met.
 //
 
@@ -116,11 +117,13 @@ var init = (p, hook) => {
 
                 p.translate(x, y);
                 p.fill(255);
-                p.stroke(0);
+                p.stroke(colors.primary);
                 p.rect(0, 0, x2 - x, y2 - y);
-                p.fill(0);
+                p.fill(colors.primary);
+
+                p.textSize(18);
                 //p.textAlign(p.TOP, p.LEFT);
-                this.text.forEach((line, i) => p.text(line, 30, 60 + 12*i));
+                this.text.forEach((line, i) => p.text(line, 30, 60 + 18*i));
                 p.pop();
                 this.buttons.forEach(button => button.draw());
             }

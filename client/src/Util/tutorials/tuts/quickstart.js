@@ -52,7 +52,7 @@ export default (p, registration, API, Window, blockerSet) => {
     });
 
 
-    let cMdimsX = 350;
+    let cMdimsX = 400;
     let cMdimsY = 200;
     let createMeasure = new Step({
         reporter: (id) => tut.current = id,
@@ -82,9 +82,8 @@ export default (p, registration, API, Window, blockerSet) => {
             ))*/ 
         ],
         text: [
-            "To add a measure,",
-            "first enter INSERT mode by clicking the bar or",
-            "pressing the 'i' key.",
+            "To add a measure, first enter INSERT mode",
+            "by clicking the bar or pressing the 'i' key.",
         ]
     });
 
@@ -99,7 +98,7 @@ export default (p, registration, API, Window, blockerSet) => {
         coords: {
             x: () => (p.width - c.TOOLBAR_WIDTH) / 3.0 + c.INSERT_WIDTH*0.5,
             y: () => p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT - cMdimsY,
-            x2: () => (p.width - c.TOOLBAR_WIDTH) / 3.0 + c.INSERT_WIDTH*0.5 + cMdimsX,
+            x2: () => (p.width - c.TOOLBAR_WIDTH) / 3.0 + c.INSERT_WIDTH + cMdimsX,
             y2: () => p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT
         },
 
@@ -121,7 +120,7 @@ export default (p, registration, API, Window, blockerSet) => {
 
     let offset = 500;
     let fMdimX = 400;
-    let fMdimY = 150;
+    let fMdimY = 200;
     let finishedMeas = new Step({
         reporter: (id) => tut.current = id,
         highlight: {
@@ -132,7 +131,7 @@ export default (p, registration, API, Window, blockerSet) => {
         },
         coords: {
             x: () => Window.scaleX(offset + 2000),
-            x2: () => Window.scaleX(offset + 2000) + fMdimX,
+            x2: () => Window.scaleX(offset + 2000) + fMdimX + 150,
             y: () => c.TRACKING_HEIGHT + c.INST_HEIGHT,
             y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT + fMdimY,
         },
@@ -164,10 +163,10 @@ export default (p, registration, API, Window, blockerSet) => {
             y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT
         },
         coords: {
-            x: () => p.width/3,
-            y: () => p.height/3,
-            x2: () => p.width*2/3,
-            y2: () => p.height*2/3
+            x: () => p.width/4,
+            y: () => p.height/6,
+            x2: () => p.width/2,
+            y2: () => p.height/3
         },
         preparation: () => {
             Window.select('clear');
@@ -195,9 +194,9 @@ export default (p, registration, API, Window, blockerSet) => {
         },
         coords: {
             x: () => c.PANES_WIDTH + 100,
-            x2: () => c.PANES_WIDTH + 450,
+            x2: () => c.PANES_WIDTH + 570,
             y: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT,
-            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT + 220
+            y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT + 150
         },
         preparation: () => {},
         criteria: [],
@@ -250,11 +249,12 @@ export default (p, registration, API, Window, blockerSet) => {
             y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2,
         },
         coords: {
-            x: () => Window.scaleX(offset + 2000),
-            x2: () => Window.scaleX(offset + 2000) + fMdimX,
+            x: () => p.width/3,
+            x2: () => p.width*2/3,
             y: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28,
             y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
         },
+
         preparation: _createTwo,
         criteria: [],
         text: [
@@ -287,10 +287,10 @@ export default (p, registration, API, Window, blockerSet) => {
             y2: () => c.PLAYBACK_HEIGHT + c.INST_HEIGHT*2,
         },
         coords: {
-            x: () => Window.scaleX(offset + 2000),
-            x2: () => Window.scaleX(offset + 2000) + fMdimX,
+            x: () => p.width/3,
+            x2: () => p.width*2/3,
             y: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28,
-            y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
+            y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 58 + fMdimY,
         },
         preparation: _createTwoSelectOne,
         criteria: [],
@@ -315,8 +315,8 @@ export default (p, registration, API, Window, blockerSet) => {
         coords: {
             x: () => p.width/3,
             y: () => p.height/2.5,
-            x2: () => p.width*2/3,
-            y2: () => p.height/2.5 + 150
+            x2: () => p.width*2/3 + 75,
+            y2: () => p.height/2.5 + 180
         },
         preparation: _createTwoSelectOne,
         criteria: [],
@@ -338,9 +338,9 @@ export default (p, registration, API, Window, blockerSet) => {
         },
         coords: {
             x: () => Window.scaleX(offset + 3629.02) - 88,
-            x2: () => Window.scaleX(offset + 3629.02) - 88 + fMdimX,
+            x2: () => Window.scaleX(offset + 3629.02) + 40 + fMdimX,
             y: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28,
-            y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 28 + fMdimY,
+            y2: () => c.TRACKING_HEIGHT + c.INST_HEIGHT*2 + 48 + fMdimY,
         },
         preparation: _createTwoSelectOne,
         criteria: [],
@@ -370,7 +370,7 @@ export default (p, registration, API, Window, blockerSet) => {
         criteria: [],
         text: [
             `For more tutorials on playback, midi export, software`,
-            `integrations, using the Bandit hardware server, &c,`,
+            `integrations, using the Bandit hardware server, etc.,`,
             `look through the Tutorials menu at the bottom of the screen.`,
         ]
     });

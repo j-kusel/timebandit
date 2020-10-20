@@ -181,10 +181,6 @@ class App extends Component {
     socket = s;
   }
 
-  componentWillUpdate() {
-      console.log('updating');
-  }
-
   focusInsertSubmit() {
       console.log('getting here');
       this.insertSubmitFocus.current.focus();
@@ -1034,9 +1030,6 @@ class App extends Component {
 		  )
 	  }
 	};
-
-    if (this.state.selected.meas)
-        console.log(this.state.selected.meas.ms * this.state.scale);
 
     return (
       <div className="App" style={{ 'backgroundColor': CONFIG.secondary }}>
