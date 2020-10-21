@@ -293,7 +293,12 @@ class App extends Component {
               instruments: []
           });
 
-      var newCursor = (loc) => self.setState(oldState => ({ cursor: loc }));
+      var newCursor = (loc, meta) => {
+          let newState = { cursor: loc };
+          if ('insertMeas' in meta)
+            newState.offset = meta.insertMeas;
+          self.setState(newState);
+      };
 
       var paste = (inst, measure, offset) => {
           logger.log(`Pasting copied measure ${measure.id} into instrument ${inst}...`);
@@ -356,9 +361,9 @@ class App extends Component {
       };
 
       var pollSelecting = () => (!!this.state.temp_offset);
-      var confirmSelecting = (inst) => {
+      var confirmSelecting = (inst, offset) => {
           this.setState(
-              (oldState) => ({ offset: oldState.cursor, temp_offset: false, insertInst: inst }),
+              (oldState) => ({ offset, temp_offset: false, insertInst: inst }),
               () => this.insertSubmitFocus.current.focus()
           );
           return this.state.cursor;

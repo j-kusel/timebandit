@@ -22,6 +22,8 @@ class UI extends Component {
             nextProps.panels !== this.props.panels ||
             !_.isEqual(nextProps.insertMeas, this.props.insertMeas) ||
             !_.isEqual(nextProps.editMeas, this.props.editMeas) ||
+            // does registerTuts work here?
+            !_.isEqual(nextProps.API.registerTuts, this.props.API.registerTuts) ||
             nextProps.locks.length !== this.props.locks.length ||
             nextProps.instruments.length !== this.props.instruments.length ||
             nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ) {

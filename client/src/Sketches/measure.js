@@ -26,6 +26,37 @@ const SLOW = process.env.NODE_ENV === 'development';
 var API = {};
 
 
+var crowding = (gaps, position, ms, options) => {
+    let strict = (options && 'strict' in options) ? options.strict : false;
+    let final = position + ms;
+    if (final <= gaps[0][1]) 
+        return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
+    let last_gap = gaps.slice(-1)[0];
+    if (position > last_gap[0])
+        return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
+        
+    return gaps
+        .reduce((acc, gap) => {
+            // does it even fit in the gap?
+            if (gap[1] - gap[0] < ms - (strict ? c.NUDGE_THRESHOLD*2 : 0))
+                return acc;
+            let start = [gap[0], position - gap[0]];
+            let end = [gap[1], gap[1] - final];
+
+            /*if (gap[0] === -Infinity && final <= gap[1])
+                acc.start = [-Infinity, Infinity]
+            else*/ if (Math.abs(start[1]) < Math.abs(acc.start[1]))
+                acc.start = start;
+            /*if (gap[1] === Infinity && position >= gap[0])
+                acc.end = [Infinity, Infinity]
+            else*/ if (Math.abs(end[1]) < Math.abs(acc.end[1]))
+                acc.end = end;
+            return acc;
+        }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
+}
+
+
+
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
 //const [SHIFT, ALT] = [16, 18];
 const [KeyC, KeyI, KeyV] = [67, 73, 86];
@@ -120,6 +151,10 @@ export default function measure(p) {
     var Window = _Window(p);
     var Mouse = _Mouse(p, Window);
     var Keyboard = _Keyboard(p);
+
+
+    var ms_to_x = ms => (ms*Window.scale + Window.viewport);
+    var x_to_ms = x => (x-Window.viewport)/Window.scale;
 
     // debugger
     var Debug = new Debugger(p, Window, Mouse);
@@ -570,10 +605,36 @@ export default function measure(p) {
             let inst = Math.floor(0.01*t_mouseY);
             if (API.pollSelecting()) {
                 if (inst < instruments.length && inst >= 0) {
-                    p.rect(t_mouseX, inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
+                    if (!instruments[inst].gap_cache)
+                        instruments[inst].gap_cache = calcGaps(instruments[inst].ordered, '');
+
+                    let offset = x_to_ms(p.mouseX - c.PANES_WIDTH); //(p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale;
+                    let crowd = crowding(instruments[inst].gap_cache, offset, Window.insertMeas.ms, { strict: true });
+
+                    let crowd_start = crowd.start[0];
+                    let crowd_end =  crowd.end[0];
+
+                    Debug.push(`mouse: ${crowd_start}, ${crowd_end}`);
+                    if (offset < crowd_start + c.SNAP_THRESHOLD && offset > crowd_start - Window.insertMeas.ms/2)
+                        offset = crowd_start
+                    else if (offset + Window.insertMeas.ms + c.SNAP_THRESHOLD > crowd_end)
+                        offset = crowd_end - Window.insertMeas.ms;
+
+                    let offset_x = ms_to_x(offset);
+                    p.rect(offset_x, inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
+                    Window.insertMeas.temp_offset = offset;
                     p.stroke(255, 0, 0);
                     if ('beats' in Window.insertMeas)
-                        Window.insertMeas.beats.forEach(draw_beats);
+                        Window.insertMeas.beats.forEach(beat => {
+                            let x = /*('inst' in Window.insertMeas) ? 
+                                (Window.insertMeas.temp_offset + beat) * Window.scale + Window.viewport :
+                                Window.insertMeas.temp_offset + beat*Window.scale;*/
+                                ms_to_x(Window.insertMeas.temp_offset + beat);
+                            let y = ('inst' in Window.insertMeas) ?
+                                Window.insertMeas.inst * c.INST_HEIGHT - Window.scroll :
+                                Math.floor(0.01*t_mouseY)*c.INST_HEIGHT - Window.scroll;
+                            p.line(x, y, x, y + c.INST_HEIGHT);
+                        });
                 }
             } else if ('temp_offset' in Window.insertMeas) {
                 p.rect(Window.insertMeas.temp_offset*Window.scale + Window.viewport, Window.selected.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
@@ -769,7 +830,7 @@ export default function measure(p) {
             return;
 
         if (API.pollSelecting()) {
-            Window.insertMeas.temp_offset = API.confirmSelecting(inst);
+            API.confirmSelecting(inst, Window.insertMeas.temp_offset);
             e.preventDefault();
             Window.insertMeas.inst = inst;
             return;
@@ -837,34 +898,6 @@ export default function measure(p) {
         if (!('gaps' in measure))
             measure.gaps = calcGaps(instruments[Window.selected.inst].ordered, Window.selected.meas.id);
 
-        var crowding = (gaps, position, ms, options) => {
-            let strict = (options && 'strict' in options) ? options.strict : false;
-            let final = position + ms;
-            if (final <= gaps[0][1]) 
-                return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
-            let last_gap = gaps.slice(-1)[0];
-            if (position > last_gap[0])
-                return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
-                
-            return gaps
-                .reduce((acc, gap) => {
-                    // does it even fit in the gap?
-                    if (gap[1] - gap[0] < ms - (strict ? c.NUDGE_THRESHOLD*2 : 0))
-                        return acc;
-                    let start = [gap[0], position - gap[0]];
-                    let end = [gap[1], gap[1] - final];
-
-                    /*if (gap[0] === -Infinity && final <= gap[1])
-                        acc.start = [-Infinity, Infinity]
-                    else*/ if (Math.abs(start[1]) < Math.abs(acc.start[1]))
-                        acc.start = start;
-                    /*if (gap[1] === Infinity && position >= gap[0])
-                        acc.end = [Infinity, Infinity]
-                    else*/ if (Math.abs(end[1]) < Math.abs(acc.end[1]))
-                        acc.end = end;
-                    return acc;
-                }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
-        }
 
         var PPQ_mod = Window.CONSTANTS.PPQ / Window.CONSTANTS.PPQ_tempo;
         var snapper = Mouse.drag.grab;
@@ -1405,9 +1438,13 @@ export default function measure(p) {
     p.mouseMoved = function(event) {
         if (p.mouseX > 0 && p.mouseX < p.width &&
             p.mouseY > 0 && p.mouseY < p.height
-        )
+        ) {
             //////////////////////////////////////
-            API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale);
+            let meta = {};
+            if (API.pollSelecting())
+                meta.insertMeas = Window.insertMeas.temp_offset;
+            API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale, meta);
+        }
         return false;
     };
     
