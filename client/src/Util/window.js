@@ -21,8 +21,40 @@ export default (p) => {
 
             this.insertMeas = {};
             this.editMeas = {};
+            this._lockingCandidate = null;
 
             this.updateViewCallback = () => null;
+        }
+
+        /* what does a lock look like
+         * {
+         *  beat
+         *  type
+         * }
+         */
+
+        locking(candidate, beat) {
+            if ('locks' in candidate) {
+                // toggle off if found
+                if (beat in candidate.locks) {
+                    delete candidate.locks[beat];
+                    return false;
+                } else
+                    candidate.locks[beat] = null;
+            } else
+                candidate.locks = { [beat]: null }
+            console.log(candidate.locks);
+            this._lockingCandidate = beat;
+            return true;
+        }
+
+        lockConfirm(candidate, type) {
+            let beat = this._lockingCandidate;
+            if (!type)
+                delete candidate.locks[beat]
+            else if (beat !== null)
+                candidate.locks[beat] = type;
+            this._lockingCandidate = null;
         }
 
         initialize_temp() {

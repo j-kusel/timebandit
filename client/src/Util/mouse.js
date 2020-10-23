@@ -95,8 +95,8 @@ export default (p, Window) => {
             this.drag.mode = 'measure';
         }
 
-        beatLock(locked) {
-            if (!(Window.selected.meas.id in locked))
+        beatLock() {
+            /*if (!(Window.selected.meas.id in locked))
                 locked[Window.selected.meas.id] = {
                     beats: [],
                     meta: {}
@@ -104,6 +104,10 @@ export default (p, Window) => {
             // IS THIS DUMB?
             if (parse_bits(locked[Window.selected.meas.id].beats).length < 2 || parse_bits(locked[Window.selected.meas.id].beats).indexOf(this.rollover.beat) !== -1)
                 locked[Window.selected.meas.id].beats = bit_toggle(locked[Window.selected.meas.id].beats, this.rollover.beat);
+                */
+            console.log(this.rollover.beat);
+            if (Window.locking(Window.selected.meas, this.rollover.beat))
+                this.drag.mode = 'lock';
         }
 
         clickTempo() {

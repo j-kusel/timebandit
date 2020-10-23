@@ -205,7 +205,7 @@ class App extends Component {
               (tut.indexOf('_') !== 0) ?
                   tutorials[tut] = obj[tut] : null
           );
-          this.setState({ mouseBlocker: obj._mouseBlocker, tutorials });
+          //this.setState({ mouseBlocker: obj._mouseBlocker, tutorials });
       }
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
@@ -219,7 +219,7 @@ class App extends Component {
           self.setState(oldState => {
               let instruments = oldState.instruments;
               let oldMeas = instruments[inst].measures[id];
-              let newMeas = { ...calc, id, inst, beat_nodes: [] };
+              let newMeas = { ...calc, id, inst, beat_nodes: [], locks: {} };
               let ordered_cpy = Object.assign(oldState.ordered, {});
               if (Object.keys(ordered_cpy))
                   calc.beats.forEach((beat, ind) =>
@@ -306,7 +306,8 @@ class App extends Component {
           self.setState(oldState => {
               let instruments = oldState.instruments;
               let id = uuidv4();
-              instruments[inst].measures[id] = { ...calc, id, inst };
+
+              instruments[inst].measures[id] = { ...calc, id, inst, beat_nodes: [], locks: {} };
               logger.log(`New measure ${id} created in instrument ${inst}.`);
               return { instruments };
           });
@@ -391,7 +392,8 @@ class App extends Component {
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
 
           let id = uuidv4();
-          let measure = { ...calc, id, inst };
+
+          let measure = { ...calc, id, inst, beat_nodes: [], locks: {} };
           
           let newState = { instruments: this.state.instruments };
           newState.instruments[inst].measures[id] = measure;
