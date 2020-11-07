@@ -205,7 +205,7 @@ class App extends Component {
               (tut.indexOf('_') !== 0) ?
                   tutorials[tut] = obj[tut] : null
           );
-          //this.setState({ mouseBlocker: obj._mouseBlocker, tutorials });
+          this.setState({ mouseBlocker: obj._mouseBlocker, tutorials });
       }
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
