@@ -693,14 +693,27 @@ export default function measure(p) {
             p.stroke(primary);
             p.rect(-45, -10, 35, 20);
             p.rect(10, -10, 35, 20);
+            p.rect(-17, -20, 35, 20);
             p.stroke(secondary)
             p.fill(secondary)
             p.textSize(10);
             p.textAlign(p.CENTER, p.CENTER);
             p.text('loc', -27, 0);
             p.text('tempo', 27, 0);
+            p.text('both', 0, -10);
             Mouse.lock_type = null;
-            if (p.mouseY > p.mouseDown.y - 10 &&
+
+            if (p.mouseX > p.mouseDown.x - 17 &&
+                p.mouseX < p.mouseDown.x + 18 &&
+                p.mouseY > p.mouseDown.y - 20 &&
+                p.mouseY < p.mouseDown.y + 0
+            ) {
+                p.stroke(primary);
+                p.rect(-17, -20, 35, 20);
+                p.fill(primary);
+                p.text('both', 0, -10);
+                Mouse.lock_type = 'both'
+            } else if (p.mouseY > p.mouseDown.y - 10 &&
                 p.mouseY < p.mouseDown.y + 10
             ) {
                 if (p.mouseX < p.mouseDown.x - 10 &&
@@ -923,8 +936,9 @@ export default function measure(p) {
         let lock_candidates = ('locks' in Window.selected.meas) ?
             Object.keys(Window.selected.meas.locks) : [];
         var beat_lock = lock_candidates.length ?
-            ({ beat: lock_candidates[0], type: Window.selected.meas.locks[lock_candidates[0]] }) :
+            ({ beat: parseInt(lock_candidates[0], 10), type: Window.selected.meas.locks[lock_candidates[0]] }) :
             {};
+
             
             /*(Window.selected.meas.id in locked && locked[Window.selected.meas.id].beats) ?
             parse_bits(locked[Window.selected.meas.id].beats) : [];
@@ -1029,7 +1043,7 @@ export default function measure(p) {
                         cumulative += last;
                     });
                     beats.push(cumulative);
-                    return { start, end, slope, offset, ms: cumulative, beats, ticks };
+                    return { start, end, slope, offset, ms: cumulative, beats, ticks, snap };
                 }
 
                 let delta = { start: alpha, end: alpha };
@@ -1054,14 +1068,15 @@ export default function measure(p) {
                 let calc_extracts = { snapped: snap };
                 if (beat_lock)
                     Object.assign(calc_extracts, { locked: beat_lock.beat });
-                console.log(beat_lock);
-                console.log(calc_extracts);
                 let calc = quickCalc(start, slope, measure.timesig, calc_extracts);
                 let { locked, snapped } = calc;
 
-                if (locked) {// && beat_lock.type === 'loc') {
-                    console.log('in!');
-                    offset = measure.offset + measure.beats[beat_lock.beat] - locked;
+                if (typeof(locked) === 'number') {// && beat_lock.type === 'loc') {
+                    // 'absolute' will shift everything around a locked point in absolute time
+                    if ('absolute' in beat_lock)
+                        offset = beat_lock.absolute - locked;
+                    else
+                        offset = measure.offset + measure.beats[beat_lock.beat] - locked;
                 } else //if (even)
                     // make SURE offset gets updated - otherwise gap will never shorten when the first beat snaps!
                     offset += (ms - calc.ms)*0.5;
@@ -1070,6 +1085,7 @@ export default function measure(p) {
 
                 
                 let new_gap = snapped + offset - target;
+                console.log(snapped, offset, target);
                 alpha = monitor(gap, new_gap, alpha);
                 return nudge(new_gap, alpha, depth + 1, even);
             }
@@ -1082,15 +1098,15 @@ export default function measure(p) {
             Mouse.drag.y += event.movementY;
             let spread = range.tempo[1] - range.tempo[0];
             let change = Mouse.drag.y / c.INST_HEIGHT * spread;
-            var abeat_lock = Object.keys(measure.locks).length ?
+            var beat_lock = Object.keys(measure.locks).length ?
                 ({ beat: parseInt(lock_candidates[0], 10), type: Window.selected.meas.locks[lock_candidates[0]] }) : {};
             
-            if (abeat_lock.beat !== Mouse.grabbed) {
+            if (beat_lock.beat !== Mouse.grabbed) {
                 let slope = (measure.end - measure.start)/measure.timesig;
                 let new_slope = slope*Mouse.grabbed - change;
 
                 // if nothing is tempo-locked
-                if (!('beat' in abeat_lock) || abeat_lock.type === 'loc') {
+                if (!('beat' in beat_lock) || beat_lock.type === 'loc') {
                     console.log('path 1');
                     let update = {
                         start: measure.start - (!(locks & 1 << 1) ? change : 0),
@@ -1125,26 +1141,57 @@ export default function measure(p) {
                     update.beats.push(cumulative);
 
 
-                    if ('beat' in abeat_lock)
-                        update.offset = measure.offset + measure.beats[abeat_lock.beat] - update.beats[abeat_lock.beat]
+                    if ('beat' in beat_lock)
+                        update.offset = measure.offset + measure.beats[beat_lock.beat] - update.beats[beat_lock.beat]
                     else
                         update.offset += (measure.ms - cumulative)/2; 
 
-                    if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD)
-                        update.offset = crowd.start[0]
-                    else if (update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD)
-                        update.offset = crowd.end[0] - cumulative;
-
                     Object.assign(update, { ms: cumulative });
 
-                    // WORKING ON SNAPS
+                    // check if the adjustment crowds the previous or next measures
+                    if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD) {
+                        // check if a segment up to a loc-locked beat is filled
+                        if ('beat' in beat_lock && beat_lock.type === 'loc') {
+                            if (!nudge_cache) {
+                                measure.temp.offset = update.offset;
+                                // the strategy with this nudge is to lock the updated offset,
+                                // overshoot the snapped beat, then shift the nudged measure offset
+                                // backwards to correct.
+                                let nudge = nudge_factory(measure, measure.offset + measure.beats[beat_lock.beat] + (measure.offset-crowd.start[0]), beat_lock.beat, { beat: 0, type: 'loc' }, 0, 0);
+                                nudge_cache = nudge(update.offset - crowd.start[0], 0.01, 0);
+                                // correct for offset
+                                nudge_cache.offset = crowd.start[0];
+                            }
+                            Object.assign(update, nudge_cache);
+                        } else
+                            update.offset = crowd.start[0];
+                    } else if (update.offset + cumulative > crowd.end[0] - c.SNAP_THRESHOLD) {
+                        // check for interference with the next measure
+                        if ('beat' in beat_lock && beat_lock.type === 'loc') {
+                            if (!nudge_cache) {
+                                update.offset = crowd.end[0];
+                                measure.temp.offset = update.offset;
+                                let nudge = nudge_factory(measure, measure.offset + measure.beats[beat_lock.beat], beat_lock.beat, { beat: measure.timesig, type: 'loc', absolute: crowd.end[0] }, 0, 0);
+                                nudge_cache = nudge(crowd.end[0] - update.offset - cumulative, 0.01, 0);
+                            }
+                            Object.assign(update, nudge_cache);
+                        } else
+                            update.offset = crowd.end[0] - cumulative;
+                    }
+
                     let exemption = null;
-                    if ('beat' in abeat_lock)
-                        exemption = abeat_lock.beat;
+                    if ('beat' in beat_lock)
+                        exemption = beat_lock.beat;
                     let close = snap_eval(update.offset, update.beats, exemption);
                     let gap = close.target - (update.beats[close.index] + update.offset);
 
-                        
+                    // if snap target changes, recalculate nudge_cache
+                    if (nudge_cache && nudge_cache.snap !== close.index)
+                        nudge_cache = false;
+
+
+                    // NEED TO COPY THIS TO 'tempo'/beat_lock === 'tempo'/'both' section below
+                    // - get tempo lock to push against the sides of adjacent measures with no 'loc' lock
                     if (cumulative > crowd.end[0] - crowd.start[0]) {
                         update.offset = crowd.start[0];
                         if (!nudge_cache) {
@@ -1159,7 +1206,7 @@ export default function measure(p) {
                         if (!nudge_cache) {
                             measure.temp.offset = update.offset;
                             let nudge = nudge_factory(measure, close.target, close.index, 
-                                ('beat' in abeat_lock) ? abeat_lock : null,
+                                ('beat' in beat_lock) ? beat_lock : null,
                             0);
                             nudge_cache = nudge(gap, 0.01, 0);
                         };
@@ -1171,11 +1218,14 @@ export default function measure(p) {
                     Object.assign(range, { temprange });
                     Object.assign(measure.temp, update);
                     return;
-                } else if (beat_lock.type === 'tempo') {
 
-                    console.log('path 2');
-                    let pivot = (measure.end - measure.start)/measure.timesig * abeat_lock.beat;
-                    let fresh_slope = (new_slope - pivot) / (Mouse.grabbed - abeat_lock.beat);
+                //} else if (beat_lock.type === 'tempo') {
+
+                // this should work for type === 'both' - DRY this up later
+                } else if (beat_lock.type) {
+
+                    let pivot = (measure.end - measure.start)/measure.timesig * beat_lock.beat;
+                    let fresh_slope = (new_slope - pivot) / (Mouse.grabbed - beat_lock.beat);
                     let temp_start = (new_slope + measure.start) - fresh_slope*Mouse.grabbed;
                     let inc = fresh_slope/Window.CONSTANTS.PPQ;
 
@@ -1196,7 +1246,11 @@ export default function measure(p) {
                     });
                     new_beats.push(cumulative);
 
-                    let temp_offset = measure.offset + measure.beats[abeat_lock.beat] - new_beats[abeat_lock.beat];
+                    let temp_offset = measure.offset;
+                    if (beat_lock.type === 'tempo')
+                        temp_offset += (measure.ms*0.5 - cumulative*0.5)
+                    else if (beat_lock.type === 'both')
+                        temp_offset += (measure.beats[beat_lock.beat] - new_beats[beat_lock.beat]);
                     
                     let crowd = crowding(measure.gaps, temp_offset, cumulative);
 
@@ -1231,7 +1285,9 @@ export default function measure(p) {
                         if (!nudge_cache) {
                             measure.temp.start = temp_start;
                             // nudge factory - tempo change, beat is locked, snap to previous measure
-                            let nudge = nudge_factory(measure, crowd.start[0], 0, beat_lock, locks, 'rot_left');
+                            let nudge = nudge_factory(measure, crowd.start[0], 0, 
+                                (beat_lock.type === 'both') ? beat_lock : null, 
+                            locks, 'rot_left');
                             nudge_cache = nudge(crowd.start[1], 0.01, 0);
                         }
                     } else if ((measure.offset + measure.ms) < (crowd.end[0] - c.NUDGE_THRESHOLD)
@@ -1243,7 +1299,7 @@ export default function measure(p) {
                             measure.temp.start = temp_start;
 
                             // nudge factory - tempo change, beat is locked, snap to previous measure
-                            let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, beat_lock, locks, 'rot_right');
+                            let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, /*beat_lock*/ null, locks, 'rot_right');
                             nudge_cache = nudge(crowd.end[1], 0.001, 0);
                         }
                     // MESSYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
@@ -1252,7 +1308,9 @@ export default function measure(p) {
                         if (!nudge_cache) {
                             measure.temp.start = temp_start;
                             let type = (gap > 0) ? 'rot_right' : 'rot_left';
-                            let nudge = nudge_factory(measure, close.target, close.index, beat_lock, locks, type);
+                            let nudge = nudge_factory(measure, close.target, close.index,
+                                (beat_lock.type === 'both') ? beat_lock : null, 
+                            locks, type);
                             nudge_cache = nudge(gap, 0.001, 0);
                         }
                     } else
@@ -1283,13 +1341,12 @@ export default function measure(p) {
                     update.ticks = new_ticks;
                     update.beats = new_beats;
                     update.ms = cumulative;
-                    if ('beat' in beat_lock)
+                    if ('beat' in beat_lock && beat_lock.type === 'both')
                         update.offset = measure.offset + measure.beats[beat_lock.beat] - new_beats[beat_lock.beat];
                     let temprange = [Math.min(update.start, range.tempo[0]), Math.max(update.end, range.tempo[1])];
                     Object.assign(range, { temprange });
 
                     Object.assign(measure.temp, update);
-                    console.log(measure.temp);
                 }
             }
 
