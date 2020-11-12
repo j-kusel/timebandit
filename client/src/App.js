@@ -17,9 +17,9 @@ import { Parser } from './Util/parser';
 import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
-import { InputGroup, FormControl } from 'react-bootstrap';
+import { InputGroup, FormControl, Container, Row, Col } from 'react-bootstrap';
 import { Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
-import { SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
+import { ExportModal, SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
 import debug from './Util/debug.json';
@@ -112,6 +112,8 @@ class App extends Component {
           newInst: false,
           PPQ: CONFIG.PPQ_default,
           tutorials: {},
+          exportsOpen: false,
+          sibeliusExport: false,
           scrollY: 0,
           mouseBlocker: () => false
       };
@@ -162,9 +164,11 @@ class App extends Component {
 		  
 		  'midi', 'play', 'preview', 'kill',
 		  'save', 'load', 'upload', 'reset', 'settings',
+          'sibelius',
 		  'handleNew', 'handleOpen',
 		  'confirmEdit',
 		  'toggleTutorials',
+		  'toggleExports',
           'focusInsertSubmit'
 	  ].forEach(func => self[func] = self[func].bind(this));
       
@@ -197,7 +201,9 @@ class App extends Component {
       };
 
       var modalCheck = () => 
-          ['warningNew', 'warningOpen', 'settingsOpen', 'tutorialsOpen'].some(o => this.state[o]);
+          ['warningNew', 'warningOpen', 'settingsOpen', 'tutorialsOpen', 'exportsOpen'].some(o => this.state[o]);
+
+      var sibeliusCheck = () => this.state.sibeliusExport;
 
       var registerTuts = (obj) => {
           let tutorials = {}
@@ -402,7 +408,7 @@ class App extends Component {
           return measure;
       };
 
-      return { registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { sibeliusCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -418,6 +424,10 @@ class App extends Component {
       _open ?
         this.setState(() => ({ newInst: true }), () => this.instNameFocus.current.focus()) :
         this.setState({ newInst: false, instName: '' });
+  }
+
+  sibelius() {
+    this.setState({ sibeliusExport: true, exportsOpen: false });
   }
 
   handleInst(e) {
@@ -855,6 +865,10 @@ class App extends Component {
       );
   }
 
+  toggleExports() {
+    this.setState(oldState => ({ exportsOpen: !oldState.exportsOpen }));
+  }
+
 
   handleTut(tut) {
       if (this.state.mouseBlocker())
@@ -1134,7 +1148,7 @@ class App extends Component {
                     <Upload onClick={this.reset}>new</Upload>
                     <Upload onClick={this.upload}>open</Upload>
                     <Upload onClick={this.save}>save</Upload>
-                    <Upload onClick={this.midi}>export</Upload>
+                    <Upload onClick={(e) => this.toggleExports()}>export</Upload>
                 </div>
             </div>
 
@@ -1168,6 +1182,29 @@ class App extends Component {
           ]}
 
         />        
+        <ExportModal
+            show={this.state.exportsOpen}
+        >
+            <Container style={{ width: '300px' }}>
+                <Row>
+                    <Col xs={4}>
+                        <button onClick={this.midi}>midi</button>
+                    </Col>
+                    <Col xs={8}>
+                    </Col>
+                </Row>
+                <Row>
+                    <Col xs={4}>
+                        <button onClick={this.sibelius}>sibelius</button>
+                    </Col>
+                    <Col xs={8}>
+                    </Col>
+                </Row>
+            </Container>
+        </ExportModal>
+
+            
+            
         <SettingsModal
             show={this.state.settingsOpen}
             onHideCallback={this.settings}

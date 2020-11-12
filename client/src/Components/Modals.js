@@ -58,6 +58,26 @@ var ServerModal = (props) => (
     </StyledModal>
 );
 
+var ExportModal = (props) => (
+    <StyledModal 
+      show={ props.show }
+      size="md"
+      onHide={ props.onHide }
+      centered
+    >
+      <ModalHeader closeButton>
+        - EXPORT SETTINGS
+      </ModalHeader>
+      <Modal.Dialog 
+        style={{ height: '100px', width: '300px' }}
+        centered
+      >
+        <ModalBody>
+            {props.children}
+        </ModalBody>
+      </Modal.Dialog>
+    </StyledModal>
+);
 
 var WarningModal = (props) => (
     <StyledModal 
@@ -185,4 +205,4 @@ var SettingsModal = (props) => {
     );
 };
 
-export { ServerModal, SettingsModal, WarningModal, TutorialsModal, WelcomeModal };
+export { ExportModal, ServerModal, SettingsModal, WarningModal, TutorialsModal, WelcomeModal };

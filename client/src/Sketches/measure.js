@@ -750,6 +750,18 @@ export default function measure(p) {
         };
             
         subs.forEach(sub => sub());
+
+        // do that sibelius check thing here
+        if (API.sibeliusCheck()) {
+            let sib_window_size = 10000*Window.scale;
+            p.push()
+            p.translate(p.mouseX - sib_window_size*0.5, c.PLAYBACK_HEIGHT);
+            let sib_color = p.color(colors.contrast_light);
+            sib_color.setAlpha(0.25);
+            p.rect(0, 0, sib_window_size, instruments.length*c.INST_HEIGHT);
+            p.pop();
+        }
+
     }
 
     p.keyReleased = function(e) {
@@ -898,6 +910,44 @@ export default function measure(p) {
         if (inst >= instruments.length || inst < 0)
             return;
 
+        if (API.sibeliusCheck()) {
+            let w = 14*72;
+            let h = 8.5*72;
+            let margins = [0.05*w, 0.05*h];
+            let img = p.createImage(w, h);
+            let duration = 10000;
+            let ratio = (w*0.9)/duration;
+            img.loadPixels();
+            let inst_height = h/instruments.length;
+            let click_loc = x_to_ms(p.mouseX-c.PANES_WIDTH);
+            console.log(click_loc);
+            let click_window = [click_loc-duration*0.5, click_loc+duration*0.5];
+            console.log(click_window);
+            instruments.forEach((inst, ind) => {
+                console.log('entering inst', ind);
+                Object.keys(inst.measures).forEach(key => {
+                    let meas = inst.measures[key];
+                    console.log('entering meas', key);
+                    meas.beats.forEach((beat, i) => {
+                        let loc = meas.offset + beat;
+                        console.log(loc, loc-click_window[0]);
+                        if (loc < click_window[1] &&
+                            loc > click_window[0]
+                        ) {
+                            for (let y=0; y<inst_height; y++) {
+                                img.set(Math.round((loc-click_window[0])*ratio) + margins[0],
+                                    y+ind*inst_height,
+                                    (i===0) ? p.color(100, 0, 255) : p.color(255, 0, 100)
+                                );
+                            }
+                        }
+                    });
+                });
+            });
+
+            img.updatePixels();
+            p.save(img, 'sibelius.png');
+        }
         if (API.pollSelecting()) {
             API.confirmSelecting(inst, Window.insertMeas.temp_offset);
             e.preventDefault();
@@ -1438,7 +1488,6 @@ export default function measure(p) {
         };
 
 
-        console.log('from regular calc:', snap);
         let { ms, locked, grabbed } = quickCalc(temp_start, slope, measure.timesig, { locked: beat_lock.beat, grabbed: snap });
 
         if (Math.abs(ms - measure.ms) < c.DRAG_THRESHOLD_X) {
@@ -1464,7 +1513,6 @@ export default function measure(p) {
         let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
         
         let gap = loc - snap_to;
-        console.log(loc, snap_to);
 
         if (Math.abs(gap) < c.SNAP_THRESHOLD) {
             // if initial snap, update measure.temp.start 
