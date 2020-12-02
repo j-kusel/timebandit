@@ -293,11 +293,13 @@ class App extends Component {
           self.setState(oldState => newState);
       };
 
-      var newFile = () =>
+      var newFile = () => {
+          console.log('newFile');
           self.setState({
               selected: { inst: -1, meas: undefined },
               instruments: []
           });
+      }
 
       var newCursor = (loc, meta) => {
           let newState = { cursor: loc };
@@ -831,6 +833,7 @@ class App extends Component {
               measures: {}
           }],
           warningNew: false,
+          selected: { inst: -1, meas: undefined },
       });
   }
 
@@ -1005,7 +1008,7 @@ class App extends Component {
 
     let selected = this.state.selected;
 
-    let inst = selected.inst > -1 ?
+    let inst = (selected.inst > -1) || (this.state.instruments[selected.inst]) ?
         this.state.instruments[selected.inst] :
         {};
 
@@ -1032,6 +1035,7 @@ class App extends Component {
     let newInstHeight = this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT - this.state.scrollY;
 
 	let propsUI = {
+        selected: this.state.selected,
 		mode: this.state.mode, 
 		locks: this.state.locks,
 	    instruments: this.state.instruments.map((inst) => ({ 

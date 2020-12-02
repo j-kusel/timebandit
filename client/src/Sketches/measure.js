@@ -190,7 +190,7 @@ export default function measure(p) {
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         instruments = props.instruments;
         Window.insertMeas = props.insertMeas;
-
+        Window.selected = props.selected || ({ inst: -1, meas: undefined });
         Window.editMeas = props.editMeas;
         Window.panels = props.panels;
         Window.mode = props.mode;

@@ -131,16 +131,13 @@ var init = (p, hook) => {
 
             this.html.position(x, y);
             this.html.style(`
-                width: ${x2 - x}px;
-                height: ${y2 - y}px;
+                width: ${x2 - x};
+                height: ${y2 - y};
                 color: ${colors.primary};
                 background-color: ${colors.secondary};
                 border: 1px solid ${colors.primary};
-                padding: 40px;
-                font-size: 12pt;
-                line-height: 14pt;
-                font-family: 'Work Sans', sans-serif;
-                z-index: 100;
+                padding: 20px;
+                font-size: 18pt;
             `);
             this.html.html(`<p>${this.text.join(' ')}</p>`);
         }
@@ -154,15 +151,15 @@ var init = (p, hook) => {
 
             this.buttons = [
                 new Button('X', {
-                    x: () => (x2()-x()) - 42, y: () => 8,
+                    x: () => x2() - 28, y: () => y() + 8,
                     width: 20, height: 20,
                 }, 'exit tutorial', () => this.parent.end(), this.html),
                 new Button('next', {
-                    x: () => x2()-x() - 72, y: () => y2()-y() - 44,
+                    x: () => x2() - 48, y: () => y2() - 28,
                     width: 40, height: 20,
                 }, 'next window', () => this.forward(), this.html),
                 new Button('back', {
-                    x: () => 8, y: () => (y2() - y()) - 44,
+                    x: () => x() + 8, y: () => y2() - 28,
                     width: 40, height: 20,
                 }, 'last window', () => this.backward(), this.html)
             ];
