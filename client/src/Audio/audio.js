@@ -102,6 +102,7 @@ function scheduler(start, node) {
 };
 
 var playback = (isPlaying, score, tracking) => {
+    console.log(score);
     tracking = tracking || 0;
     if (isPlaying) {
         locator = {

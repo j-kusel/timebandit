@@ -19,7 +19,7 @@ let find = (node, ms) => {
 }
 
 let insert = (loc, meas, root) => {
-    if (!root) {
+    if (!root || !('loc' in root)) {
         let root = { loc, meas: [meas] };
         ('beat_nodes' in meas) ?
             meas.beat_nodes.push(root) :

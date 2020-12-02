@@ -297,7 +297,8 @@ class App extends Component {
           console.log('newFile');
           self.setState({
               selected: { inst: -1, meas: undefined },
-              instruments: []
+              instruments: [],
+              ordered: {}
           });
       }
 
@@ -403,8 +404,11 @@ class App extends Component {
 
           let measure = { ...calc, id, inst, beat_nodes: [], locks: {} };
           
-          let newState = { instruments: this.state.instruments };
+          let newState = { instruments: this.state.instruments, ordered: this.state.ordered };
           newState.instruments[inst].measures[id] = measure;
+          measure.beats.forEach((beat) =>
+              newState.ordered = ordered.tree.insert(beat + measure.offset, measure, newState.ordered)
+          );
 
           this.setState(newState);
           return measure;
@@ -495,7 +499,14 @@ class App extends Component {
           instruments[inst].measures[id] = { ...calc, id, inst };
           let [start, end, timesig, offset] = ['', '', '', ''];
           let temp_offset = false;
+          let newOrdered = Object.assign(oldState.ordered, {});
+          calc.beats.forEach((beat) =>
+              newOrdered = ordered.tree.insert(beat + newMeasure.offset, instruments[inst].measures[id], newOrdered)
+          );
+          console.log(oldState.ordered);
+          console.log(newOrdered);
           return {
+              ordered: newOrdered,
               instruments,
               mode: 0,
               start, end, timesig, offset, temp_offset
@@ -731,6 +742,7 @@ class App extends Component {
       if (this.state.mouseBlocker())
           return;
 
+      console.log(this.state.ordered);
       let newState = {};
       if (!isPlaying) {
           audio.kill();
@@ -738,11 +750,11 @@ class App extends Component {
       else if (_.isEqual(this.state.ordered, {})) {
           var root;
           this.state.instruments.forEach((inst, i_ind) =>
-              Object.keys(inst.measures).forEach((key) =>
+              Object.keys(inst.measures).forEach((key) => {
                 inst.measures[key].beats.forEach((beat) =>
                     root = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], root)
-                )
-              )
+                );
+              })
           );
 
           audio.play(isPlaying, root, cursor);
@@ -752,7 +764,7 @@ class App extends Component {
 
       document.activeElement.blur();
       newState.isPlaying = isPlaying;
-      this.setState(oldState => (newState));
+      this.setState(newState);
   }
 
   preview(isPreviewing) {
@@ -834,6 +846,7 @@ class App extends Component {
           }],
           warningNew: false,
           selected: { inst: -1, meas: undefined },
+          ordered: {}
       });
   }
 
