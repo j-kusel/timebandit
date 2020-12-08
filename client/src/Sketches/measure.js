@@ -999,7 +999,12 @@ export default function measure(p) {
             crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true });
         var crowd = crowd_cache;
 
-
+        // initialize update
+        var update = {
+            beats: [], ticks: [], offset: measure.offset,
+            start: measure.start,
+            end: measure.end
+        };
 
 
         // find snap point closest to a position in other instruments
@@ -1044,11 +1049,11 @@ export default function measure(p) {
             // determine whether start or end are closer
             // negative numbers signify conflicts
             let crowd = crowding(measure.gaps, position, measure.ms);
-            let update = {
+            Object.assign(update, {
                 ticks: measure.ticks.slice(0),
                 beats: measure.beats.slice(0),
                 offset: position
-            };
+            });
 
             // initialize flag to prevent snapping when there's no space anyways
             let check_snap = true;
@@ -1141,6 +1146,8 @@ export default function measure(p) {
             beats.push(ms);
             return { beats, ticks, ms }
         }
+
+
 
             /* so we need :
              * number of ticks
@@ -1299,6 +1306,70 @@ export default function measure(p) {
             return nudge;
         };
 
+        const tweak_crowd_size = (update) => {
+            console.log('Getting too big! Nudge #1');
+            // can't really do this with a location lock
+            if (beat_lock.type && beat_lock.type !== 'tempo')
+                return;
+            //update.offset = crowd.start[0];
+            if (!nudge_cache || nudge_cache.type !== 1) {
+                measure.temp.offset = crowd.start[0];
+                // nudge factory - fill gap
+                let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, { beat: 0, type: 'loc', absolute: crowd.start[0] }, 
+                    // use rotation type if 'tempo' lock
+                    beat_lock.type === 'tempo' ? 'rot_right': 0
+                );
+                nudge_cache = nudge(crowd.end[0] - (crowd.start[0] - update.ms), 0.01, 0);
+                nudge_cache.type = 1;
+            }
+            Object.assign(update, nudge_cache);
+            update.offset = crowd.start[0];
+            return update;
+        }
+
+        const tweak_crowd_previous = (update) => {
+            console.log("Crowding previous measure! Nudge #2");
+            if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
+                if (!nudge_cache || nudge_cache.type !== 2) {
+                    measure.temp.offset = crowd.start[0]; //update.offset;
+                    let nudge = nudge_factory(measure, crowd.start[0], 0, beat_lock, 0, beat_lock.type === 'both' ? 'rot_left' : 0);
+                    nudge_cache = nudge(update.offset - crowd.start[0], 0.01, 0);
+                    nudge_cache.offset = crowd.start[0];
+                    nudge_cache.type = 2;
+                }
+                Object.assign(update, nudge_cache);
+            } else 
+                update.offset = crowd.start[0];
+            return update;
+        };
+
+        const tweak_crowd_next = (update) => {
+            console.log("Crowding next measure! Nudge #3");
+            // check for interference with the next measure
+            if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
+                if (!nudge_cache || nudge_cache.type !== 3) {
+                    measure.temp.offset = update.offset;
+                    // the strategy here is to lock the standard beat, 
+                    // then treat crowd.end[0] as a point to snap
+                    // the end of the measure to
+                    let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, { beat: beat_lock.beat, /*absolute: measure.offset + measure.beats[beat_lock.beat],*/ type: 'loc' }, 0, 
+                        beat_lock.type === 'both' ? 'rot_right' : 0);
+                    nudge_cache = nudge(crowd.end[0] - update.offset - update.ms, 0.01, 0);
+                    // correct for offset ???
+                    // not sure if the lock or the measure crowding is more important here;
+                    // nudge_cache.offset = (measure.offset + measure.beats[beat_lock.beat]) - nudge_cache.beats[beat_lock.beat]; 
+                    // // i'm inclined to say the crowding.
+                    nudge_cache.offset = crowd.end[0] - nudge_cache.ms;
+                    nudge_cache.type = 3;
+                }
+                Object.assign(update, nudge_cache);
+            } else
+                update.offset = crowd.end[0] - update.ms;
+            return update;
+        };
+
+
+
         // begin tweaks
 
         // if we move this to a separate function, what globals does it depend on?
@@ -1327,7 +1398,7 @@ export default function measure(p) {
             //
             //
             // if nothing is tempo-locked
-            let update = { beats: [], ticks: [], offset: measure.offset };
+            //update = { beats: [], ticks: [], offset: measure.offset };
             if (!('beat' in beat_lock) || beat_lock.type === 'loc') {
                 update.start = measure.start - (!(locks & 1 << 1) ? change : 0);
                 update.end = measure.end - (!(locks & 1 << 2) ? change : 0);
@@ -1363,15 +1434,22 @@ export default function measure(p) {
             // I BASICALLY DON'T THINK THIS IS POSSIBLE WITH A LOCATION LOCK...
             // BUT ALSO DOES IT EVEN MATTER?
             if (update.ms > crowd.end[0] - crowd.start[0]) {
+                console.log(Object.assign({}, update));
                 console.log('Getting too big! Nudge #1');
+                update = tweak_crowd_size(update);
+                update.offset = crowd.start[0];
+                return finalize();
                 // can't really do this with a location lock
-                if (beat_lock.type && beat_lock.type !== 'tempo')
+                /*if (beat_lock.type && beat_lock.type !== 'tempo')
                     return;
-                //update.offset = crowd.start[0];
+                update.offset = crowd.start[0];
                 if (!nudge_cache || nudge_cache.type !== 1) {
                     measure.temp.offset = crowd.start[0];
+                    measure.temp.start = update.start;
+
+                    console.log(Object.assign({}, update));
                     // nudge factory - fill gap
-                    let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, { beat: 0, type: 'loc' }, 
+                    let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, { beat: 0, type: 'loc', absolute: crowd.start[0] }, 
                         // use rotation type if 'tempo' lock
                         beat_lock.type === 'tempo' ? 'rot_right': 0
                     );
@@ -1382,20 +1460,10 @@ export default function measure(p) {
                 update.offset = crowd.start[0];
                 // let's maybe just break early here
                 return finalize();
+                */
             // this next part needs to come later -
             // "gap" is irrelevant if we haven't shifted the offset yet
-            } /*else if (Math.abs(gap) < c.SNAP_THRESHOLD/2) {
-                console.log('snapping ', close.index, gap);
-                if (!nudge_cache) {
-                    measure.temp.offset = update.offset;
-                    let nudge = nudge_factory(measure, close.target, close.index, 
-                        ('beat' in beat_lock) ? beat_lock : null,
-                    0);
-                    nudge_cache = nudge(gap, 0.01, 0);
-                };
-                Object.assign(update, nudge_cache);
-            } else */
-                //nudge_cache = false;
+            }
 
             // shift offset depending on 'loc' lock
             update.offset += (!beat_lock.type || beat_lock.type === 'tempo') ?
@@ -1406,6 +1474,8 @@ export default function measure(p) {
 
             // check if the adjustment crowds the previous or next measures
             if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD) {
+                update = tweak_crowd_previous(update);
+                /*
                 console.log("Crowding previous measure! Nudge #2");
                 // check if a segment up to a loc-locked beat is filled
                 if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
@@ -1414,9 +1484,8 @@ export default function measure(p) {
                         // DEPR: the strategy with this nudge is to lock the updated offset,
                         // overshoot the snapped beat, then shift the nudged measure offset
                         // backwards to correct.
-                        /*let nudge = nudge_factory(measure, measure.offset + measure.beats[beat_lock.beat], beat_lock.beat, { beat: 0, type: 'loc' }, 0, 
-                            beat_lock.type === 'both' ? 'rot_left' : 0);
-                            */
+                        //let nudge = nudge_factory(measure, measure.offset + measure.beats[beat_lock.beat], beat_lock.beat, { beat: 0, type: 'loc' }, 0, 
+                        //    beat_lock.type === 'both' ? 'rot_left' : 0);
                         // NEW: what if instead, we tried just "snapping" the start point to crowd.start[0]?
                         // this is working well!
                         let nudge = nudge_factory(measure, crowd.start[0], 0, beat_lock, 0, beat_lock.type === 'both' ? 'rot_left' : 0);
@@ -1428,8 +1497,11 @@ export default function measure(p) {
                     Object.assign(update, nudge_cache);
                 } else 
                     update.offset = crowd.start[0];
+                    */
             } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD) {
-                console.log("Crowding next measure! Nudge #3");
+
+                update = tweak_crowd_next(update);
+                /*console.log("Crowding next measure! Nudge #3");
                 // check for interference with the next measure
                 if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
                     if (!nudge_cache || nudge_cache.type !== 3) {
@@ -1450,6 +1522,7 @@ export default function measure(p) {
                     Object.assign(update, nudge_cache);
                 } else
                     update.offset = crowd.end[0] - update.ms;
+    */
             }
 
             // the final (and lowest priority) checks are for snaps in adjacent instruments
@@ -1508,12 +1581,15 @@ export default function measure(p) {
 
             let amp_lock = beatscale/perc;
 
-            var update = {
+            /*var update = {
                 beats: [], ticks: [], offset: measure.offset,
                 start: measure.start,
                 end: measure.end
             };
+            */
 
+            // LEAVING OFF HERE
+            //if 
 
             // these should be generalized to other drag modes.
             // if START is locked
@@ -1541,76 +1617,19 @@ export default function measure(p) {
                 //update.start = measure.start + amp_lock/2;
             };
 
-
-            //let { ms, locked, grabbed } = quickCalc(temp_start, slope, measure.timesig, { locked: beat_lock.beat, grabbed: snap });
-            let calc = completeCalc(update.start, update.end-update.start, measure.timesig);
-
-            // i don't really think this is necessary, but i was going
-            // for a scale-based drag threshold. better ways to implement this.
-            if (Math.abs(calc.ms - measure.ms) < c.DRAG_THRESHOLD_X) {
-                measure.temp.offset = measure.offset;
-                measure.temp.start = measure.start;
-                slope = measure.end - measure.start;
-                return;
-            };
-
-
-            /*let temp_offset = locked ?
-                measure.offset + measure.beats[beat_lock.beat] - locked :
-                measure.offset;
-                */
-            update.offset = beat_lock.type ?
-                measure.offset + measure.beats[beat_lock.beat] - calc[beat_lock.beat] :
-                update.offset;
-
-            let loc = calc.beats[snap] + update.offset;
-
-            // LEAVING OFF HERE
-
-            // check for overlaps
-            crowd = crowding(measure.gaps, update.offset, calc.ms);
-            if (crowd.start[1] < 0 || crowd.end[1] < 0)
-                return;
-
-            let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
-            
-            let gap = loc - snap_to;
-
-            if (Math.abs(gap) < c.SNAP_THRESHOLD) {
-                // if initial snap, update measure.temp.start 
-                // for the last time and nudge.
-                if (!nudge_cache) {
-                    measure.temp.start = temp_start;
-
-                    // nudge factory - tick mouse drag, snap to adjacent measure beats
-                    //
-                    let nudge = nudge_factory(measure, snap_to, snap, beat_lock, locks); 
-                    nudge_cache = nudge(gap, 0.001, 0);
-                    Object.assign(measure.temp, nudge_cache);
-                };
-                Object.assign(measure.temp, nudge_cache);
-            } else {
-                nudge_cache = false;
-                measure.temp.start = temp_start;
-                measure.temp.slope = slope;
-            }
-
-                       
-            // INVERT THIS DRAG AT SOME POINT?
-
-            var SNAP_THRESH = 2.0;
-
+            const SNAP_THRESH = 2.0;
             // if DIRECTION is locked
             if (locks & (1 << 3)) {
                 // flat measure can't change direction
                 if (!Window.selected.dir)
                     return;
-                if (measure.temp.slope * Window.selected.dir < SNAP_THRESH) {
+                let slope = update.end - update.start
+                if (slope * Window.selected.dir < SNAP_THRESH) {
                     measure.temp.slope = 0;
                     if (locks & (1 << 2))
-                        measure.temp.start = measure.end;
+                        update.start = measure.end;
                     else if (locks & (1 << 1))
-                        measure.temp.end = measure.start;
+                        update.end = measure.start;
                 }
                 /*inc = (Window.selected.dir === 1) ?
                     Math.max(inc, 0) : inc;
@@ -1621,7 +1640,133 @@ export default function measure(p) {
                         */
             };
 
-            let calc = completeCalc(measure.temp.start, measure.temp.slope, measure.timesig);
+
+            //let { ms, locked, grabbed } = quickCalc(temp_start, slope, measure.timesig, { locked: beat_lock.beat, grabbed: snap });
+            let calc = completeCalc(update.start, update.end-update.start, measure.timesig);
+            Object.assign(update, calc);
+
+            // i don't really think this is necessary, but i was going
+            // for a scale-based drag threshold. better ways to implement this.
+            /*if (Math.abs(calc.ms - measure.ms) < c.DRAG_THRESHOLD_X) {
+                measure.temp.offset = measure.offset;
+                measure.temp.start = measure.start;
+                slope = measure.end - measure.start;
+                return;
+            };
+            */
+
+
+            /*let temp_offset = locked ?
+                measure.offset + measure.beats[beat_lock.beat] - locked :
+                measure.offset;
+                */
+            /*update.offset = beat_lock.type ?
+                measure.offset + measure.beats[beat_lock.beat] - calc.beats[beat_lock.beat] :
+                update.offset;
+                */
+
+            // shift offset depending on 'loc' lock
+            update.offset += (!beat_lock.type || beat_lock.type === 'tempo') ?
+                (measure.ms - update.ms)/2 : 
+                measure.beats[beat_lock.beat] - update.beats[beat_lock.beat];
+
+
+            let loc = calc.beats[snap] + update.offset;
+
+            // LEAVING OFF HERE
+
+            // check for overlaps
+            //crowd = crowding(measure.gaps, update.offset, calc.ms);
+            if (update.ms > crowd.end[0] - crowd.start[0]) {
+                update = tweak_crowd_size(update);
+                /*update.offset = crowd.start[0];
+                return finalize();
+                console.log('Getting too big! Nudge #1');
+                // can't really do this with a location lock
+                if (beat_lock.type && beat_lock.type !== 'tempo')
+                    return;
+                //update.offset = crowd.start[0];
+                if (!nudge_cache || nudge_cache.type !== 1) {
+                    measure.temp.offset = crowd.start[0];
+                    // nudge factory - fill gap
+                    let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, { beat: 0, type: 'loc' }, 
+                        // use rotation type if 'tempo' lock
+                        beat_lock.type === 'tempo' ? 'rot_right': 0
+                    );
+                    nudge_cache = nudge(crowd.end[0] - (crowd.start[0] - update.ms), 0.01, 0);
+                    nudge_cache.type = 1;
+                }
+                Object.assign(update, nudge_cache);
+                update.offset = crowd.start[0];
+                // let's maybe just break early here
+                return finalize();
+                */
+            } 
+
+            // check if the adjustment crowds the previous or next measures
+            if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD) {
+                update = tweak_crowd_previous(update);
+                /*console.log("Crowding previous measure! Nudge #2");
+                if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
+                    if (!nudge_cache || nudge_cache.type !== 2) {
+                        measure.temp.offset = crowd.start[0]; //update.offset;
+                        let nudge = nudge_factory(measure, crowd.start[0], 0, beat_lock, 0, beat_lock.type === 'both' ? 'rot_left' : 0);
+                        nudge_cache = nudge(update.offset - crowd.start[0], 0.01, 0);
+                        nudge_cache.offset = crowd.start[0];
+                        nudge_cache.type = 2;
+                    }
+                    Object.assign(update, nudge_cache);
+                } else 
+                    update.offset = crowd.start[0];
+                    */
+            } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD) {
+                update = tweak_crowd_next(update);
+                /*console.log("Crowding next measure! Nudge #3");
+                if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
+                    if (!nudge_cache || nudge_cache.type !== 3) {
+                        measure.temp.offset = update.offset;
+                        let nudge = nudge_factory(measure, crowd.end[0], measure.timesig, { beat: beat_lock.beat, absolute: measure.offset + measure.beats[beat_lock.beat], type: 'loc' }, 0, 
+                            beat_lock.type === 'both' ? 'rot_right' : 0);
+                        nudge_cache = nudge(crowd.end[0] - update.offset - update.ms, 0.01, 0);
+                        nudge_cache.offset = crowd.end[0] - nudge_cache.ms;
+                        nudge_cache.type = 3;
+                    }
+                    Object.assign(update, nudge_cache);
+                } else
+                    update.offset = crowd.end[0] - update.ms;
+                    */
+            }
+            return finalize();
+
+            let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
+            
+            let gap = loc - snap_to;
+
+            if (Math.abs(gap) < c.SNAP_THRESHOLD) {
+                console.log('we dont get in here');
+                // if initial snap, update measure.temp.start 
+                // for the last time and nudge.
+                if (!nudge_cache || nudge_cache.type !== 5) {
+                    measure.temp.start = update.start;
+
+                    // nudge factory - tick mouse drag, snap to adjacent measure beats
+                    //
+                    let nudge = nudge_factory(measure, snap_to, snap, beat_lock, locks); 
+                    nudge_cache = nudge(gap, 0.001, 0);
+                    nudge_cache.type = 5;
+                    //Object.assign(measure.temp, nudge_cache);
+                };
+                Object.assign(update, nudge_cache);
+            } else
+                nudge_cache = false;
+
+            return finalize();
+
+                       
+            // INVERT THIS DRAG AT SOME POINT?
+
+
+            /*let calc = completeCalc(measure.temp.start, measure.temp.slope, measure.timesig);
             let update = Object.assign({}, calc);
 
 
@@ -1630,13 +1775,8 @@ export default function measure(p) {
             update.offset = measure.offset;
             if ('beat' in beat_lock)
                 update.offset += measure.beats[beat_lock.beat] - update.beats[beat_lock.beat];
+                */
 
-            Object.assign(range, { temprange: [
-                Math.min(measure.temp.start, range.tempo[0]),
-                Math.max(measure.temp.end, range.tempo[1])
-            ] });
-
-            Object.assign(measure.temp, update);
         }
 
     };
@@ -1696,7 +1836,7 @@ export default function measure(p) {
         };
 
         if (Mouse.drag.mode === 'tick') {
-            let end = measure.temp.start + measure.temp.slope;
+            let end = measure.temp.end;
             measure.temp.ticks = [];
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             if (end < 10)

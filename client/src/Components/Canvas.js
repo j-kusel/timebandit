@@ -18,12 +18,22 @@ class UI extends Component {
     // NEVER UPDATE
     shouldComponentUpdate(nextProps, nextState) {
 
+        /*
+            console.log(nextProps.mode !== this.props.mode);
+            console.log(nextProps.panels !== this.props.panels);
+            console.log(!_.isEqual(nextProps.insertMeas, this.props.insertMeas));
+            console.log(!_.isEqual(nextProps.editMeas, this.props.editMeas));
+            console.log(!_.isEqual(nextProps.API.registerTuts, this.props.API.registerTuts));
+            console.log(nextProps.locks.length !== this.props.locks.length);
+            console.log(nextProps.instruments.length !== this.props.instruments.length);
+            console.log(nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ);
+        */
         if (nextProps.mode !== this.props.mode ||
             nextProps.panels !== this.props.panels ||
             !_.isEqual(nextProps.insertMeas, this.props.insertMeas) ||
             !_.isEqual(nextProps.editMeas, this.props.editMeas) ||
             // does registerTuts work here?
-            !_.isEqual(nextProps.API.registerTuts, this.props.API.registerTuts) ||
+            //!_.isEqual(nextProps.API.registerTuts, this.props.API.registerTuts) ||
             nextProps.locks.length !== this.props.locks.length ||
             nextProps.instruments.length !== this.props.instruments.length ||
             nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ) {
