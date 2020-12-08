@@ -586,6 +586,8 @@ export default function measure(p) {
         Mouse.pop();
 
         if (DEBUG) {
+            if (Window.selected.meas)
+                Debug.push(`locked: ${Object.keys(Window.selected.meas.locks).join(' ')}`);
             Debug.push(`viewport: ${Window.viewport}`);
             Debug.push(`scale: ${Window.scale}`);
             Debug.push(`scroll: ${Window.scroll}`);
@@ -1581,6 +1583,10 @@ export default function measure(p) {
 
             let amp_lock = beatscale/perc;
 
+            // new feature: invert "change" if dragging a beat before the lock
+            // if (Mouse.grabbed < beat_lock.beat)
+            //     amp_lock *= -1;
+
             /*var update = {
                 beats: [], ticks: [], offset: measure.offset,
                 start: measure.start,
@@ -1589,11 +1595,44 @@ export default function measure(p) {
             */
 
             // LEAVING OFF HERE
-            //if 
+            let tempo_flag = beat_lock.type === 'tempo' || beat_lock.type === 'both'; 
 
+            if (tempo_flag) {
+                /* tick dragging with a tempo lock presents a problem -
+                 * measure expansion/contraction is parabolic when
+                 * maintaining tempo at a lock point.
+                 *
+                 * we can predict whether an initial drag will expand or
+                 * contract based on how far/how many ticks into the measure the lock is
+                 *
+                 * if locked at less than half,
+                 * drag right increases slope, drag left decreases slope
+                 *
+                 * if locked at more than half,
+                 * drag right decreases slope, drag left increases slope
+                 *
+                 * for now, the behavior of this is just gonna feel kinda weird.
+                 */
+
+                // increase slope, then lower both start/end to maintain beat lock tempo;
+                // comparable to a 'rot_right' nudge.
+
+                // with first beat loc-locked, this feels better as subtraction than addition.
+                update.end += amp_lock;
+                let slope = update.end - update.start;
+                let lock_tempo_diff = slope/measure.timesig * beat_lock.beat - (measure.end - measure.start)/measure.timesig * beat_lock.beat;
+                update.start -= lock_tempo_diff;
+                update.end -= lock_tempo_diff;
+            } else {
+                update.start += amp_lock/2;
+                update.end += amp_lock/2;
+            }
+
+            // NEED TO RETHINK THIS WHOLE SYSTEM
             // these should be generalized to other drag modes.
             // if START is locked
             // change slope, preserve start
+            /*
             if (locks & (1 << 1)) {
                 //slope += amp_lock;
                 update.end += amp_lock;
@@ -1616,6 +1655,7 @@ export default function measure(p) {
                 //slope += amp_lock/2; 
                 //update.start = measure.start + amp_lock/2;
             };
+            */
 
             const SNAP_THRESH = 2.0;
             // if DIRECTION is locked
@@ -1704,7 +1744,9 @@ export default function measure(p) {
             } 
 
             // check if the adjustment crowds the previous or next measures
-            if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD) {
+            // bypass if first or last beats are 'loc' locked
+            let loc_lock = (beat_lock.type === 'both' || beat_lock.type === 'loc');
+            if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD && !loc_lock) {
                 update = tweak_crowd_previous(update);
                 /*console.log("Crowding previous measure! Nudge #2");
                 if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
@@ -1719,7 +1761,7 @@ export default function measure(p) {
                 } else 
                     update.offset = crowd.start[0];
                     */
-            } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD) {
+            } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD && !loc_lock) {
                 update = tweak_crowd_next(update);
                 /*console.log("Crowding next measure! Nudge #3");
                 if (beat_lock.type === 'loc' || beat_lock.type === 'both') {

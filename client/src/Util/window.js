@@ -34,6 +34,9 @@ export default (p) => {
          */
 
         locking(candidate, beat) {
+            console.log(beat);
+            if (typeof(beat) !== 'number')
+                return false;
             if ('locks' in candidate) {
                 // toggle off if found
                 if (beat in candidate.locks) {
