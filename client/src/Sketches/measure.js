@@ -585,16 +585,6 @@ export default function measure(p) {
         }
         Mouse.pop();
 
-        if (DEBUG) {
-            if (Window.selected.meas)
-                Debug.push(`locked: ${Object.keys(Window.selected.meas.locks).join(' ')}`);
-            Debug.push(`viewport: ${Window.viewport}`);
-            Debug.push(`scale: ${Window.scale}`);
-            Debug.push(`scroll: ${Window.scroll}`);
-            Debug.write({ x: 0, y: (instruments.length+1)*c.INST_HEIGHT + c.DEBUG_TEXT }, c.DEBUG_TEXT);
-            Debug.frameRate();
-            Debug.clear();
-        };
 
             
 
@@ -629,8 +619,9 @@ export default function measure(p) {
                     let crowd_start = crowd.start[0];
                     let crowd_end =  crowd.end[0];
 
+
                     Debug.push(`mouse: ${crowd_start}, ${crowd_end}`);
-                    if (offset < crowd_start + c.SNAP_THRESHOLD && offset > crowd_start - Window.insertMeas.ms/2)
+                    if (offset < crowd_start + c.SNAP_THRESHOLD) // && offset > crowd_start - Window.insertMeas.ms/2)
                         offset = crowd_start
                     else if (offset + Window.insertMeas.ms + c.SNAP_THRESHOLD > crowd_end)
                         offset = crowd_end - Window.insertMeas.ms;
@@ -656,6 +647,15 @@ export default function measure(p) {
                 p.stroke(255, 0, 0);
                 Window.insertMeas.beats.forEach(draw_beats);
             };
+        };
+
+        if (DEBUG) {
+            Debug.push(`viewport: ${Window.viewport}`);
+            Debug.push(`scale: ${Window.scale}`);
+            Debug.push(`scroll: ${Window.scroll}`);
+            Debug.write({ x: 0, y: (instruments.length+1)*c.INST_HEIGHT + c.DEBUG_TEXT }, c.DEBUG_TEXT);
+            Debug.frameRate();
+            Debug.clear();
         };
 
 
