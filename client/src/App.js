@@ -688,17 +688,19 @@ class App extends Component {
                   // after the first measure, account for T1 note.
                   if (m_ind)
                       delta -= 1;
+                  let last_beat = 0;
                   meas.beats.forEach((beat, b_ind) => {
                       if (b_ind)
                           // convert each gap/beat into ticks
-                          delta = parseInt(beat * tick_perc, 10) - 1; // -1 to account for actual T1 note.
+                          delta = parseInt((beat - last_beat) * tick_perc, 10) - 1; // -1 to account for actual T1 note.
                       beats.push({ wait: `T${Math.max(delta, 0)}`, duration: 'T1', pitch: ['C4'] });
+                      last_beat = beat;
                   });
                   last = meas.ms + meas.offset;
               });
 
               // return track object
-              return ({ tempi, beats });
+              return ({ tempi, beats, name: inst.name });
           });
 
           console.log(tracks);
