@@ -672,7 +672,39 @@ class App extends Component {
     this.setState(oldState => ({ PPQ: eventKey }));
   };
 
-  midi() {
+  midi(type) {
+      if (type === 'global') {
+          // gotta convert everything to 60 BPM.
+          let tick_perc = this.state.PPQ / 1000.0 // Parts-Per-Quarter (per beat) / 1000ms per beat
+          let tracks = this.state.instruments.map((inst, i_ind) => {
+              // iterate through measures, adding offsets
+              let last = 0; 
+              let beats = [];
+              let tempi = [{ tempo: 60, timesig: 4 }];
+
+              order_by_key(inst.measures, 'offset').forEach((meas, m_ind) => {
+                  // calculate number of ticks to rest for first beat
+                  let delta = parseInt((meas.offset - last) * tick_perc, 10);
+                  // after the first measure, account for T1 note.
+                  if (m_ind)
+                      delta -= 1;
+                  meas.beats.forEach((beat, b_ind) => {
+                      if (b_ind)
+                          // convert each gap/beat into ticks
+                          delta = parseInt(beat * tick_perc, 10) - 1; // -1 to account for actual T1 note.
+                      beats.push({ wait: `T${Math.max(delta, 0)}`, duration: 'T1', pitch: ['C4'] });
+                  });
+                  last = meas.ms + meas.offset;
+              });
+
+              // return track object
+              return ({ tempi, beats });
+          });
+
+          console.log(tracks);
+          midi(tracks, this.state.PPQ, this.state.PPQ_tempo);
+          return;
+      }
       let tracks = this.state.instruments.map((inst, i_ind) => {
 
           // this would be solved by sorting measures on entry
@@ -694,8 +726,9 @@ class App extends Component {
               // push empty message if within delta threshold
               let delta = this.state.PPQ - 1;
               if (last) {
-                  if (meas.offset - (last.offset + last.ms) > CONFIG.DELTA_THRESHOLD) {
-                      delta = parseInt(delta / (tpm / last.end), 10);
+                  let gap = meas.offset - (last.offset + last.ms);
+                  if (gap > CONFIG.DELTA_THRESHOLD) {
+                      delta = parseInt((last.end / 60000.0) * gap * this.state.PPQ, 10);  //delta / (tpm / last.end), 10);
                       acc.push({ delta, tempo: last.end });
                   };
               } else {
@@ -1201,15 +1234,24 @@ class App extends Component {
         />        
         <ExportModal
             show={this.state.exportsOpen}
+            onHide={this.toggleExports}
         >
             <Container style={{ width: '300px' }}>
                 <Row>
                     <Col xs={4}>
-                        <button onClick={this.midi}>midi</button>
+                        <button onClick={this.midi}>midi (separate tempi)</button>
                     </Col>
                     <Col xs={8}>
                     </Col>
                 </Row>
+                <Row>
+                    <Col xs={4}>
+                        <button onClick={(e) => this.midi('global')}>midi (quantized to 60BPM)</button>
+                    </Col>
+                    <Col xs={8}>
+                    </Col>
+                </Row>
+
                 <Row>
                     <Col xs={4}>
                         <button onClick={this.sibelius}>sibelius</button>
