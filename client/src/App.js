@@ -675,8 +675,27 @@ class App extends Component {
   midi(type) {
       if (type === 'global') {
           // gotta convert everything to 60 BPM.
-          let tick_perc = this.state.PPQ / 1000.0 // Parts-Per-Quarter (per beat) / 1000ms per beat
+
+          // going to try calculating absolute tick location as a percentage of the whole score.
+          // this will (ideally) lessen the dependency that beat locations have on each other,
+          // an unfortunate by-product of the midi protocol.
+
+          // this works so well it should be adapted to the independent export!
+          let tick_perc = this.state.PPQ / 1000.0; // Parts-Per-Quarter (per beat) / 1000ms per beat
+
+          let extremes = this.state.instruments.reduce((acc, inst) => {
+              Object.keys(inst.measures).forEach(key => {
+                  acc.min = Math.min(inst.measures[key].offset, acc.min);
+                  acc.max = Math.max(inst.measures[key].offset + inst.measures[key].ms, acc.max);
+              });
+              return acc;
+          }, { max: -Infinity, min: 0 });
+
+          // total ticks in the score at 60 BPM
+          let tick_total = parseInt((extremes.max - extremes.min) * tick_perc, 10);
+
           let tracks = this.state.instruments.map((inst, i_ind) => {
+              let tick_accum = 0;
               // iterate through measures, adding offsets
               let last = 0; 
               let beats = [];
@@ -684,17 +703,24 @@ class App extends Component {
 
               order_by_key(inst.measures, 'offset').forEach((meas, m_ind) => {
                   // calculate number of ticks to rest for first beat
-                  let delta = parseInt((meas.offset - last) * tick_perc, 10);
+                  let absolute = parseInt(meas.offset * tick_perc, 10);
+                  let delta = Math.max(absolute - tick_accum, 0);
+
+                  //let delta = parseInt((meas.offset - last) * tick_perc, 10);
                   // after the first measure, account for T1 note.
-                  if (m_ind)
+                  /*if (m_ind)
                       delta -= 1;
-                  beats.push({ wait: `T${Math.max(delta, 0)}`, duration: 'T1', pitch: ['C4'] });
+                  */
+                  beats.push({ wait: `T${delta}`, duration: 'T1', pitch: ['C4'] });
+                  tick_accum += delta + 1;
                   let last_beat = 0;
                   for (let b = 1; b < meas.beats.length - 1; b++) {
                       let beat = meas.beats[b];
-                      delta = parseInt((beat - last_beat) * tick_perc, 10) - 1; // -1 to account for actual T1 note.
-                      beats.push({ wait: `T${Math.max(delta, 0)}`, duration: 'T1', pitch: ['C4'] });
-                      last_beat = beat;
+                      absolute = parseInt((beat + meas.offset) * tick_perc, 10);
+                      delta = Math.max(absolute - tick_accum, 0); 
+                      beats.push({ wait: `T${delta}`, duration: 'T1', pitch: ['C4'] });
+                      tick_accum += delta + 1; // +1 to account for actual T1 note.
+                      //last_beat = beat;
                   };
                   /*meas.beats.forEach((beat, b_ind) => {
                       if (b_ind)
@@ -704,7 +730,7 @@ class App extends Component {
                       last_beat = beat;
                   });
                   */
-                  last = meas.ms + meas.offset;
+                  //last = meas.ms + meas.offset;
               });
 
               // return track object
@@ -715,6 +741,8 @@ class App extends Component {
           midi(tracks, this.state.PPQ, this.state.PPQ_tempo);
           return;
       }
+
+      // this eventually needs to use a similar absolute time system for constant error correction.
       let tracks = this.state.instruments.map((inst, i_ind) => {
 
           // this would be solved by sorting measures on entry
@@ -728,52 +756,58 @@ class App extends Component {
           let last = 0;
 
           let tpm = 60000.0 / this.state.PPQ;
-
           let rest = `T${this.state.PPQ - 1}`;
+
 
           let beats = [];
           let tempi = order_by_key(inst.measures, 'offset').reduce((acc, meas, ind) => {
               // push empty message if within delta threshold
+
+              let new_beat = { duration: 'T1', pitch: ['C4'] };
+
               let delta = this.state.PPQ - 1;
+
               if (last) {
                   let gap = meas.offset - (last.offset + last.ms);
                   if (gap > CONFIG.DELTA_THRESHOLD) {
-                      delta = parseInt((last.end / 60000.0) * gap * this.state.PPQ, 10);  //delta / (tpm / last.end), 10);
+                      // in the future, may want to use 300BPM instead of last.end for greater accuracy
+                      delta = parseInt((last.end / 60000.0) * gap * this.state.PPQ, 10);
                       acc.push({ delta, tempo: last.end });
-                  };
+                      // if we're not adding final beats of measures, need to delay first measure after gaps
+                      // by one "beat" (PPQ);
+                      delta += this.state.PPQ;
+                  }
               } else {
                   // or default to ? bpm for initial gap
                   delta = Math.round(meas.offset / (tpm / 300));
-                  let tempo = delta/(meas.offset / tpm);
-                  acc.push({ delta, tempo });
+                  acc.push({ delta, tempo: 300 });
               };
 
               let wait = `T${delta}`;
               last = meas;
 
               let slope = (meas.end - meas.start)/meas.ticks.length;
-
-              let new_tick = {};
-              let new_beat = { duration: 'T1', pitch: ['C4'] };
-
-              let ticks = [{ ...new_tick, tempo: meas.start, timesig: meas.timesig }];
+              acc.push({ tempo: meas.start, timesig: meas.timesig });
               beats.push({ ...new_beat, wait });
 
               meas.ticks.forEach((_, i) => {
+                  // first beat will always be handled above, so skip it.
                   if (i === 0)
                       return;
                   if (!(i % this.state.PPQ_mod)) {
                       if (!(i % (meas.ticks.length / meas.timesig)))
                           beats.push({ ...new_beat, wait: rest });
-                      ticks.push({ ...new_tick, tempo: meas.start + i * slope });
+                      acc.push({ tempo: meas.start + i * slope });
                   };
               });
 
-              return acc.concat(ticks);
+              return acc;
           }, []);
           
-          beats.push({ duration: '4', pitch: ['C4'], wait: rest });
+          beats.push({ duration: 'T1', pitch: ['C4'], wait: rest });
           tempi.push({ tempo: last.end });
+          console.log(tempi);
+          console.log(beats);
           return ({ tempi, beats, name: inst.name });
       });
       
