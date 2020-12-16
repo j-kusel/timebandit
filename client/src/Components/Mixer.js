@@ -1,8 +1,42 @@
 import React, { Component } from 'react';
-import { Popover, Overlay } from 'react-bootstrap';
-import { MixerRow, MixerArrow, MixerButton, Slider } from 'bandit-lib';
+import styled from 'styled-components';
+import { Popover, Overlay, Container, Row, Col } from 'react-bootstrap';
+import { FormInput, FormLabel, MixerRow, MixerArrow, MixerButton, TBDropdown, Slider, colors } from 'bandit-lib';
 import { Module, PanelHeader } from 'bandit-lib';
 import _ from 'underscore';
+
+const sine = (
+    <svg width="80%" height="100%" viewBox="0 0 190 160" version="1.1" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 80  C 40 10, 65 10, 95 80 S 150 150, 180 80 Z" stroke="currentColor" fill="currentColor"/>
+    </svg>
+);
+
+const SynthButton = styled.button`
+    border: none;
+    width: 26px;
+    padding: 0px 2px;
+    color: ${colors.contrast_lighter};
+    background-color: ${colors.secondary};
+    &:hover {
+        color: ${colors.contrast};
+    }
+`;
+
+const Synth = styled(Container)`
+    width: 300px;
+    background: ${colors.secondary};
+    color: ${colors.primary};
+    border: 1px solid black;
+`;
+
+const StyledFormInput = styled(FormInput)`
+    -webkit-outer-spin-button,
+    -webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    -moz-appearance: textfield;
+`;
 
 
 /**
@@ -32,6 +66,14 @@ class Mixer extends Component {
             solos: props.insts.map(__ => false),
             volumes: props.insts.map(__ => 80),
             */
+            frequencies: props.insts.reduce((acc, i) => ({
+                ...acc,
+                [i.audioId]: this.props.audio.getFrequency(i.audioId),
+            }), {}),
+            types: props.insts.reduce((acc, i) => ({
+                ...acc,
+                [i.audioId]: this.props.audio.getType(i.audioId),
+            }), {}),
             volShows: -1
         }
         
@@ -40,8 +82,13 @@ class Mixer extends Component {
         this.handleVolume = this.handleVolume.bind(this);
         this.handleShow = this.handleShow.bind(this);
 
+        this.setFrequency = this.setFrequency.bind(this);
+        this.submitFrequency = this.submitFrequency.bind(this);
+        this.handleType = this.handleType.bind(this);
+
         this.popRefs = [0,1,2,3,4,5,6,7,8,9].reduce((acc, ind) => Object.assign(acc, { ['pop' + ind]: React.createRef() }), {}); //{ 'pop0': React.createRef(), 'pop1': React.createRef() };
         this.state.popShows = [0,1,2,3,4,5,6,7,8,9].reduce((acc, ind) => Object.assign(acc, { ['pop' + ind]: false }), {} );
+
         
     }
 
@@ -85,6 +132,35 @@ class Mixer extends Component {
         console.log(this.popRefs);
         return true;
         */
+    }
+
+    handleType(id, type) {
+        if (this.state.types[id] === type)
+            return;
+        this.props.audio.setType(id, type);
+        this.setState(oldState => {
+            let types = Object.assign({}, this.state.types);
+            types[id] = type;
+            return ({ types });
+        });
+    }
+
+    setFrequency(id, freq) {
+        this.setState(oldState => {
+            let frequencies = oldState.frequencies;
+            frequencies[id] = parseInt(freq, 10);
+            return ({ frequencies });
+        });
+    }
+
+    submitFrequency(id, freq) {
+        if (freq > 20 && freq < 20000)
+            return this.props.audio.setFrequency(id, freq);
+        this.setState(oldState => {
+            let frequencies = oldState.frequencies;
+            frequencies[id] = this.props.audio.getFrequency(id);
+            return ({ frequencies });
+        });
     }
 
     handleShow(ref_id, bool) {
@@ -176,13 +252,43 @@ class Mixer extends Component {
         
                 <td>{this.state.volShows === i ? this.state.volumes[i] : null}</td>
                 <td>
-                    <button ref={this.popRefs['pop' + i]} onClick={() => this.handleShow('pop' + i, !this.state.popShows['pop' + i])}>asdf</button>
-                    <Overlay target={this.popRefs['pop' + i].current} show={this.state.popShows['pop' + i]} placement="top">
+                    <SynthButton ref={this.popRefs['pop' + i]} onClick={() => this.handleShow('pop' + i, !this.state.popShows['pop' + i])}>{sine}</SynthButton>
+                    <Overlay target={this.popRefs['pop' + i].current} show={this.state.popShows['pop' + i]} placement="right">
                     
             {/*<Popover id="synth">
                             <Popover.Content>*/}
                         {({ placement, arrowProps, show: _show, popper, ...props }) => (
-                                <span {...props}>hello world {i}</span>
+                            <Synth {...props}>
+                                <Row>
+                                    <Col>
+                                        <FormLabel style={{margin: '0px'}}>frequency</FormLabel>
+                                    </Col>
+                                    <Col>
+                                        <StyledFormInput
+                                            type="number"
+                                            defaultValue={this.state.frequencies[inst.audioId]}
+                                            placeholder={this.props.audio.getFrequency(inst.audioId)}
+                                            onBlur={e => this.submitFrequency(inst.audioId, parseInt(e.target.value, 10))}
+                                        />
+                                    </Col>
+                                </Row>
+                                <Row>
+                                    <Col>
+                                        <FormLabel style={{margin: '0px'}}>type</FormLabel>
+                                    </Col>
+                                    <Col>
+                                        <TBDropdown
+                                            height={20}
+                                            toggle={this.state.types[inst.audioId]}
+                                            onSelect={(key, e) => this.handleType(inst.audioId, key)}
+                                            menuItems={this.props.audio.WAVES.map(wave => ({
+                                                eventKey: wave,
+                                                text: wave
+                                            }))}
+                                        />
+                                    </Col>
+                                </Row>
+                            </Synth>
                         )}
             {/*</Popover.Content>
                         </Popover>

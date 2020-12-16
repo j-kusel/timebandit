@@ -81,7 +81,7 @@ class _AudioInst {
                 return false;
             }
         }
-        return this.osc.frequency;
+        return this.osc.frequency.value;
     }
 
     delete() {
@@ -113,6 +113,23 @@ const setVolume = (id, vol) => {
     insts[id].volume.gain.setValueAtTime(vol, aC.currentTime);
     return true;
 }
+
+const getType = (id) => {
+    return insts[id].type();
+};
+
+const setType = (id, type) => {
+    return insts[id].type(type);
+};
+
+
+const getFrequency = (id) => {
+    return insts[id].frequency();
+}
+
+const setFrequency = (id, freq) => {
+    return insts[id].frequency(freq);
+};
 
 
 
@@ -246,6 +263,10 @@ var audio = {
         //inst[1].forEach((beat) => trigger(ind, beat, adsr))),
     kill: () => playback(false),
     setVolume,
+    getType,
+    setType,
+    getFrequency,
+    setFrequency,
     mute,
     solo,
     set: (param, val) => {
@@ -255,7 +276,8 @@ var audio = {
     triggerHook: (func) => trigger_hooks.push(func),
     schedulerHook: (func) => scheduler_hooks.push(func),
     context: aC,
-    locator: () => (aC.currentTime - locator.start + locator.origin)*1000.0
+    locator: () => (aC.currentTime - locator.start + locator.origin)*1000.0,
+    WAVES
 }
 
 
