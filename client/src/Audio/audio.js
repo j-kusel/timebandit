@@ -10,7 +10,11 @@ var trigger_hooks = [];
     .then((midiAccess) => console.log(midiAccess.inputs));
     */
 
-var gains = [];
+var insts = {};
+var gains = {};
+var volumes = {};
+var mutes = {};
+/*var gains = [];
 var volumes = [];
 var mutes = [];
 for (let i=0; i < 5; i++) {
@@ -24,8 +28,95 @@ for (let i=0; i < 5; i++) {
     gains.push(gain);
     volumes.push(vol);
 };
+*/
 
-var oscs = [];
+const WAVES = ['sine', 'square', 'sawtooth', 'triangle'];
+
+class _AudioInst {
+    constructor(id, { type, frequency }) {
+        console.log(type, frequency);
+        this.id = id;
+
+        [this.gain, this.volume, this.mute] = [ 1, 2, 3 ].map(__ => aC.createGain());
+        this.osc = aC.createOscillator();
+
+        this.gain.gain.setValueAtTime(0.0, aC.currentTime);
+        this.volume.gain.setValueAtTime(0.8, aC.currentTime);
+        this.mute.gain.setValueAtTime(1.0, aC.currentTime);
+
+        if (!type)
+            type = 'sine';
+        if (!frequency)
+            frequency = 440;
+        this.osc.type = type;
+        this.osc.frequency.setValueAtTime(frequency, aC.currentTime);
+
+        this.osc.connect(this.gain);
+        this.gain.connect(this.mute);
+        this.mute.connect(this.volume);
+        this.volume.connect(aC.destination);
+        
+        // maybe wait to start on playback?
+        this.osc.start();
+    };
+
+    type(wave) {
+        if (wave) {
+            if (WAVES.indexOf(wave) >= 0) {
+                this.osc.type = wave;
+            } else {
+                console.log('Invalid argument for oscillator type:', wave);
+                return false;
+            }
+        }
+        return this.osc.type;
+    }
+
+    frequency(freq) {
+        if (freq) {
+            if (typeof(freq) === 'number') {
+                this.osc.frequency.setValueAtTime(freq, aC.currentTime);
+            } else {
+                console.log('Invalid argument for oscillator frequency:', freq);
+                return false;
+            }
+        }
+        return this.osc.frequency;
+    }
+
+    delete() {
+        ['gain', 'mute', 'volume'].forEach(gain => this[gain].disconnect());
+        this.osc.stop();
+        delete insts[this.id];
+    }
+
+}
+
+const newInst = (id, options) => {
+    insts[id] = new _AudioInst(id, options);
+};
+
+const deleteInst = (id) => {
+    if (id in insts) {
+        delete insts[id];
+        return true;
+    }
+    console.log('Instrument ID not found, nothing deleted.');
+    return false;
+}
+
+const setVolume = (id, vol) => {
+    if (vol < 0.0 || vol > 1.0) {
+        console.log('Volume must be a float between 0.0 - 1.0.');
+        return false;
+    };
+    insts[id].volume.gain.setValueAtTime(vol, aC.currentTime);
+    return true;
+}
+
+
+
+/*var oscs = [];
 [440, 220, 110].forEach((freq, ind) => {
     let osc = aC.createOscillator();
     osc.type = 'sine';
@@ -39,6 +130,7 @@ var oscs = [];
 });
 
 volumes.forEach(vol => vol.connect(aC.destination));
+*/
 
 var PARAMS = {
     sustain: 50,
@@ -53,30 +145,31 @@ var trigger = (event, params) => {
     let ms = params.map(param => param/1000.0);
     for (let i=0; i<event.inst.length; i++) {
         let timing = aC.currentTime + event.time / 1000.0;
-        let osc = event.inst[i];
+        let gain = insts[event.inst[i]];
         //trigger_hooks.forEach(hook => setTimeout(hook(osc), event.time));
-        gains[osc].gain.setValueAtTime(0.0, timing);
-        gains[osc].gain.linearRampToValueAtTime(0.7, timing + ms[0]);
-        gains[osc].gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1]);
-        gains[osc].gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1] + PARAMS.sustain);
-        gains[osc].gain.linearRampToValueAtTime(0.0, timing + ms[0] + ms[1] + PARAMS.sustain + ms[3]);
+        gain.gain.gain.setValueAtTime(0.0, timing);
+        gain.gain.gain.linearRampToValueAtTime(0.7, timing + ms[0]);
+        gain.gain.gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1]);
+        gain.gain.gain.linearRampToValueAtTime(ms[2], timing + ms[0] + ms[1] + PARAMS.sustain);
+        gain.gain.gain.linearRampToValueAtTime(0.0, timing + ms[0] + ms[1] + PARAMS.sustain + ms[3]);
     };
     return setTimeout(() => trigger_hooks.forEach(hook => hook(event.inst)), event.time);
 };
 
 
 // time handled in seconds
-function scheduler(start, node) {
+function scheduler(start, node, audioIds) {
     let b_start = aC.currentTime*1000 - start;
     let b_end = b_start + PARAMS.scheduleAheadTime * 1000.0;
     let candidates = [];
+    console.log(node);
 
     let search = (n) => {
         if (n === undefined)
             return;
         let next = [];
         if (n.loc > b_start && n.loc < b_end) {
-            candidates.push({ time: n.loc - b_start, inst: n.meas.map(m => m.inst) });
+            candidates.push({ time: n.loc - b_start, inst: n.meas.map(m => audioIds[m.inst]) });
             next.push(n.left);
             next.push(n.right);
         } else if (n.loc > b_end)
@@ -96,13 +189,13 @@ function scheduler(start, node) {
     });
 
     let new_id = window.setTimeout(() => {
-        scheduler(start, node);
+        scheduler(start, node, audioIds);
     }, PARAMS.lookahead);
     timerIDs.push(new_id);
 };
 
-var playback = (isPlaying, score, tracking) => {
-    console.log(score);
+var playback = (isPlaying, score, tracking, audioIds) => {
+    console.log(audioIds);
     tracking = tracking || 0;
     if (isPlaying) {
         locator = {
@@ -112,10 +205,11 @@ var playback = (isPlaying, score, tracking) => {
         if (aC.state === 'suspended')
             aC.resume();
         //score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
-        scheduler(aC.currentTime*1000 - tracking, score);
+        scheduler(aC.currentTime*1000 - tracking, score, audioIds);
     } else {
         timerIDs.forEach(ID => window.clearTimeout(ID));
-        gains.forEach(gain => {
+        Object.keys(insts).forEach(inst => {
+            let gain = insts[inst].gain;
             gain.gain.cancelScheduledValues(aC.currentTime);
             gain.gain.linearRampToValueAtTime(gain.gain.value, aC.currentTime);
             gain.gain.linearRampToValueAtTime(0.0, aC.currentTime + 0.05);
@@ -123,28 +217,31 @@ var playback = (isPlaying, score, tracking) => {
     }
 };
 
-var setVolume = (target, vol) => {
+/*var setVolume = (target, vol) => {
     volumes[target].gain.cancelScheduledValues(aC.currentTime);
     volumes[target].gain.linearRampToValueAtTime(vol, aC.currentTime + 0.1);
-}
+}*/
 
 var mute = (target, bool) => {
-    mutes[target].gain.cancelScheduledValues(aC.currentTime);
-    mutes[target].gain.linearRampToValueAtTime(bool ? 0.0 : 1.0, aC.currentTime + 0.05);
+    insts[target].mute.gain.cancelScheduledValues(aC.currentTime);
+    insts[target].mute.gain.linearRampToValueAtTime(bool ? 0.0 : 1.0, aC.currentTime + 0.05);
 }
 
 var solo = (target, bool) => {
-    mutes.forEach((mute, i) => {
+    Object.keys(insts).forEach((key, i) => {
+        let inst = insts[key];
         let vol = bool ? 
-            (i === target ? 1.0 : 0.0) :
+            (key === target ? 1.0 : 0.0) :
             1.0; 
-        mute.gain.cancelScheduledValues(aC.currentTime);
-        mute.gain.linearRampToValueAtTime(vol, aC.currentTime + 0.05);
+        inst.mute.gain.cancelScheduledValues(aC.currentTime);
+        inst.mute.gain.linearRampToValueAtTime(vol, aC.currentTime + 0.05);
     });
 }
 
 var audio = {
     init: () => aC.resume().then(() => console.log('resumed')),
+    newInst,
+    deleteInst,
     play: playback, //compile(score), //score.forEach((inst, ind) =>
         //inst[1].forEach((beat) => trigger(ind, beat, adsr))),
     kill: () => playback(false),

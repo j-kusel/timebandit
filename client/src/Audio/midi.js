@@ -1,6 +1,15 @@
 import MidiWriter from 'midi-writer-js';
 import JSZip from 'jszip';
 
+/*
+var MIDI;
+
+window.navigator.requestMIDIAccess().then(access => {
+    MIDI = access;
+    console.log(MIDI.outputs.values());
+});
+*/
+
 // monkey patching TempoEvent to allow for delta changes
 class _TempoEvent {
     constructor(delta, bpm) {

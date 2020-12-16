@@ -44,7 +44,7 @@ export class Parser {
                     }
                 });
             }, {});
-            return ({ name: inst.name, measures });
+            return ({ name: inst.name, measures, audioId: uuidv4() });
         });
     }
 }

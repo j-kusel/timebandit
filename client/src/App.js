@@ -131,9 +131,15 @@ class App extends Component {
       // hook into buzzer
       audio.schedulerHook((data) => {
       });
-      audio.triggerHook((inst) => {
-          if (socket)
-              socket.emit('trigger', inst.reduce((acc, i) => acc |= (1 << i), 0b00000000));
+      audio.triggerHook((instIds) => {
+          let targets = this.state.instruments.reduce((acc, inst, i) => {
+              if (instIds.indexOf(i) >= 0)
+                  acc |= (1 << i)
+          }, 0b00000000);
+          if (targets)
+              console.log(targets);
+          if (socket && targets)
+              socket.emit('trigger', targets);
       });
 
       this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
@@ -142,7 +148,8 @@ class App extends Component {
       let parser = new Parser(this.state.PPQ, this.state.PPQ_tempo);
 
       // load DEBUG script
-      this.state.instruments = DEBUG ? parser.parse(debug) : [{ name: 'default', measures: {} }];
+      this.state.instruments = DEBUG ? parser.parse(debug) : [{ name: 'default', measures: {}, audioId: uuidv4() }];
+      this.state.instruments.forEach((inst, ind) => audio.newInst(inst.audioId, { type: 'sine', frequency: 440*(ind + 1) }));
       
       this.location = 0.0;
 
@@ -392,7 +399,7 @@ class App extends Component {
       var newInstrument = (name) =>
           this.setState(oldState => {
               let instruments = oldState.instruments;
-              instruments.push({ name, measures: {}});
+              instruments.push({ name, measures: {}, audioId: uuidv4() });
               return ({ instruments });
           });
 
@@ -443,7 +450,8 @@ class App extends Component {
 
       let newInst = {
           name: this.state.instName,
-          measures: {}
+          measures: {},
+          audioId: uuidv4()
       }
 
       this.setState((oldState) => {
@@ -468,6 +476,12 @@ class App extends Component {
       let instruments = [].concat(this.state.instruments);
       let [moved] = instruments.splice(inst, 1);
       instruments.splice(dir === 'up' ? inst-1 : inst+1, 0, moved);
+      // update all measures' inst information
+      instruments.forEach((inst, ind) => 
+          Object.keys(inst.measures).forEach(key =>
+              inst.measures[key].inst = ind
+          )
+      );
       this.setState({ instruments });
   }
 
@@ -821,6 +835,7 @@ class App extends Component {
 
       console.log(this.state.ordered);
       let newState = {};
+      let audioIds = this.state.instruments.map(i => i.audioId);
       if (!isPlaying) {
           audio.kill();
       }
@@ -834,10 +849,10 @@ class App extends Component {
               })
           );
 
-          audio.play(isPlaying, root, cursor);
+          audio.play(isPlaying, root, cursor, audioIds);
           newState.ordered = root;
       } else
-          audio.play(isPlaying, this.state.ordered, cursor);
+          audio.play(isPlaying, this.state.ordered, cursor, audioIds);
 
       document.activeElement.blur();
       newState.isPlaying = isPlaying;
