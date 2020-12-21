@@ -48,7 +48,7 @@ var ServerModal = (props) => (
         - HARDWARE SETTINGS
       </ModalHeader>
       <Modal.Dialog 
-        style={{ height: '100px', width: '300px' }}
+        style={{ width: '300px' }}
         centered
       >
         <ModalBody>
@@ -69,10 +69,12 @@ var ExportModal = (props) => (
         - EXPORT SETTINGS
       </ModalHeader>
       <Modal.Dialog 
-        style={{ height: '100px', width: '300px' }}
+        style={{ margin: '0px', width: '100%' }}
         centered
       >
-        <ModalBody>
+        <ModalBody
+            style={{ padding: '40px' }}
+        >
             {props.children}
         </ModalBody>
       </Modal.Dialog>

@@ -28,8 +28,10 @@ var K;
 
 
 var crowding = (gaps, position, ms, options) => {
+    let center = (options && 'center' in options) ? options.center : false;
     let strict = (options && 'strict' in options) ? options.strict : false;
     let final = position + ms;
+    let mid = position + ms/2;
     if (final <= gaps[0][1]) 
         return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
     let last_gap = gaps.slice(-1)[0];
@@ -37,23 +39,39 @@ var crowding = (gaps, position, ms, options) => {
         return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
         
     return gaps
-        .reduce((acc, gap) => {
+        .reduce((acc, gap, ind) => {
             // does it even fit in the gap?
             if (gap[1] - gap[0] < ms - (strict ? c.NUDGE_THRESHOLD*2 : 0))
                 return acc;
             let start = [gap[0], position - gap[0]];
             let end = [gap[1], gap[1] - final];
 
-            /*if (gap[0] === -Infinity && final <= gap[1])
-                acc.start = [-Infinity, Infinity]
-            else*/ if (Math.abs(start[1]) < Math.abs(acc.start[1]))
-                acc.start = start;
-            /*if (gap[1] === Infinity && position >= gap[0])
-                acc.end = [Infinity, Infinity]
-            else*/ if (Math.abs(end[1]) < Math.abs(acc.end[1]))
-                acc.end = end;
+            // attempt 3: is the start or end 
+
+            // trying something new... base closest gap on the center of the given spread,
+            // in relation to the start or end of available gaps.
+            if (center) {
+                let target = (gap[0]+acc.end[0])/2;
+                // if the previous gap start is -Infinity and 
+                //if ((!isFinite(acc.start[0]) && )
+                //    || mid < (gap[0]+acc.end[0])/2))
+                if (isFinite(target) && mid < target)
+                    return acc;
+            }
+
+            // is there ever an instance where these two aren't both triggered?
+
+            // 1. if the distance to the start of the gap is less than the previous,
+            // update the returned gap.
+            if (Math.abs(start[1]) < Math.abs(acc.start[1]) ||
+                (Math.abs(end[1]) < Math.abs(acc.end[1])))
+                return ({ start, end, gap: ind });
+            // 2. if the distance to the end of the gap is less than the previous,
+            // update the returned gap.
+            //if (Math.abs(end[1]) < Math.abs(acc.end[1]))
+            //    acc.end = end;
             return acc;
-        }, { start: [0, Infinity], end: [0, Infinity], gap: [] });
+        }, { start: [0, Infinity], end: [0, Infinity], gap: -1 });
 }
 
 
@@ -614,7 +632,7 @@ export default function measure(p) {
                         instruments[inst].gap_cache = calcGaps(instruments[inst].ordered, '');
 
                     let offset = x_to_ms(p.mouseX - c.PANES_WIDTH); //(p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale;
-                    let crowd = crowding(instruments[inst].gap_cache, offset, Window.insertMeas.ms, { strict: true });
+                    let crowd = crowding(instruments[inst].gap_cache, offset, Window.insertMeas.ms, { strict: true, center: true });
 
                     let crowd_start = crowd.start[0];
                     let crowd_end =  crowd.end[0];
@@ -684,6 +702,14 @@ export default function measure(p) {
 
                 
 
+        p.pop();
+
+        p.push();
+        p.stroke(0);
+        p.strokeWeight(5);
+        if (p.mouseDown.x && p.mouseDown.y && DEBUG) {
+            p.line(p.mouseDown.x, p.mouseDown.y, p.mouseDown.x + Mouse.drag.x, p.mouseDown.y + Mouse.drag.y);
+        }
         p.pop();
 
         // draw lock menu
@@ -976,8 +1002,13 @@ export default function measure(p) {
 
     p.mouseDragged = function(event) {
         // no matter what happens, the mouse still registers as dragged.
-        Mouse.drag.x += event.movementX;
-        Mouse.drag.y += event.movementY;
+        // is this bugging out??
+        //Mouse.drag.x += event.movementX;
+        //Mouse.drag.y += event.movementY;
+
+        // this is more accurate, i don't know why.
+        Mouse.drag.x = p.mouseX - p.mouseDown.x;
+        Mouse.drag.y = p.mouseY - p.mouseDown.y;
 
         // can't drag if haven't clicked, can't drag when locking
         if (!Mouse.drag.mode || Mouse.drag.mode === 'lock')
@@ -1050,12 +1081,14 @@ export default function measure(p) {
 
             // determine whether start or end are closer
             // negative numbers signify conflicts
-            let crowd = crowding(measure.gaps, position, measure.ms);
+            let crowd = crowding(measure.gaps, position, measure.ms, { center: true });
             Object.assign(update, {
                 ticks: measure.ticks.slice(0),
                 beats: measure.beats.slice(0),
                 offset: position
             });
+
+            console.log(crowd);
 
             // initialize flag to prevent snapping when there's no space anyways
             let check_snap = true;

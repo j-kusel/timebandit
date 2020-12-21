@@ -18,7 +18,7 @@ import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
 import { InputGroup, FormControl, Container, Row, Col } from 'react-bootstrap';
-import { Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
+import { TBButton, Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
 import { ExportModal, SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -1295,25 +1295,27 @@ class App extends Component {
             show={this.state.exportsOpen}
             onHide={this.toggleExports}
         >
-            <Container style={{ width: '300px' }}>
+            <Container>
                 <Row>
-                    <Col xs={4}>
-                        <button onClick={this.midi}>midi (separate tempi)</button>
+                    <Col xs={4} className="text-right">
+                        <TBButton onClick={this.midi}>midi (separate)</TBButton>
                     </Col>
                     <Col xs={8}>
+                        <p>export each instrument as an individual midi file. preserves tempo and time signature information.</p>
                     </Col>
                 </Row>
                 <Row>
-                    <Col xs={4}>
-                        <button onClick={(e) => this.midi('global')}>midi (quantized to 60BPM)</button>
+                    <Col xs={4} className="text-right">
+                        <TBButton onClick={(e) => this.midi('global')}>midi (quantized)</TBButton>
                     </Col>
                     <Col xs={8}>
+                        <p>export all instruments as midi click tracks in a global file. quantizes all beats to 60BPM.</p>
                     </Col>
                 </Row>
 
                 <Row>
-                    <Col xs={4}>
-                        <button onClick={this.sibelius}>sibelius</button>
+                    <Col xs={4} className="text-right">
+                        <TBButton onClick={this.sibelius}>sibelius</TBButton>
                     </Col>
                     <Col xs={8}>
                     </Col>
