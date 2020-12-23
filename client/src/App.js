@@ -211,6 +211,7 @@ class App extends Component {
           ['warningNew', 'warningOpen', 'settingsOpen', 'tutorialsOpen', 'exportsOpen'].some(o => this.state[o]);
 
       var sibeliusCheck = () => this.state.sibeliusExport;
+      var sibeliusSet = (bool) => this.setState({ sibeliusExport: bool });
 
       var registerTuts = (obj) => {
           let tutorials = {}
@@ -421,7 +422,7 @@ class App extends Component {
           return measure;
       };
 
-      return { sibeliusCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { sibeliusSet, sibeliusCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**

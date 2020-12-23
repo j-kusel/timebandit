@@ -181,6 +181,18 @@ export default (p) => {
             }
         }
 
+        drawPrinter(pages) {
+            p.push();
+            p.translate(0, p.height - 150);
+            Object.keys(pages).forEach(key => {
+                // page === { center, spread, img }
+                let page = pages[key];
+
+                p.image(page.img, (page.center - page.spread[0])*this.scale + this.viewport, 0, 200, 100);
+            });
+            p.pop();
+        }
+
         drawTimesig(numerator, denominator) {
             let denom = typeof denominator === 'string' ?
                 denominator : parseInt(denominator, 10);

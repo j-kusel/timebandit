@@ -15,6 +15,7 @@ import _Window from '../Util/window.js';
 import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
 import { Debugger } from '../Util/debugger.js';
+import Printer from '../Util/printer.js';
 import keycodes from '../Util/keycodes.js';
 import { CTRL, MOD } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
@@ -175,6 +176,7 @@ export default function measure(p) {
     var Mouse = _Mouse(p, Window);
     var Keyboard = _Keyboard(p);
 
+    var printer = new Printer(p);
 
     var ms_to_x = ms => (ms*Window.scale + Window.viewport);
     var x_to_ms = x => (x-Window.viewport)/Window.scale;
@@ -712,6 +714,8 @@ export default function measure(p) {
         }
         p.pop();
 
+        Window.drawPrinter(printer.pages);
+
         // draw lock menu
         if (Mouse.drag.mode === 'lock') {
             p.push();
@@ -803,6 +807,8 @@ export default function measure(p) {
             return;
 
         if (p.keyCode === ESC) {
+            if (API.sibeliusCheck())
+                API.sibeliusSet(false);
             if (Window.mode === 0)
                 API.toggleInst(true);
             else {
@@ -939,42 +945,9 @@ export default function measure(p) {
             return;
 
         if (API.sibeliusCheck()) {
-            let w = 14*72;
-            let h = 8.5*72;
-            let margins = [0.05*w, 0.05*h];
-            let img = p.createImage(w, h);
-            let duration = 10000;
-            let ratio = (w*0.9)/duration;
-            img.loadPixels();
-            let inst_height = h/instruments.length;
-            let click_loc = x_to_ms(p.mouseX-c.PANES_WIDTH);
-            console.log(click_loc);
-            let click_window = [click_loc-duration*0.5, click_loc+duration*0.5];
-            console.log(click_window);
-            instruments.forEach((inst, ind) => {
-                console.log('entering inst', ind);
-                Object.keys(inst.measures).forEach(key => {
-                    let meas = inst.measures[key];
-                    console.log('entering meas', key);
-                    meas.beats.forEach((beat, i) => {
-                        let loc = meas.offset + beat;
-                        console.log(loc, loc-click_window[0]);
-                        if (loc < click_window[1] &&
-                            loc > click_window[0]
-                        ) {
-                            for (let y=0; y<inst_height; y++) {
-                                img.set(Math.round((loc-click_window[0])*ratio) + margins[0],
-                                    y+ind*inst_height,
-                                    (i===0) ? p.color(100, 0, 255) : p.color(255, 0, 100)
-                                );
-                            }
-                        }
-                    });
-                });
-            });
-
-            img.updatePixels();
-            p.save(img, 'sibelius.png');
+            let center = x_to_ms(p.mouseX-c.PANES_WIDTH);
+            let img = printer.snapshot(instruments, center);
+            //p.save(img, 'sibelius.png');
         }
         if (API.pollSelecting()) {
             API.confirmSelecting(inst, Window.insertMeas.temp_offset);
