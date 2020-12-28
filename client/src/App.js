@@ -19,7 +19,7 @@ import Server from './Components/Server';
 import Mixer from './Components/Mixer';
 import { InputGroup, FormControl, Container, Row, Col } from 'react-bootstrap';
 import { TBButton, Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
-import { ExportModal, SettingsModal, WarningModal, TutorialsModal, WelcomeModal } from './Components/Modals';
+import { ExportModal, SettingsModal, WarningModal, NewFileModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
 import debug from './Util/debug.json';
@@ -99,9 +99,6 @@ class App extends Component {
           viewport: 0,
           time: 0,
           selected: { },
-          isPlaying: false,
-          isPreviewing: false,
-          keysDisabled: false,
           previewMeasure: {},
           insertMeas: {},
           editMeas: {},
@@ -109,14 +106,18 @@ class App extends Component {
           tracking: 0,
           locks: [],
           mode: 0,
-          newInst: false,
           PPQ: CONFIG.PPQ_default,
           tutorials: {},
-          exportsOpen: false,
-          sibeliusExport: false,
           scrollY: 0,
           mouseBlocker: () => false
       };
+
+      [
+        'isPlaying', 'isPreviewing',
+        'keysDisabled',
+        'newInst', 'newFile',
+        'exportsOpen', 'sibeliusExport'
+      ].forEach(key => this.state.key = false);
 
       [
         'insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'insertSubmitFocus',
@@ -125,6 +126,8 @@ class App extends Component {
       ].forEach(ref => this[ref] = React.createRef());
 
       Object.assign(this.state, PPQ_OPTIONS[1]);
+      this.state.reservePPQ = this.state.PPQ;
+      this.state.reservePPQ_tempo = this.state.PPQ_tempo;
 
       // subscribe to audio updates
       audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
@@ -163,8 +166,8 @@ class App extends Component {
 		  'handleNumEdit',
 		  'handleNameInput',
 		  'handleOffset',
-		  'handlePPQ',
-		  'handleTempoPPQ',
+		  'selectPPQ',
+		  'selectTempoPPQ',
 		  'handleInstMove',
 
 		  'instToggle',
@@ -666,25 +669,16 @@ class App extends Component {
     this.setState({ temp_offset: focus });
   }
 
-  handleTempoPPQ(eventKey) {
+  selectTempoPPQ(eventKey) {
       document.activeElement.blur();
       let new_PPQ = PPQ_OPTIONS[eventKey];
-      this.setState(oldState => new_PPQ);
+      let newState = { reservePPQ_tempo: new_PPQ.PPQ_tempo, PPQ_desc: new_PPQ.PPQ_desc };
+      this.setState(newState);
   };
 
-  handlePPQ(eventKey, e) {
+  selectPPQ(eventKey, e) {
     document.activeElement.blur();
-
-    // DEPRECATED, GET THIS WORKING AGAIN
-    /*let tempo_ppqs = PPQ_OPTIONS.reduce((acc, ppq, ind) => {
-        console.log(ppq.PPQ_tempo);
-        console.log(eventKey % ppq.PPQ_tempo);
-        return (eventKey % ppq.PPQ_tempo) ?
-            acc :
-            [...acc, { eventKey: ind, text: `${ppq.PPQ_tempo} (${ppq.PPQ_desc})`} ]},
-        []);
-        */
-    this.setState(oldState => ({ PPQ: eventKey }));
+    this.setState(oldState => ({ reservePPQ: eventKey }));
   };
 
   midi(type) {
@@ -932,15 +926,22 @@ class App extends Component {
       if (this.state.mouseBlocker())
           return;
 
-      this.setState({ instruments:
-          [{
-              name: 'default',
-              measures: {}
-          }],
-          warningNew: false,
-          selected: { inst: -1, meas: undefined },
-          ordered: {}
-      });
+      this.setState((oldState) => 
+          ({ 
+              instruments:
+                  [{
+                      name: 'default',
+                      measures: {}
+                  }],
+              PPQ: this.state.reservePPQ,
+              PPQ_tempo: this.state.reservePPQ_tempo,
+              PPQ_mod: this.state.reservePPQ / this.state.reservePPQ_tempo,
+              newFile: false,
+              selected: { inst: -1, meas: undefined },
+              ordered: {}
+          }),
+          () => this.API = this.initAPI()
+      )
   }
 
   handleOpen(e) {
@@ -1276,22 +1277,40 @@ class App extends Component {
         <WarningModal
           show={this.state.warningNew}
           onHide={() => this.setState({ warningNew: false })}
-          header={"Close without saving?"}
+          header={" - CLOSE WITHOUT SAVING?"}
           buttons={[
               { onClick: this.save, text: 'save' },
-              { onClick: this.handleNew, text: 'new file' }
+              { onClick: () => this.setState({ warningNew: false, newFile: true }), text: 'new file' }
           ]}
         />        
         <WarningModal
           show={this.state.warningOpen}
           onHide={() => this.setState({ warningOpen: false })}
-          header={"Close without saving?"}
+          header={" - CLOSE WITHOUT SAVING?"}
           buttons={[
               { onClick: this.save, text: 'save' },
               { onClick: this.handleOpen, text: 'open file...' }
           ]}
 
         />        
+        <NewFileModal
+            show={this.state.newFile}
+            onHide={() => this.setState({ newFile: false })}
+            header={" - NEW FILE"}
+            onTempoSelect={this.selectTempoPPQ}
+            onPPQSelect={this.selectPPQ}
+            settings={({
+                PPQ_tempo: this.state.reservePPQ_tempo || this.state.PPQ_tempo,
+                PPQ_desc: this.state.PPQ_desc,
+                PPQ: this.state.reservePPQ || this.state.PPQ,
+            })}
+            buttons={[
+                { onClick: this.handleNew, text: 'create' },
+                { onClick: () => this.setState({ newFile: false }), text: 'cancel' }
+            ]}
+        >
+          
+        </NewFileModal>
         <ExportModal
             show={this.state.exportsOpen}
             onHide={this.toggleExports}
@@ -1329,12 +1348,12 @@ class App extends Component {
         <SettingsModal
             show={this.state.settingsOpen}
             onHideCallback={this.settings}
-            onTempoSelect={this.handleTempoPPQ}
-            onPPQSelect={this.handlePPQ}
+            onTempoSelect={this.selectTempoPPQ}
+            onPPQSelect={this.selectPPQ}
             settings={({
-                PPQ_tempo: this.state.PPQ_tempo,
+                PPQ_tempo: this.state.reservePPQ_tempo || this.state.PPQ_tempo,
                 PPQ_desc: this.state.PPQ_desc,
-                PPQ: this.state.PPQ,
+                PPQ: this.state.reservePPQ || this.state.PPQ,
             })}
         />
         <TutorialsModal

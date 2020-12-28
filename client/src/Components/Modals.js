@@ -1,8 +1,38 @@
 import React from 'react';
 import { Container, Row, Col, Modal } from 'react-bootstrap';
+import { Accordion, Button, Card } from 'react-bootstrap';
 import { FormLabel, TBButton, TBDropdown } from 'bandit-lib';
+import { mixins, colors } from 'bandit-lib';
 import styled from 'styled-components';
 import { primary, secondary, PPQ_OPTIONS } from '../config/CONFIG.json';
+import { PPQ_explainer } from '../Util/help';
+
+const StyledAccordion = styled(Accordion)`
+    padding: 0px;
+    width: 100%;
+
+    .card {
+        background-color: ${secondary};
+        border: none;
+        .card-header {
+            padding: 2px;
+            background-color: ${secondary};
+            .btn {
+                transition: all 0.2s;
+                transition-timing-function: ease-out;
+                &:hover {
+                    color: ${colors.accent};
+                    padding-left: 10px;
+                }
+                font-size: 0.75em;
+                padding: 0px 6px 4px 6px;
+                text-decoration: none;
+                color: ${primary};
+                ${mixins.font_mixin}
+            }
+        }
+    }
+`;
 
 var StyledModal = styled(Modal)`
     .modal-content {
@@ -100,6 +130,76 @@ var WarningModal = (props) => (
       </ModalBody>
     </StyledModal>
 ); // unmounting bootstrap modals mean we can't use styled-components
+
+
+const NewFileModal = (props) => {
+    // this is copied directly from SettingsModal. how to dry this up?
+    var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => ({ eventKey: ind, text: `${ppq[0]} (${ppq[1]})` }));
+    var global_ppqs = [];
+    var i = 1;
+    while (i * props.settings.PPQ_tempo < 1024*16 || i < 20)
+        global_ppqs.push(props.settings.PPQ_tempo * i++);
+
+    return (
+    <StyledModal 
+      show={ props.show }
+      size="md"
+      onHide={ props.onHide }
+      centered
+    >
+      <ModalHeader closeButton>
+          { props.header }
+      </ModalHeader>
+      <ModalBody>
+        <Container style={{ padding: '0px' }}>
+          {/* need a filename in here */}
+          <Row>
+              <Col xs={4}><FormLabel>Tempo PPQ</FormLabel></Col>
+              <Col xs={8}>
+                  <TBDropdown
+                      onSelect={props.onTempoSelect}
+                      toggle={props.settings.PPQ_tempo + ' (' + props.settings.PPQ_desc + ')'}
+                      menuItems={tempo_ppqs}
+                  />
+              </Col>
+          </Row>
+          <Row>
+              <Col xs={4}><FormLabel>Global PPQ</FormLabel></Col>
+              <Col xs={8}>
+                <TBDropdown
+                    className="shadow-none"
+                    onSelect={props.onPPQSelect}
+                    toggle={props.settings.PPQ}
+                    menuItems={global_ppqs.map(ppq => ({ eventKey: ppq, text: ppq }))}
+                />
+              </Col>
+          </Row>
+          <Row>
+            <Col>
+            <hr style={{ margin: '0px' }}/>
+            <StyledAccordion>
+              <Card>
+                <Card.Header>
+                  <Accordion.Toggle as={Button} variant="link" eventKey="0">
+                    What do these settings mean?
+                  </Accordion.Toggle>
+                </Card.Header>
+                <Accordion.Collapse eventKey="0">
+                  <Card.Body>{PPQ_explainer}</Card.Body>
+                </Accordion.Collapse>
+              </Card>
+            </StyledAccordion>
+            <hr style={{ margin: '0px' }}/>
+            </Col>
+          </Row>
+          <Row>
+            { props.buttons.map((b, i) => (<Col className="text-center"><ModalButton key={i} onClick={b.onClick}>{b.text}</ModalButton></Col>)) }
+          </Row>
+        </Container>
+      </ModalBody>
+    </StyledModal>
+  );
+}
 
 var WelcomeModal = (props) => 
     (<StyledModal 
@@ -207,4 +307,4 @@ var SettingsModal = (props) => {
     );
 };
 
-export { ExportModal, ServerModal, SettingsModal, WarningModal, TutorialsModal, WelcomeModal };
+export { ExportModal, ServerModal, SettingsModal, WarningModal, NewFileModal, TutorialsModal, WelcomeModal };
