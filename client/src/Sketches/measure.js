@@ -178,7 +178,6 @@ export default function measure(p) {
 
     var printer = new Printer(p);
 
-    var ms_to_x = ms => (ms*Window.scale + Window.viewport);
     var x_to_ms = x => (x-Window.viewport)/Window.scale;
 
     // debugger
@@ -646,7 +645,7 @@ export default function measure(p) {
                     else if (offset + Window.insertMeas.ms + c.SNAP_THRESHOLD > crowd_end)
                         offset = crowd_end - Window.insertMeas.ms;
 
-                    let offset_x = ms_to_x(offset);
+                    let offset_x = Window.ms_to_x(offset);
                     p.rect(offset_x, inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
                     Window.insertMeas.temp_offset = offset;
                     p.stroke(255, 0, 0);
@@ -655,7 +654,7 @@ export default function measure(p) {
                             let x = /*('inst' in Window.insertMeas) ? 
                                 (Window.insertMeas.temp_offset + beat) * Window.scale + Window.viewport :
                                 Window.insertMeas.temp_offset + beat*Window.scale;*/
-                                ms_to_x(Window.insertMeas.temp_offset + beat);
+                                Window.ms_to_x(Window.insertMeas.temp_offset + beat);
                             let y = ('inst' in Window.insertMeas) ?
                                 Window.insertMeas.inst * c.INST_HEIGHT - Window.scroll :
                                 Math.floor(0.01*t_mouseY)*c.INST_HEIGHT - Window.scroll;
@@ -699,7 +698,6 @@ export default function measure(p) {
         };
 
         Mouse.dragCursorUpdate();
-        document.body.style.cursor = Mouse.cursor;
 
 
                 
@@ -774,7 +772,6 @@ export default function measure(p) {
         Window.drawPlayback();
         Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc, isPlaying });
         Window.drawToolbar(range);
-        Mouse.updateRollover();
 
         if (Window.panels) {
             p.fill(255, 0, 0, 10);
@@ -785,14 +782,46 @@ export default function measure(p) {
 
         // do that sibelius check thing here
         if (API.sibeliusCheck()) {
-            let sib_window_size = 10000*Window.scale;
-            p.push()
-            p.translate(p.mouseX - sib_window_size*0.5, c.PLAYBACK_HEIGHT);
-            let sib_color = p.color(colors.contrast_light);
-            sib_color.setAlpha(0.25);
-            p.rect(0, 0, sib_window_size, instruments.length*c.INST_HEIGHT);
-            p.pop();
+            // draw temporary printer window
+            let height = instruments.length*c.INST_HEIGHT;
+            Window.printDraw(printer.frames, height);
+            // check confirm/cancel buttons, X rollover
+            if (p.mouseY > height + 12 + c.PLAYBACK_HEIGHT &&
+                p.mouseY < height + 26 + c.PLAYBACK_HEIGHT &&
+                p.mouseX > p.width - 22 &&
+                p.mouseX < p.width - 8
+            ) {
+                Mouse._rollover = { type: 'printerClose' };
+                Mouse.cursor = 'pointer';               
+            } else if (p.mouseY > height + c.PLAYBACK_HEIGHT + 40 &&
+                p.mouseY < height + c.PLAYBACK_HEIGHT + 60
+            ) {
+                if (p.mouseX > p.width - 300 + 14 &&
+                    p.mouseX < p.width - 300 + 64
+                ) {
+                    Mouse._rollover = { type: 'printerConfirm' };
+                    Mouse.cursor = 'pointer';
+                } else if (p.mouseX > p.width - 300 + 74 &&
+                    p.mouseX < p.width - 300 + 124
+                ) {
+                    Mouse._rollover = { type: 'printerClear' };
+                    Mouse.cursor = 'pointer';
+                }
+            } else {
+                let X_y = c.PLAYBACK_HEIGHT + 14;
+                Object.keys(printer.frames).forEach(key => {
+                    let frame_X = Window.ms_to_x(printer.frames[key].start);
+                    if (p.mouseX > frame_X && p.mouseX < frame_X + 14 &&
+                        p.mouseY > c.PLAYBACK_HEIGHT && p.mouseY < X_y
+                    ) {
+                        Mouse._rollover = { type: 'printerDelete', id: key };
+                        Mouse.cursor = 'pointer';
+                    }
+                });
+            }
         }
+        document.body.style.cursor = Mouse.cursor;
+        Mouse.updateRollover();
 
     }
 
@@ -807,8 +836,10 @@ export default function measure(p) {
             return;
 
         if (p.keyCode === ESC) {
-            if (API.sibeliusCheck())
+            if (API.sibeliusCheck()) {
+                printer.clear();
                 API.sibeliusSet(false);
+            }
             if (Window.mode === 0)
                 API.toggleInst(true);
             else {
@@ -941,13 +972,42 @@ export default function measure(p) {
             return;
 
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
-        if (inst >= instruments.length || inst < 0)
-            return;
 
+        // printing mode
         if (API.sibeliusCheck()) {
-            let center = x_to_ms(p.mouseX-c.PANES_WIDTH);
+            console.log(Mouse.rollover.type);
+            // are we deleting a page?
+            if (Mouse.rollover.type === 'printerClose') {
+                API.sibeliusSet(false);
+                return;
+            } else if (Mouse.rollover.type === 'printerDelete') {
+                printer.clear(Mouse.rollover.id);
+                return;
+            } else if (Mouse.rollover.type === 'printerClear') {
+                printer.clear();
+                return;
+            } else if (Mouse.rollover.type === 'printerConfirm') {
+                order_by_key(printer.frames, 'start').forEach((frame, i) => {
+                    console.log(frame);
+                    let img = printer.snapshot(instruments, (frame.end+frame.start)/2, { duration: frame.end - frame.start });
+                    // these still save individually... how to zip?
+                    p.save(img, `bandit_${i}.png`);
+                });
+
+                printer.clear();
+                return;
+            }
+
+
+            // new drag feature
+            Mouse.printMode();
+            let loc = x_to_ms(p.mouseX);
+            Window.printAdjust({ start: loc, end: loc }); 
+            /*let center = x_to_ms(p.mouseX-c.PANES_WIDTH);
             let img = printer.snapshot(instruments, center);
+            */
             //p.save(img, 'sibelius.png');
+            return;
         }
         if (API.pollSelecting()) {
             API.confirmSelecting(inst, Window.insertMeas.temp_offset);
@@ -955,6 +1015,9 @@ export default function measure(p) {
             Window.insertMeas.inst = inst;
             return;
         }
+
+        if (inst >= instruments.length || inst < 0)
+            return;
 
         Mouse.select();
 
@@ -982,6 +1045,12 @@ export default function measure(p) {
         // this is more accurate, i don't know why.
         Mouse.drag.x = p.mouseX - p.mouseDown.x;
         Mouse.drag.y = p.mouseY - p.mouseDown.y;
+
+        // printer drag
+        if (Mouse.drag.mode === 'printer') {
+            Window.printAdjust({ end: x_to_ms(p.mouseX) });
+            return;
+        };
 
         // can't drag if haven't clicked, can't drag when locking
         if (!Mouse.drag.mode || Mouse.drag.mode === 'lock')
@@ -1836,6 +1905,14 @@ export default function measure(p) {
             return;
         }
 
+        if (Mouse.drag.mode === 'printer') {
+            Mouse.resetDrag();
+            if (Window.printTemp.end - Window.printTemp.start > 500)
+                printer.push(Window.printTemp);
+            Window.printCancel();
+            return;
+        }
+
         if (Mouse.drag.mode === 'lock') {
             Window.lockConfirm(Window.selected.meas, Mouse.lock_type);
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
@@ -1856,12 +1933,12 @@ export default function measure(p) {
         ) {
             if (Window.selected.meas)
                 delete Window.selected.meas.temp;
-            Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
+            Mouse.resetDrag();
             return;
         };
 
         if (!(Window.selected.meas)) {
-            Mouse.drag.mode = '';
+            Mouse.resetDrag();
             return;
         }
 

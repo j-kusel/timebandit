@@ -10,8 +10,13 @@ class Printer {
         this.dpi = 72;
         this.margins = 5;
         this.duration = 10000;
+        this.frames = {};
         this.pages = {};
        
+    }
+
+    push(range) {
+        this.frames[uuidv4()] = range;
     }
 
     snapshot(instruments, center, options) {
@@ -57,7 +62,12 @@ class Printer {
         return img;
     }
 
-    clear() {
+    clear(target) {
+        if (target) {
+            delete this.frames[target];
+            return;
+        }
+        this.frames = {};
         this.pages = {};
     }
 };

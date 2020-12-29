@@ -1,5 +1,6 @@
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light } from '../config/CONFIG.json';
+import { colors } from 'bandit-lib';
 
 export default (p) => {
     class _Window {
@@ -23,6 +24,8 @@ export default (p) => {
             this.editMeas = {};
             this._lockingCandidate = null;
 
+            this.printTemp = {};
+
             this.updateViewCallback = () => null;
         }
 
@@ -32,6 +35,97 @@ export default (p) => {
          *  type
          * }
          */
+
+
+        ms_to_x(ms) {
+            return (ms*this.scale + this.viewport);
+        }
+
+        printAdjust({ start, end }) {
+            if (start)
+                this.printTemp.start = start;
+            if (end)
+                this.printTemp.end = end;
+        }
+
+        printCancel() {
+            this.printTemp = {};
+        }
+
+        printDraw(frames, instHeight) {
+            // print temp
+            if (this.printTemp !== {}) {
+                p.push()
+                    p.translate(this.ms_to_x(this.printTemp.start), c.PLAYBACK_HEIGHT);
+                    let sib_color = p.color(colors.contrast_light);
+                    sib_color.setAlpha(0.25 * 255);
+                    p.fill(sib_color);
+                    p.rect(0, 0, this.ms_to_x(this.printTemp.end) - this.ms_to_x(this.printTemp.start), instHeight);
+                    p.stroke(colors.secondary);
+                    p.fill(colors.secondary);
+                    p.push();
+                        p.strokeWeight(4);
+                        p.line(2, 2, 10, 10);
+                        p.line(2, 10, 10, 2);
+                    p.pop()
+                    p.translate(14, 0);
+                    p.textAlign(p.LEFT, p.TOP);
+                    p.text(parseInt(this.printTemp.end - this.printTemp.start, 10), 0, 0);
+                p.pop();
+            }
+            Object.keys(frames).forEach(key => {
+                let frame = frames[key];
+                p.push();
+                    p.translate(this.ms_to_x(frame.start), c.PLAYBACK_HEIGHT);
+                    let sib_color = p.color(colors.contrast_light);
+                    sib_color.setAlpha(0.50 * 255);
+                    p.fill(sib_color);
+                    p.rect(0, 0, this.ms_to_x(frame.end) - this.ms_to_x(frame.start), instHeight);
+                    p.stroke(colors.secondary);
+                    p.fill(colors.secondary);
+                    p.push();
+                        p.strokeWeight(4);
+                        p.line(2, 2, 10, 10);
+                        p.line(2, 10, 10, 2);
+                    p.pop()
+
+                    p.translate(14, 0);
+                    p.textAlign(p.LEFT, p.TOP);
+                    p.text(parseInt(frame.end - frame.start, 10), 0, 0);
+                p.pop();
+            });
+            p.push();
+                p.translate(p.width-300, instHeight + c.PLAYBACK_HEIGHT);
+                let sib_color = p.color(colors.contrast);
+                sib_color.setAlpha(0.50 * 255);
+                p.fill(sib_color);
+                p.rect(0, 0, 300, c.INST_HEIGHT);
+                p.stroke(colors.secondary);
+                p.fill(colors.secondary);
+                p.push();
+                    p.translate(14, 14);
+                    p.textAlign(p.LEFT, p.TOP);
+                    p.text(`${Object.keys(frames).length} pages ready for export.`, 0, 0);
+                    // exit button
+                    p.push();
+                        p.strokeWeight(4);
+                        p.translate(-20, 0);
+                        p.line(286, 0, 294, 8);
+                        p.line(286, 8, 294, 0);
+                    p.pop()
+                    // confirm/clear buttons
+                    p.translate(0, 14 + 12);
+                    p.rect(0, 0, 50, 20);
+                    p.rect(60, 0, 50, 20);
+                    p.stroke(colors.primary);
+                    p.fill(colors.primary);
+                    p.textAlign(p.CENTER, p.CENTER);
+                    p.text('confirm', 25, 10);
+                    p.text('clear', 85, 10);
+                p.pop()
+            p.pop();
+        }
+
 
         locking(candidate, beat) {
             console.log(beat);

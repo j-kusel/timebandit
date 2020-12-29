@@ -134,10 +134,10 @@ var WarningModal = (props) => (
 
 const NewFileModal = (props) => {
     // this is copied directly from SettingsModal. how to dry this up?
-    var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => ({ eventKey: ind, text: `${ppq[0]} (${ppq[1]})` }));
+    var tempo_ppqs = PPQ_OPTIONS.map((ppq, ind) => ({ eventKey: ind + 1, text: `${ppq[0]} (${ppq[1]})` }));
     var global_ppqs = [];
     var i = 1;
-    while (i * props.settings.PPQ_tempo < 1024*16 || i < 20)
+    while (i * props.settings.PPQ_tempo < 1024*16 && i < 20)
         global_ppqs.push(props.settings.PPQ_tempo * i++);
 
     return (
@@ -157,7 +157,7 @@ const NewFileModal = (props) => {
               <Col xs={4}><FormLabel>Tempo PPQ</FormLabel></Col>
               <Col xs={8}>
                   <TBDropdown
-                      onSelect={props.onTempoSelect}
+                      onSelect={(eventKey) => props.onTempoSelect(eventKey-1)}
                       toggle={props.settings.PPQ_tempo + ' (' + props.settings.PPQ_desc + ')'}
                       menuItems={tempo_ppqs}
                   />

@@ -13,6 +13,7 @@ import { bit_toggle, parse_bits } from './index.js';
 var cursors = {
     'tempo': (__) => 'ns-resize',
     'inst': (__) => 'default',
+    'printerDelete': (__) => 'pointer',
     'measure': (mods) => 
         mods.shift ? 'ew-resize' : 'default',
     'beat': (mods) =>
@@ -32,6 +33,10 @@ export default (p, Window) => {
             this._rollover = {};
             this.cursor = 'default';
             this.translate = [];
+        }
+
+        resetDrag() {
+            Object.assign(this.drag, { x: 0, y: 0, mode: '' });
         }
 
         select() {
@@ -88,6 +93,10 @@ export default (p, Window) => {
                     -1 : 0);
             this.drag.mode = 'tick';
             this.drag.grab = this.rollover.beat;
+        }
+
+        printMode() {
+            this.drag.mode = 'printer';
         }
 
         measureMode() {

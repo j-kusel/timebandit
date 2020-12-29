@@ -671,6 +671,7 @@ class App extends Component {
 
   selectTempoPPQ(eventKey) {
       document.activeElement.blur();
+      console.log(eventKey, PPQ_OPTIONS[eventKey]);
       let new_PPQ = PPQ_OPTIONS[eventKey];
       let newState = { reservePPQ_tempo: new_PPQ.PPQ_tempo, PPQ_desc: new_PPQ.PPQ_desc };
       this.setState(newState);
