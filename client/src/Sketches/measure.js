@@ -412,6 +412,9 @@ export default function measure(p) {
                         step = Window.CONSTANTS.PPQ_mod;
                 };
 
+                if (Window.CONSTANTS.PPQ_tempo > 64)
+                    step = Window.CONSTANTS.PPQ_mod * 8;
+
                 for (var i=0; i < ticks.length; i += step) {
                     let loc = ticks[i]*Window.scale;
                     // skip if offscreen
@@ -780,13 +783,34 @@ export default function measure(p) {
             
         subs.forEach(sub => sub());
 
-        // do that sibelius check thing here
-        if (API.sibeliusCheck()) {
+        // do that printout check thing here
+        if (API.printoutCheck()) {
             // draw temporary printer window
             let height = instruments.length*c.INST_HEIGHT;
             Window.printDraw(printer.frames, height);
+            // check drag
+            if (Mouse.drag.type !== 'printerDrag' &&
+                p.mouseY > c.PLAYBACK_HEIGHT &&
+                p.mouseY < height + c.PLAYBACK_HEIGHT &&
+                Object.keys(printer.frames).some(key => {
+                    let frame = printer.frames[key];
+                    let start = Window.ms_to_x(frame.start);
+                    let end = Window.ms_to_x(frame.end);
+                    if (p.mouseX > start - 5 && p.mouseX < start + 5) {
+                        console.log(1);
+                        Mouse._rollover = { type: 'printerDrag', id: key, edge: 'start' };
+                        return true;
+                    } else if (p.mouseX > end - 5 && p.mouseX < end + 5) {
+                        console.log(2);
+                        Mouse._rollover = { type: 'printerDrag', id: key, edge: 'end' };
+                        return true;
+                    }
+                    return false;
+                })
+            ) {
+                Mouse.cursor = 'ew-resize';
             // check confirm/cancel buttons, X rollover
-            if (p.mouseY > height + 12 + c.PLAYBACK_HEIGHT &&
+            } else if (p.mouseY > height + 12 + c.PLAYBACK_HEIGHT &&
                 p.mouseY < height + 26 + c.PLAYBACK_HEIGHT &&
                 p.mouseX > p.width - 22 &&
                 p.mouseX < p.width - 8
@@ -836,9 +860,9 @@ export default function measure(p) {
             return;
 
         if (p.keyCode === ESC) {
-            if (API.sibeliusCheck()) {
-                printer.clear();
-                API.sibeliusSet(false);
+            if (API.printoutCheck()) {
+                //printer.clear();
+                API.printoutSet(false);
             }
             if (Window.mode === 0)
                 API.toggleInst(true);
@@ -974,11 +998,16 @@ export default function measure(p) {
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
 
         // printing mode
-        if (API.sibeliusCheck()) {
-            console.log(Mouse.rollover.type);
-            // are we deleting a page?
-            if (Mouse.rollover.type === 'printerClose') {
-                API.sibeliusSet(false);
+        if (API.printoutCheck()) {
+            if (Mouse.rollover.type === 'printerDrag') {
+                Mouse.drag.mode = 'printerDrag';
+                Mouse.drag.id = Mouse.rollover.id;
+                Mouse.drag.edge = Mouse.rollover.edge;
+                return;
+            }
+            // are we deleting a page? closing? clearing? confirming?
+            else if (Mouse.rollover.type === 'printerClose') {
+                API.printoutSet(false);
                 return;
             } else if (Mouse.rollover.type === 'printerDelete') {
                 printer.clear(Mouse.rollover.id);
@@ -988,25 +1017,16 @@ export default function measure(p) {
                 return;
             } else if (Mouse.rollover.type === 'printerConfirm') {
                 order_by_key(printer.frames, 'start').forEach((frame, i) => {
-                    console.log(frame);
-                    let img = printer.snapshot(instruments, (frame.end+frame.start)/2, { duration: frame.end - frame.start });
+                    let img = printer.snapshot(instruments, (frame.end+frame.start)/2, { duration: Math.abs(frame.end - frame.start) });
                     // these still save individually... how to zip?
                     p.save(img, `bandit_${i}.png`);
                 });
-
-                printer.clear();
                 return;
             }
 
-
-            // new drag feature
             Mouse.printMode();
             let loc = x_to_ms(p.mouseX);
             Window.printAdjust({ start: loc, end: loc }); 
-            /*let center = x_to_ms(p.mouseX-c.PANES_WIDTH);
-            let img = printer.snapshot(instruments, center);
-            */
-            //p.save(img, 'sibelius.png');
             return;
         }
         if (API.pollSelecting()) {
@@ -1051,6 +1071,12 @@ export default function measure(p) {
             Window.printAdjust({ end: x_to_ms(p.mouseX) });
             return;
         };
+
+
+        if (Mouse.drag.mode === 'printerDrag') {
+            printer.frames[Mouse.drag.id][Mouse.drag.edge] = x_to_ms(p.mouseX);
+            return;
+        }
 
         // can't drag if haven't clicked, can't drag when locking
         if (!Mouse.drag.mode || Mouse.drag.mode === 'lock')

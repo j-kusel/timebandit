@@ -116,7 +116,7 @@ class App extends Component {
         'isPlaying', 'isPreviewing',
         'keysDisabled',
         'newInst', 'newFile',
-        'exportsOpen', 'sibeliusExport'
+        'exportsOpen', 'printoutExport'
       ].forEach(key => this.state.key = false);
 
       [
@@ -174,7 +174,7 @@ class App extends Component {
 		  
 		  'midi', 'play', 'preview', 'kill',
 		  'save', 'load', 'upload', 'reset', 'settings',
-          'sibelius',
+          'printout',
 		  'handleNew', 'handleOpen',
 		  'confirmEdit',
 		  'toggleTutorials',
@@ -213,8 +213,8 @@ class App extends Component {
       var modalCheck = () => 
           ['warningNew', 'warningOpen', 'settingsOpen', 'tutorialsOpen', 'exportsOpen'].some(o => this.state[o]);
 
-      var sibeliusCheck = () => this.state.sibeliusExport;
-      var sibeliusSet = (bool) => this.setState({ sibeliusExport: bool });
+      var printoutCheck = () => this.state.printoutExport;
+      var printoutSet = (bool) => this.setState({ printoutExport: bool });
 
       var registerTuts = (obj) => {
           let tutorials = {}
@@ -425,7 +425,7 @@ class App extends Component {
           return measure;
       };
 
-      return { sibeliusSet, sibeliusCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -443,8 +443,8 @@ class App extends Component {
         this.setState({ newInst: false, instName: '' });
   }
 
-  sibelius() {
-    this.setState({ sibeliusExport: true, exportsOpen: false });
+  printout() {
+    this.setState({ printoutExport: true, exportsOpen: false });
   }
 
   handleInst(e) {
@@ -1336,7 +1336,7 @@ class App extends Component {
 
                 <Row>
                     <Col xs={4} className="text-right">
-                        <TBButton onClick={this.sibelius}>sibelius</TBButton>
+                        <TBButton onClick={this.printout}>printout</TBButton>
                     </Col>
                     <Col xs={8}>
                     </Col>

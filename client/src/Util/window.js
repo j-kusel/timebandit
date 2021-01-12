@@ -70,7 +70,7 @@ export default (p) => {
                     p.pop()
                     p.translate(14, 0);
                     p.textAlign(p.LEFT, p.TOP);
-                    p.text(parseInt(this.printTemp.end - this.printTemp.start, 10), 0, 0);
+                    p.text(parseInt(Math.abs(this.printTemp.end - this.printTemp.start), 10), 0, 0);
                 p.pop();
             }
             Object.keys(frames).forEach(key => {
@@ -109,7 +109,7 @@ export default (p) => {
                     // exit button
                     p.push();
                         p.strokeWeight(4);
-                        p.translate(-20, 0);
+                        p.translate(-22, 0);
                         p.line(286, 0, 294, 8);
                         p.line(286, 8, 294, 0);
                     p.pop()
