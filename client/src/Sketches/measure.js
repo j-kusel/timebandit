@@ -179,6 +179,34 @@ export default function measure(p) {
     var printer = new Printer(p);
 
     var x_to_ms = x => (x-Window.viewport)/Window.scale;
+    var tick_zoom = () => {
+        let step = Window.CONSTANTS.PPQ;
+        let resolutions = [];
+        let tempo_ticks = 1;
+        while ((tempo_ticks) <= Window.CONSTANTS.PPQ ) {
+            resolutions.push(tempo_ticks);
+            tempo_ticks *= 2;
+        }
+        // BREAK OUT INTO FUNCTION
+        let scales = [5, 1, 0.075, 0.05, 0.025];
+        let which = null;
+        let lerp = 0;
+        scales.some((scale, index) => {
+            if (Window.scale > scale) {
+                // linear interpolation for tick fades.
+                // how far away from the next division are we?
+                step = (index >= resolutions.length) ?
+                     Window.CONSTANTS.PPQ : resolutions[index];
+                lerp = index ? 
+                    (Window.scale - scale)/(scales[index-1]-scale) : 0;
+                return true;
+            }
+            return false;
+        });
+
+        return [step, lerp];
+    }
+
 
     // debugger
     var Debug = new Debugger(p, Window, Mouse);
@@ -361,8 +389,14 @@ export default function measure(p) {
             p.fill(secondary_light2);
 
             // handle inst selection
-            if (!Window.selected.meas && Window.selected.inst === i_ind)
-                p.fill(230);
+            if (!Window.selected.meas && Window.selected.inst === i_ind) {
+                let sel_color = p.color(colors.contrast);
+                sel_color.setGreen(140);
+                sel_color.setAlpha(30);
+                p.fill(sel_color);
+            }
+
+                //p.fill(230);
 
             p.rect(0, 0, p.width-1, 99);
 
@@ -397,29 +431,30 @@ export default function measure(p) {
 
                 // handle selection
                 if (Window.selected.meas && key === Window.selected.meas.id) {
-                    p.fill(0, 255, 0, 60);
+                    let sel_color = p.color(colors.contrast);
+                    sel_color.setGreen(150);
+                    sel_color.setAlpha(50);
+                    p.fill(sel_color);
+                     
+                    //p.fill(0, 255, 0, 60);
                     p.rect(0, 0, final, c.INST_HEIGHT);
                 }
 
                 // draw ticks
-                p.stroke(240);
-                let step = 1;
-                // BREAK OUT INTO FUNCTION
-                if (Window.scale < 1) { 
-                    if (Window.scale < 0.05)
-                        step = (Window.scale < 0.025) ? Window.CONSTANTS.PPQ : Window.CONSTANTS.PPQ_mod * 2 
-                    else 
-                        step = Window.CONSTANTS.PPQ_mod;
-                };
 
-                if (Window.CONSTANTS.PPQ_tempo > 64)
-                    step = Window.CONSTANTS.PPQ_mod * 8;
-
-                for (var i=0; i < ticks.length; i += step) {
+                let step, lerp;
+                [step, lerp] = tick_zoom();
+                //let step = 4;
+                for (var i=0; i < ticks.length; i += (step === 1 ? step : step/2)) {
                     let loc = ticks[i]*Window.scale;
                     // skip if offscreen
                     if (loc + origin > p.width || loc + origin < 0)
                         continue;
+
+                    let color = p.color(240);
+                    if (i % step)
+                        color.setAlpha(255*lerp)
+                    p.stroke(color);
                     p.line(loc, 0, loc, c.INST_HEIGHT);
                 };
 
@@ -613,7 +648,7 @@ export default function measure(p) {
         // draw cursor / insertMeas
         p.stroke(200);
         p.fill(240);
-        Mouse.push({x: c.PANES_WIDTH, y:0});
+        Mouse.push({x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
         let t_mouseX = p.mouseX - Mouse.loc.x;
         let t_mouseY = p.mouseY - Mouse.loc.y;
         p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
@@ -977,6 +1012,7 @@ export default function measure(p) {
         event.preventDefault();
         let zoom = p.keyIsDown(MOD);
         Window.updateView(event, { zoom });
+        tick_zoom();
         /*if (zoom)
             API.newScaling(Window.scale);*/
         API.reportWindow(Window.viewport, Window.scale, Window.scroll);
@@ -1029,7 +1065,7 @@ export default function measure(p) {
             Window.printAdjust({ start: loc, end: loc }); 
             return;
         }
-        if (API.pollSelecting()) {
+        if (API.pollSelecting() && Mouse.select('inst')) {
             API.confirmSelecting(inst, Window.insertMeas.temp_offset);
             e.preventDefault();
             Window.insertMeas.inst = inst;

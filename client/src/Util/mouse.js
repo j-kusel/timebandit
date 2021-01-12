@@ -39,16 +39,21 @@ export default (p, Window) => {
             Object.assign(this.drag, { x: 0, y: 0, mode: '' });
         }
 
-        select() {
+        select(type) {
             let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
+
             if (inst >= Window.insts)
                 this.outside_origin = true
             else {
-                this.outside_origin = Window.select({
-                    ind: this.rollover.ind,
-                    inst: inst,
-                    meas: this.rollover.meas,
-                });
+                let new_select = { inst };
+                if (!type || type !== 'inst')
+                    Object.assign(new_select, {
+                        meas: this.rollover.meas,
+                        ind: this.rollover.ind,
+                    });
+                
+                // changing how Window.select() returns here, might be issues down the road
+                this.outside_origin = Window.select(new_select);
                 /*if (!_.isEqual(newSelect, Window.selected)) {
                     Window.selected = newSelect;
                     this.outside_origin = true;
