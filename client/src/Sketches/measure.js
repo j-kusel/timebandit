@@ -78,6 +78,7 @@ var crowding = (gaps, position, ms, options) => {
 
 
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
+const [ENTER] = [13];
 //const [SHIFT, ALT] = [16, 18];
 const [KeyC, KeyI, KeyV] = [67, 73, 86];
 //const [KeyH, KeyJ, KeyK, KeyL] = [72, 74, 75, 76];
@@ -395,8 +396,7 @@ export default function measure(p) {
                 sel_color.setAlpha(30);
                 p.fill(sel_color);
             }
-
-                //p.fill(230);
+            //p.fill(230);
 
             p.rect(0, 0, p.width-1, 99);
 
@@ -699,8 +699,9 @@ export default function measure(p) {
                             p.line(x, y, x, y + c.INST_HEIGHT);
                         });
                 }
+            // if insertMeas has already been placed
             } else if ('temp_offset' in Window.insertMeas) {
-                p.rect(Window.insertMeas.temp_offset*Window.scale + Window.viewport, Window.selected.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
+                p.rect(Window.insertMeas.temp_offset*Window.scale + Window.viewport, /*Window.selected.inst*/ Window.insertMeas.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
                 p.stroke(255, 0, 0);
                 Window.insertMeas.beats.forEach(draw_beats);
             };
@@ -908,6 +909,10 @@ export default function measure(p) {
             return;
         };
 
+        if (p.keyCode === ENTER && Window.insertMeas.confirmed)
+            return API.enterSelecting();
+            
+
         if (API.disableKeys()) 
             return;
         if (API.checkFocus()) // && Keyboard.checkNumPress())
@@ -1019,20 +1024,24 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
-        if (API.modalCheck())
-            return;
-        p.mouseDown = { x: p.mouseX, y: p.mouseY };
-        let block = tuts._mouseBlocker();
-        if (block)
-            return;
-        Mouse.updatePress(buttons);
-        Mouse.updatePress(core_buttons);
+        let checks = [
+            API.modalCheck,
+            tuts._mouseBlocker,
+            () => Mouse.checkOrigin(p),
+            () => [buttons, core_buttons]
+                .reduce((acc, arr) => acc.concat(arr), [])
+                .some(click => click()),
+            () => Mouse.checkTempo(),
+            () => (Window.insertMeas.confirmed),
+        ];
+        Mouse.pressInit(p, checks);
 
-        if (Mouse.outside_origin)
+        console.log(Mouse.cancel);
+        if (Mouse.cancel)
             return;
+
 
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
-
         // printing mode
         if (API.printoutCheck()) {
             if (Mouse.rollover.type === 'printerDrag') {
@@ -1065,7 +1074,9 @@ export default function measure(p) {
             Window.printAdjust({ start: loc, end: loc }); 
             return;
         }
-        if (API.pollSelecting() && Mouse.select('inst')) {
+
+        if (API.pollSelecting() && !Mouse.select('inst')) {
+            console.log('can this change? ', inst);
             API.confirmSelecting(inst, Window.insertMeas.temp_offset);
             e.preventDefault();
             Window.insertMeas.inst = inst;
@@ -1119,7 +1130,7 @@ export default function measure(p) {
             return;
         // still can't drag the first beat, this needs to be changed
         if (Mouse.rollover.beat === 0
-            || Mouse.outside_origin
+            || Mouse.cancel
             || Window.selected.meas === -1)
             return;
 
@@ -1962,7 +1973,7 @@ export default function measure(p) {
 
     p.mouseReleased = function(event) {
         p.mouseDown = false;
-        if (Mouse.outside_origin) {
+        if (Mouse.cancel) {
             Mouse.drag.mode = '';
             return;
         }

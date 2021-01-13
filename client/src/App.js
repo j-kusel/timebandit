@@ -383,12 +383,18 @@ class App extends Component {
 
       var pollSelecting = () => (!!this.state.temp_offset);
       var confirmSelecting = (inst, offset) => {
+          console.log('confirmed ', inst);
           this.setState(
-              (oldState) => ({ offset, temp_offset: false, insertInst: inst }),
+              (oldState) => {
+                  let insertMeas = oldState.insertMeas;
+                  insertMeas.confirmed = true;
+                  return ({ offset, temp_offset: false, insertInst: inst, insertMeas })
+              },
               () => this.insertSubmitFocus.current.focus()
           );
           return this.state.cursor;
       };
+      var enterSelecting = () => this.insertSubmitFocus.current.click();
 
       var reportWindow = (viewport, scale, scrollY) => this.setState({ viewport, scale, scrollY });
 
@@ -425,7 +431,7 @@ class App extends Component {
           return measure;
       };
 
-      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, enterSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**

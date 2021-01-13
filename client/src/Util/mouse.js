@@ -28,11 +28,20 @@ export default (p, Window) => {
                 x: 0, y: 0,
                 mode: '',
             };
-            this.outside_origin = true;
+            this.cancel = true;
             this.rollover = {};
             this._rollover = {};
             this.cursor = 'default';
             this.translate = [];
+        }
+
+        pressInit(p, checks) {
+            // basic resets
+            this.resetDrag();
+            p.mouseDown = { x: p.mouseX, y: p.mouseY };
+
+            // run all interruption checks and assign bool for cancellation
+            this.cancel = checks.some(check => check());
         }
 
         resetDrag() {
@@ -43,21 +52,26 @@ export default (p, Window) => {
             let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
 
             if (inst >= Window.insts)
-                this.outside_origin = true
+                this.cancel = true
             else {
                 let new_select = { inst };
-                if (!type || type !== 'inst')
-                    Object.assign(new_select, {
-                        meas: this.rollover.meas,
-                        ind: this.rollover.ind,
-                    });
-                
-                // changing how Window.select() returns here, might be issues down the road
-                this.outside_origin = Window.select(new_select);
-                /*if (!_.isEqual(newSelect, Window.selected)) {
-                    Window.selected = newSelect;
-                    this.outside_origin = true;
-                }*/
+
+                // type specification overrides standard selection checking.
+                // even a successful check returns false.
+                if (type && type === 'inst') {
+                    Window.select(new_select);
+                    this.cancel = false;
+                    return false;
+                }
+
+                Object.assign(new_select, {
+                    meas: this.rollover.meas,
+                    ind: this.rollover.ind,
+                });
+
+                // cancel the rest of the mousePressed event if a selection is successful
+                this.cancel = Window.select(new_select);
+                return this.cancel;
             };
         };
 
@@ -69,6 +83,7 @@ export default (p, Window) => {
                 || p.mouseY < 0
                 || p.mouseY > p.height
             ) {
+                this.cancel = true;
                 return true;
             }
 
@@ -82,8 +97,10 @@ export default (p, Window) => {
                     && p.mouseX > selStart
                     && p.mouseX < selStart + Window.selected.meas.ms*Window.scale
                 )
+                    this.cancel = true;
                     return true;
             }
+            this.cancel = false;
             return false;
         };
 
@@ -124,11 +141,15 @@ export default (p, Window) => {
                 this.drag.mode = 'lock';
         }
 
-        clickTempo() {
-            this.drag.mode = 'tempo';
-            Window.initialize_temp();
-            this.drag.grab = this.rollover.beat;
-            this.grabbed = this.rollover.beat;
+        checkTempo() {
+            if (this.rollover.type === 'tempo') {
+                this.drag.mode = 'tempo';
+                Window.initialize_temp();
+                this.drag.grab = this.rollover.beat;
+                this.grabbed = this.rollover.beat;
+                return true;
+            };
+            return false;
         }
 
         rolloverCheck(coords, meta, additional) {
@@ -211,20 +232,13 @@ export default (p, Window) => {
             return this.translate.pop();
         }
 
-        updatePress(buttons) {
-            this.drag = { x: 0, y: 0 };
+        buttonCheck(buttons) {
             if (buttons.some(click => click())) {
+                // what's the point of clearing buttons here?
                 buttons = [];
-                this.outside_origin = true;
+                this.cancel = true;
+                return true;
             }
-            this.outside_origin = this.checkOrigin(p);
-            if (this.outside_origin)
-                return true;
-
-            if (this.rollover.type === 'tempo') {
-                this.clickTempo();
-                return true;
-            };
             return false;
         }
     };
