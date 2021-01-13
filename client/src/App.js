@@ -532,6 +532,7 @@ class App extends Component {
           return {
               ordered: newOrdered,
               instruments,
+              insertMeas: {},
               mode: 0,
               start, end, timesig, offset, temp_offset
           };
@@ -899,7 +900,10 @@ class App extends Component {
           return;
 
       let insts = this.state.instruments;
-      let rows = [['inst', 'start', 'end', 'timesig', 'offset']];
+      let rows = [
+        ['PPQ', this.state.PPQ.toString(), 'PPQ_tempo', this.state.PPQ_tempo.toString()],
+        ['inst', 'start', 'end', 'timesig', 'offset']
+      ];
 
       Object.keys(insts).forEach((inst) => 
           Object.keys(insts[inst].measures).forEach((meas) => 
@@ -1009,10 +1013,16 @@ class App extends Component {
           let numInst = -1,
               numMeas = 0;
               //gaps = [];
+          let rows = e.target.result.split('\n');
+
+          // parse meta information in {key: value} pairs
+          let meta = {};
+          let metaRow = rows[0].split(',');
+          for (let m=0; m<metaRow.length; m+=2)
+              meta[metaRow[m]] = metaRow[m+1]
           
-          let instruments = e.target.result
-              .split('\n')
-              .slice(1) // remove headers
+          let instruments = rows
+              .slice(2) // remove headers
               .reduce((acc, line) => {
                   let params = line.split(',');
                   numInst = Math.max(numInst, params[0]);
@@ -1020,7 +1030,10 @@ class App extends Component {
                   let newMeas = MeasureCalc(
                       ['start', 'end', 'timesig', 'offset']
                           .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
-                      , { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
+                      ,
+                      ('PPQ' in meta && 'PPQ_tempo' in meta) ?
+                        ({ PPQ: meta.PPQ, PPQ_tempo: meta.PPQ_tempo }) :
+                        ({ PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo })
                   );
                   /*let spread = [newMeas.offset, newMeas.offset + newMeas.ms];
                   let clean = true;
@@ -1061,7 +1074,10 @@ class App extends Component {
               }, []);
           logger.log(`Loaded ${numMeas} measures across ${numInst + 1} instruments.`);
 
-          this.setState({ instruments });
+          let newState = { instruments };
+          if ('PPQ' in meta && 'PPQ_tempo' in meta)
+              Object.assign(newState, { PPQ: meta.PPQ, PPQ_tempo: meta.PPQ_tempo });
+          this.setState(newState);
       };
 
       reader.readAsText(e.target.files[0]);
