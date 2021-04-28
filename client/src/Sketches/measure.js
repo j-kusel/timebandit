@@ -27,7 +27,7 @@ const SLOW = process.env.NODE_ENV === 'development';
 var API = {};
 var K;
 
-
+// finds adjacent measures and returns their location and distance
 var crowding = (gaps, position, ms, options) => {
     let center = (options && 'center' in options) ? options.center : false;
     let strict = (options && 'strict' in options) ? options.strict : false;
@@ -173,6 +173,7 @@ export default function measure(p) {
     // misc
     var isPlaying = false;
 
+    // instantiate classes
     var Window = _Window(p);
     var Mouse = _Mouse(p, Window);
     var Keyboard = _Keyboard(p);
@@ -373,7 +374,11 @@ export default function measure(p) {
 
         // update Mouse location
         let new_rollover = {};
+
+        // this instrument loop is 200 lines, that's ridiculous.
         instruments.forEach((inst, i_ind) => {
+            // prototyping this new function
+            Window.drawInst(inst, i_ind);
             var yloc = i_ind*c.INST_HEIGHT - Window.scroll;
 
             p.push();
@@ -386,7 +391,7 @@ export default function measure(p) {
                 });
 
             // push into instrument channel
-            p.stroke(colors.accent);
+            /*p.stroke(colors.accent);
             p.fill(secondary_light2);
 
             // handle inst selection
@@ -399,13 +404,15 @@ export default function measure(p) {
             //p.fill(230);
 
             p.rect(0, 0, p.width-1, 99);
+            */
 
+            // moving into Window.drawMeas?
             inst.ordered.forEach((measure, m_ind) => {
                 let key = measure.id;
 
-
-                let temp = 'temp' in measure;
-                var [ticks, beats, offset, ms, start, end] = temp ?
+                // set FLAG_TEMP if drawing a temporary measure?
+                let FLAG_TEMP = 'temp' in measure;
+                var [ticks, beats, offset, ms, start, end] = FLAG_TEMP ?
                     [measure.temp.ticks, measure.temp.beats, measure.temp.offset, measure.temp.beats.slice(-1)[0], measure.temp.start || measure.start, measure.temp.end || measure.end] :
                     [measure.ticks, measure.beats, measure.offset, measure.beats.slice(-1)[0], measure.start, measure.end];
 
@@ -473,7 +480,7 @@ export default function measure(p) {
                         alpha = Math.max(60, 255*(Window.scale/0.05));
 
                     // try Mouse.rollover
-                    if (!temp && Mouse.rolloverCheck( 
+                    if (!FLAG_TEMP && Mouse.rolloverCheck( 
                         [coord-c.ROLLOVER_TOLERANCE, 0, coord+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
                         { type: 'beat', beat: index }
                     )) {

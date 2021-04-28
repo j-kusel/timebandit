@@ -1,5 +1,5 @@
 import c from '../config/CONFIG.json';
-import { primary, secondary, secondary_light } from '../config/CONFIG.json';
+import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
 
 export default (p) => {
@@ -27,6 +27,12 @@ export default (p) => {
             this.printTemp = {};
 
             this.updateViewCallback = () => null;
+
+            // monkey patch selection color
+            let sel_color = p.color(colors.contrast);
+            sel_color.setGreen(140);
+            sel_color.setAlpha(30);
+            colors.selected_inst = sel_color;
         }
 
         /* what does a lock look like
@@ -338,6 +344,10 @@ export default (p) => {
             p.stroke(secondary);
             p.fill(secondary);
             p.rect(0, p.height - c.TRACKING_HEIGHT, p.width, c.TRACKING_HEIGHT);
+
+            // DRAW SIDEBAR
+            p.push();
+
         }
 
         drawTabs({ locator, cursor_loc, isPlaying }) {
@@ -382,6 +392,24 @@ export default (p) => {
             p.pop();
         }
 
+        drawInst(inst, index) {
+            var yloc = index*c.INST_HEIGHT - this.scroll;
+            // frustum culling
+            if (yloc + c.INST_HEIGHT < 0)
+                return;
+            p.push();
+            p.translate(0, yloc);
+            p.stroke(colors.accent);
+            p.fill(secondary_light2);
+
+            // mouse rollover check here?
+            
+            // handle color if inst selected
+            if (!this.selected.meas && this.selected.inst === index)
+                p.fill(colors.selected_inst);
+            p.rect(0, 0, p.width-1, c.INST_HEIGHT-1);
+            p.pop();
+        }
 
         _scaleY(input, height, range) {
             return height - (input - range.tempo[0])/(range.tempo[1] - range.tempo[0])*height;
