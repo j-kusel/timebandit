@@ -161,14 +161,25 @@ export default (p) => {
         }
 
         initialize_temp() {
+            let sel = this.selected.meas;
             this.selected.meas.temp = {
-                start: this.selected.meas.start,
-                end: this.selected.meas.end,
-                ms: this.selected.meas.ms,
-                ticks: this.selected.meas.ticks,
-                beats: this.selected.meas.beats,
-                offset: this.selected.meas.offset
+                start: sel.start,
+                end: sel.end,
+                ms: sel.ms,
+                ticks: sel.ticks,
+                beats: sel.beats,
+                offset: sel.offset
             };
+
+            Object.assign(this.selected.meas.temp, {
+                cache: {
+                    offset: sel.offset*this.scale,
+                    beats: sel.beats.map(b => b*this.scale),
+                    ticks: sel.ticks.map(t => t*this.scale),
+                    ms: sel.ms*this.scale
+                }
+            });
+
         }
 
         setUpdateViewCallback(cb) {
@@ -184,15 +195,17 @@ export default (p) => {
             this.viewport -= event.deltaX;
 
             let frame_height = (p.height - c.PLAYBACK_HEIGHT - c.TRACKING_HEIGHT);
-            if (frame_height > this.insts*c.INST_HEIGHT) {
-                this.scroll = 0;
-                return;
-            } else {
-                this.scroll += event.deltaY;
-                if (this.scroll < 0)
+            if (!zoom) {
+                if (frame_height > this.insts*c.INST_HEIGHT) {
                     this.scroll = 0;
-                if (this.scroll > this.insts*c.INST_HEIGHT - frame_height + 28 + (this.panels ? c.INST_HEIGHT : 0))
-                    this.scroll = this.insts*c.INST_HEIGHT - frame_height + 28 + (this.panels ? c.INST_HEIGHT : 0);
+                    return;
+                } else {
+                    this.scroll += event.deltaY;
+                    if (this.scroll < 0)
+                        this.scroll = 0;
+                    if (this.scroll > this.insts*c.INST_HEIGHT - frame_height + 28 + (this.panels ? c.INST_HEIGHT : 0))
+                        this.scroll = this.insts*c.INST_HEIGHT - frame_height + 28 + (this.panels ? c.INST_HEIGHT : 0);
+                }
             }
 
             this.updateViewCallback(this.viewport, this.scale, this.scroll);
@@ -330,6 +343,7 @@ export default (p) => {
                 delete this.selected.meas.temp;
             }
             Object.assign(this.selected, newSelected);
+            console.log(this.selected);
             return true;
         }
      
@@ -402,8 +416,6 @@ export default (p) => {
             p.stroke(colors.accent);
             p.fill(secondary_light2);
 
-            // mouse rollover check here?
-            
             // handle color if inst selected
             if (!this.selected.meas && this.selected.inst === index)
                 p.fill(colors.selected_inst);

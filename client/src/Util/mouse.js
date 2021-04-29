@@ -64,10 +64,10 @@ export default (p, Window) => {
                     return false;
                 }
 
-                Object.assign(new_select, {
-                    meas: this.rollover.meas,
-                    ind: this.rollover.ind,
-                });
+                new_select.meas = this.rollover.meas;
+
+                if (type && type === 'beat')
+                    new_select.beat = this.rollover.beat;
 
                 // cancel the rest of the mousePressed event if a selection is successful
                 this.cancel = Window.select(new_select);
@@ -152,6 +152,10 @@ export default (p, Window) => {
             return false;
         }
 
+        setRollover(meta) {
+            this.rollover = meta
+        }
+
         rolloverCheck(coords, meta, additional) {
             // a four-number array checks within a box,
             // a two-number array checks a point within tolerances
@@ -209,6 +213,8 @@ export default (p, Window) => {
 
 
         updateRollover() {
+            console.log('rollover updating');
+            // RIGHT HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
             this.rollover = this._rollover;
             this._rollover = {};
         }
