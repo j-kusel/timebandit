@@ -211,6 +211,22 @@ export default (p, Window) => {
                 this.cursor = 'text';
         }
 
+        eval_cursor(mods, selected) {
+            this.cursor = 'default';
+            if (selected) {
+                // if selected measure is in rollover
+                if ('meas' in this.rollover && this.rollover.meas.id === selected.id) {
+                    if (Window.mods.mod && (this.rollover.type === 'beat')) {
+                        this.cursor = 'pointer';
+                        if (Window.mods.shift)
+                            this.cursor = 'text';
+                    } else if (Window.mods.shift && this.rollover.type === 'measure')
+                        this.cursor = 'ew-resize';
+                }
+            }
+            document.body.style.cursor = this.cursor;
+        }
+
 
         updateRollover() {
             console.log('rollover updating');

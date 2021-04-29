@@ -380,13 +380,7 @@ export default function measure(p) {
         if (SLOW)
             p.frameRate(10);
 
-        // reset Mouse.rollover cursor
 
-        // key check
-        ['CTRL', 'SHIFT', 'MOD', 'ALT'].forEach(k =>
-            Object.assign(Window.mods, { [k.toLowerCase()]: p.keyIsDown(keycodes[k]) }));
-        snaps.div_index = (Keyboard.num_counter) ?
-            Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
 
         Window.drawFrame();
 
@@ -910,6 +904,17 @@ export default function measure(p) {
     }
 
     p.keyReleased = function(e) {
+        let mods = ['CTRL', 'SHIFT', 'MOD', 'ALT'];
+        let mod_change_flag = false;
+        mods.forEach(k => {
+            if (e.keyCode === keycodes[k]) {
+                Window.mods[k.toLowerCase()] = false;
+                mod_change_flag = true;
+            }
+        })
+        if (mod_change_flag)
+            Mouse.eval_cursor(Window.mods, Window.selected.meas);
+
         if (!API.checkFocus() && Keyboard.checkNumRelease())
             return false;
         return false;
@@ -918,6 +923,24 @@ export default function measure(p) {
     p.keyPressed = function(e) {
         if (API.modalCheck())
             return;
+
+        let mods = ['CTRL', 'SHIFT', 'MOD', 'ALT'];
+        let mod_change_flag = false;
+        mods.forEach(k => {
+            if (e.keyCode === keycodes[k]) {
+                Window.mods[k.toLowerCase()] = true;
+                mod_change_flag = true;
+            }
+        })
+
+        // this updates the mouse cursor when turning mod keys on and off
+        // (otherwise the cursor would only refresh on movement!)
+        if (mod_change_flag)
+            Mouse.eval_cursor(Window.mods, Window.selected.meas);
+
+        snaps.div_index = (Keyboard.num_counter) ?
+            Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
+
 
         if (p.keyCode === ESC) {
             if (API.printoutCheck()) {
@@ -1119,7 +1142,6 @@ export default function measure(p) {
         Mouse.select();
 
         if (Window.selected.meas) {
-            //let [shift, ctrl] = [p.keyIsDown(SHIFT), p.keyIsDown(CTRL)];
             if (Window.mods.shift) {
                 if (Window.mods.mod)
                     Mouse.tickMode()
@@ -1134,12 +1156,6 @@ export default function measure(p) {
     }
 
     p.mouseDragged = function(event) {
-        // no matter what happens, the mouse still registers as dragged.
-        // is this bugging out??
-        //Mouse.drag.x += event.movementX;
-        //Mouse.drag.y += event.movementY;
-
-        // this is more accurate, i don't know why.
         Mouse.drag.x = p.mouseX - p.mouseDown.x;
         Mouse.drag.y = p.mouseY - p.mouseDown.y;
 
@@ -1148,7 +1164,6 @@ export default function measure(p) {
             Window.printAdjust({ end: x_to_ms(p.mouseX) });
             return;
         };
-
 
         if (Mouse.drag.mode === 'printerDrag') {
             printer.frames[Mouse.drag.id][Mouse.drag.edge] = x_to_ms(p.mouseX);
@@ -2138,19 +2153,7 @@ export default function measure(p) {
         }
 
         // set cursor based on Mouse.rollover
-        Mouse.cursor = 'default';
-        if (Window.selected.meas) {
-            // if selected measure is in rollover
-            if ('meas' in Mouse.rollover && Mouse.rollover.meas.id === Window.selected.meas.id) {
-                if (Window.mods.mod && (Mouse.rollover.type === 'beat')) {
-                    Mouse.cursor = 'pointer';
-                    if (Window.mods.shift)
-                        Mouse.cursor = 'text';
-                } else if (Window.mods.shift && Mouse.rollover.type === 'measure')
-                    Mouse.cursor = 'ew-resize';
-            }
-        }
-        document.body.style.cursor = Mouse.cursor;
+        Mouse.eval_cursor(Window.mods, Window.selected.meas);
 
         /*if (Mouse.drag.mode === '')
             Mouse.rolloverCheck([0, 0, 
