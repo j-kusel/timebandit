@@ -156,6 +156,7 @@ export default (p, Window) => {
             this.rollover = meta
         }
 
+        /* DEPRECATED
         rolloverCheck(coords, meta, additional) {
             // a four-number array checks within a box,
             // a two-number array checks a point within tolerances
@@ -201,6 +202,7 @@ export default (p, Window) => {
             }
             return false;
         }
+        */
 
         dragCursorUpdate() {
             if (this.drag.mode === 'measure')
@@ -225,14 +227,6 @@ export default (p, Window) => {
                 }
             }
             document.body.style.cursor = this.cursor;
-        }
-
-
-        updateRollover() {
-            console.log('rollover updating');
-            // RIGHT HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-            this.rollover = this._rollover;
-            this._rollover = {};
         }
 
         get loc() {

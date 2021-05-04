@@ -181,6 +181,28 @@ export default function measure(p) {
     var printer = new Printer(p);
 
     var x_to_ms = x => (x-Window.viewport)/Window.scale;
+    var insertMeasSelecting = () => {
+        let x_loc = x_to_ms(p.mouseX - c.PANES_WIDTH);
+        if (Window.mode === 1) {
+            //let offset = x_to_ms(p.mouseX - c.PANES_WIDTH); //(p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale;
+            let inst = Math.floor(0.01*(p.mouseY - c.PLAYBACK_HEIGHT));
+            if (inst < instruments.length && inst >= 0) {
+                let crowd = crowding(instruments[inst].gap_cache, x_loc, Window.insertMeas.ms, { strict: true, center: true });
+                let crowd_start = crowd.start[0];
+                let crowd_end =  crowd.end[0];
+
+                let offset = x_loc;
+                if (offset < crowd_start + c.SNAP_THRESHOLD) // && offset > crowd_start - Window.insertMeas.ms/2)
+                    Window.insertMeas.temp_offset = crowd_start
+                else if (offset + Window.insertMeas.ms + c.SNAP_THRESHOLD > crowd_end)
+                    Window.insertMeas.temp_offset = crowd_end - Window.insertMeas.ms
+                else
+                    Window.insertMeas.temp_offset = x_loc;;
+                Window.insertMeas.cache.offset = Window.ms_to_x(Window.insertMeas.temp_offset);
+            }
+        }
+    }
+
     var tick_zoom = () => {
         let step = Window.CONSTANTS.PPQ;
         let resolutions = [];
@@ -236,6 +258,14 @@ export default function measure(p) {
                 }
             });
         });
+        if ('beats' in Window.insertMeas) {
+            Window.insertMeas.cache = {
+                offset: Window.insertMeas.temp_offset * Window.scale,
+                beats: Window.insertMeas.beats.map(b => b * Window.scale),
+                ticks: Window.insertMeas.ticks.map(t => t * Window.scale),
+                ms: Window.insertMeas.ms*Window.scale,
+            }
+        }
     }
 
     p.setup = function () {
@@ -331,22 +361,14 @@ export default function measure(p) {
                     Math.max(Window.span[1], last.offset + last.ms)
                 ];
             };
+
+            // cache gaps
+            inst.gap_cache = calcGaps(inst.ordered, '');
         });
 
         // calculate beat visual locations for all measures
         calculate_cache(instruments);
         // calculate insertMeas visual locations
-        if ('beats' in Window.insertMeas) {
-            Window.insertMeas.cache = {
-                offset: Window.insertMeas.offset*Window.scale,
-                beats: Window.insertMeas.beats.map(b => b * Window.scale),
-                ticks: Window.insertMeas.ticks.map(t => t * Window.scale),
-                ms: Window.insertMeas.ms*Window.scale,
-            }
-        }
-
-        if (instruments.length)
-            console.log(instruments[0].ordered[0].cache.offset);
 
 
         // rewrite this
@@ -596,14 +618,6 @@ export default function measure(p) {
                 p.line(xloc, yloc, xloc, yloc + c.INST_HEIGHT);
             });
 
-        let mouse = (p.mouseX - Window.viewport)/Window.scale - c.PANES_WIDTH;
-        let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
-        cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
-            parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
-            .join(':');
-        cursor_loc += '.' + parseInt(Math.abs(mouse % 1000), 10).toString().padStart(3, "0");
-        if (mouse < 0.0)
-           cursor_loc = '-' + cursor_loc;
 
         // draw editor frame
         if (Window.mode === 2 && Window.selected.meas) {
@@ -668,9 +682,12 @@ export default function measure(p) {
         p.stroke(200);
         p.fill(240);
         Mouse.push({x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
+
         let t_mouseX = p.mouseX - Mouse.loc.x;
         let t_mouseY = p.mouseY - Mouse.loc.y;
-        p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
+        //p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
+        p.line(p.mouseX-c.PANES_WIDTH, 0, p.mouseX-c.PANES_WIDTH, c.INST_HEIGHT*instruments.length);
+        
         let draw_beats = beat => {
             let x = ('inst' in Window.insertMeas) ? 
                 (Window.insertMeas.temp_offset + beat) * Window.scale + Window.viewport :
@@ -680,19 +697,17 @@ export default function measure(p) {
                 Math.floor(0.01*t_mouseY)*c.INST_HEIGHT - Window.scroll;
             p.line(x, y, x, y + c.INST_HEIGHT);
         };
-        Mouse.pop();
+        //Mouse.pop();
 
         // INSERT MODE
         if (Window.mode === 1) {
-            let inst = Math.floor(0.01*t_mouseY);
+            let inst = Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT)); //t_mouseY);
             if (API.pollSelecting()) {
                 if (inst < instruments.length && inst >= 0) {
-                    if (!instruments[inst].gap_cache)
-                        instruments[inst].gap_cache = calcGaps(instruments[inst].ordered, '');
 
-                    let offset = x_to_ms(p.mouseX - c.PANES_WIDTH); //(p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale;
+                    // ALL THIS CAN BE CACHED
+                    /*let offset = x_to_ms(p.mouseX - c.PANES_WIDTH); //(p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale;
                     let crowd = crowding(instruments[inst].gap_cache, offset, Window.insertMeas.ms, { strict: true, center: true });
-
                     let crowd_start = crowd.start[0];
                     let crowd_end =  crowd.end[0];
 
@@ -701,27 +716,33 @@ export default function measure(p) {
                     if (offset < crowd_start + c.SNAP_THRESHOLD) // && offset > crowd_start - Window.insertMeas.ms/2)
                         offset = crowd_start
                     else if (offset + Window.insertMeas.ms + c.SNAP_THRESHOLD > crowd_end)
-                        offset = crowd_end - Window.insertMeas.ms;
+                        offset = crowd_end - Window.insertMeas.ms
+                    else
+                        offset = Window.insertMeas.cache.offset;
 
                     let offset_x = Window.ms_to_x(offset);
-                    p.rect(offset_x, inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
-                    Window.insertMeas.temp_offset = offset;
+                    */
+
+                    p.push();
+                    p.translate(Window.insertMeas.cache.offset, inst*c.INST_HEIGHT);
+                    p.rect(0, 0, Window.insertMeas.cache.ms, c.INST_HEIGHT);
+                    //Window.insertMeas.temp_offset = offset;
                     p.stroke(255, 0, 0);
                     if ('beats' in Window.insertMeas)
-                        Window.insertMeas.beats.forEach(beat => {
-                            let x = /*('inst' in Window.insertMeas) ? 
-                                (Window.insertMeas.temp_offset + beat) * Window.scale + Window.viewport :
-                                Window.insertMeas.temp_offset + beat*Window.scale;*/
-                                Window.ms_to_x(Window.insertMeas.temp_offset + beat);
+                        Window.insertMeas.cache.beats.forEach(beat => {
+                            /*let x = Window.ms_to_x(Window.insertMeas.temp_offset + beat);
                             let y = ('inst' in Window.insertMeas) ?
                                 Window.insertMeas.inst * c.INST_HEIGHT - Window.scroll :
                                 Math.floor(0.01*t_mouseY)*c.INST_HEIGHT - Window.scroll;
                             p.line(x, y, x, y + c.INST_HEIGHT);
+                            */
+                            p.line(beat, 0, beat, c.INST_HEIGHT);
                         });
+                    p.pop();
                 }
             // if insertMeas has already been placed
             } else if ('temp_offset' in Window.insertMeas) {
-                p.rect(Window.insertMeas.temp_offset*Window.scale + Window.viewport, /*Window.selected.inst*/ Window.insertMeas.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
+                p.rect(Window.insertMeas.temp_offset*Window.scale + Window.viewport, Window.insertMeas.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
                 p.stroke(255, 0, 0);
                 Window.insertMeas.beats.forEach(draw_beats);
             };
@@ -830,7 +851,7 @@ export default function measure(p) {
        
 
         Window.drawPlayback();
-        Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc, isPlaying });
+        Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc: Window.cursor_loc, isPlaying });
         Window.drawToolbar(range);
 
         if (Window.panels) {
@@ -1063,12 +1084,16 @@ export default function measure(p) {
             return;
         event.preventDefault();
         let zoom = p.keyIsDown(MOD);
+        
+        Window.updateCursorLoc();
         Window.updateView(event, { zoom });
         tick_zoom();
 
         // if zooming, recalculate location cache
         if (zoom)
             calculate_cache(instruments);     
+        if (API.pollSelecting())
+            insertMeasSelecting();
 
 
         // i think this is redundant? it's already called in Window.updateView()
@@ -1077,7 +1102,6 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
-        console.log(Mouse.rollover);
         let checks = [
             API.modalCheck,
             tuts._mouseBlocker,
@@ -1602,8 +1626,8 @@ export default function measure(p) {
             // if nothing is tempo-locked
             //update = { beats: [], ticks: [], offset: measure.offset };
             if (!('beat' in beat_lock) || beat_lock.type === 'loc') {
-                update.start = measure.start - (!(locks & 1 << 1) ? change : 0);
-                update.end = measure.end - (!(locks & 1 << 2) ? change : 0);
+                update.start = measure.start - (!(locks & (1 << 1)) ? change : 0);
+                update.end = measure.end - (!(locks & (1 << 2)) ? change : 0);
 
                 // no ridiculous values... yet
                 if (update.start < 10 || update.end < 10) 
@@ -2098,29 +2122,24 @@ export default function measure(p) {
     }
 
     p.mouseMoved = function(event) {
-        //new rollover code
-        //#########################
-        // checks if hovering over an individual measure
-        /*if (Mouse.drag.mode === '')
-            Mouse.rolloverCheck([0, 0, final, c.INST_HEIGHT], {
-                ind: m_ind, type: 'measure', meas: measure
-            });
-            */
-
         if (!(p.mouseX > 0 && p.mouseX < p.width &&
             p.mouseY > 0 && p.mouseY < p.height
         )) {
             return false;
         }
 
+        Window.updateCursorLoc();
+
         if (API.pollSelecting()) {
+            insertMeasSelecting();
             API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale, { insertMeas: Window.insertMeas.temp_offset });
+            // return without changing rollover??
             return false;
         }
 
 
-
-        // which instrument?\
+        // checking for rollover.
+        // which instrument?
         let inst_row = Math.floor((p.mouseY - c.PLAYBACK_HEIGHT + Window.scroll) /  c.INST_HEIGHT);
         if (inst_row < instruments.length && inst_row >= 0) {
             let inst = instruments[inst_row];
@@ -2181,16 +2200,6 @@ export default function measure(p) {
                         } 
                     }
                     */
-        // cursor_loc text updating?
-        /*let mouse = (p.mouseX - Window.viewport)/Window.scale - c.PANES_WIDTH;
-        let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
-        cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
-            parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
-            .join(':');
-        cursor_loc += '.' + parseInt(Math.abs(mouse % 1000), 10).toString().padStart(3, "0");
-        if (mouse < 0.0)
-           cursor_loc = '-' + cursor_loc;
-           */
 
 
         return false;

@@ -9,6 +9,7 @@ export default (p) => {
             this.viewport = 0;
             this.scroll = 0;
             this.span = [Infinity, -Infinity];
+            this.cursor_loc = 0;
 
             // modes: ESC, INS, EDITOR
             this.mode = 0;
@@ -42,6 +43,17 @@ export default (p) => {
          * }
          */
 
+        updateCursorLoc() {
+            let mouse = (p.mouseX - this.viewport)/this.scale - c.PANES_WIDTH;
+            let cursor_loc = [parseInt(Math.abs(mouse / 3600000), 10)];
+            cursor_loc = cursor_loc.concat([60000, 1000].map((num) =>
+                parseInt(Math.abs(mouse / num), 10).toString().padStart(2, "0")))
+                .join(':');
+            cursor_loc += '.' + parseInt(Math.abs(mouse % 1000), 10).toString().padStart(3, "0");
+            if (mouse < 0.0)
+               cursor_loc = '-' + cursor_loc;
+            this.cursor_loc = cursor_loc;
+        }
 
         ms_to_x(ms) {
             return (ms*this.scale + this.viewport);
