@@ -32,7 +32,6 @@ export default (p, Window) => {
             this.rollover = {};
             this._rollover = {};
             this.cursor = 'default';
-            this.translate = [];
         }
 
         pressInit(p, checks) {
@@ -227,25 +226,6 @@ export default (p, Window) => {
                 }
             }
             document.body.style.cursor = this.cursor;
-        }
-
-        get loc() {
-            return this.translate.slice(-1)[0];
-        }
-
-        push(t) {
-            let last = this.translate.slice(-1)[0];
-            if (last)
-                this.translate.push({
-                    x: last.x + t.x,
-                    y: last.y + t.y
-                })
-            else
-                this.translate.push(t);
-        }
-
-        pop() {
-            return this.translate.pop();
         }
 
         buttonCheck(buttons) {

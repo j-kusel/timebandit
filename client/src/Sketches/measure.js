@@ -408,7 +408,6 @@ export default function measure(p) {
 
         // push below playback bar
         p.push();
-        Mouse.push({ x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
 
         p.translate(0, c.PLAYBACK_HEIGHT);
         p.stroke(primary);
@@ -426,14 +425,6 @@ export default function measure(p) {
 
             p.push();
             p.translate(0, yloc);
-            Mouse.push({ x: 0, y: yloc });
-            // what does this do now?
-            /*if (Mouse.drag.mode === '')
-                Mouse.rolloverCheck([null, 0, null, c.INST_HEIGHT], {
-                    type: 'inst',
-                    inst: i_ind,
-                });
-                */
 
             // moving into Window.drawMeas?
             inst.ordered.forEach((measure, m_ind) => {
@@ -460,7 +451,6 @@ export default function measure(p) {
                 )
                     return;
                
-                Mouse.push({ x: origin, y: 0 });
                 p.push();
                 p.translate(origin, 0);
 
@@ -498,7 +488,6 @@ export default function measure(p) {
 
                 // draw beats
                 beats.forEach((beat, index) => {
-                    //let coord = beat*Window.scale;
                     let alpha = 255;
                     let color = ('locks' in measure && index in measure.locks) ?
                         p.color(0, 0, 255) : p.color(colors.accent);
@@ -506,35 +495,10 @@ export default function measure(p) {
                     // bypass first beat when fading
                     if (Window.scale < 0.05 && (index !== 0))
                         alpha = Math.max(60, 255*(Window.scale/0.05));
-
-                    // try Mouse.rollover
-                    /*if (!FLAG_TEMP && Mouse.rolloverCheck( 
-                        //[coord-c.ROLLOVER_TOLERANCE, 0, coord+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
-                        [beat-c.ROLLOVER_TOLERANCE, 0, beat+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
-                        { type: 'beat', beat: index }
-                    )) {
-                        alpha = 100;
-                        if (Window.mods.mod && Window.selected.meas) {
-                            // change Mouse.rollover cursor
-                            Mouse.cursor = (Window.mods.shift) ?
-                                'text' : 'pointer';
-
-                            if (key in locked) {
-                                let bits = parse_bits(locked[key].beats);
-                                if ((bits.length >= 2 && (bits.indexOf(new_rollover.beat) === -1) && !Window.mods.shift)
-                                    || (bits.indexOf(new_rollover.beat) !== -1 && Window.mods.shift)
-                                )
-                                    Mouse.cursor = 'not-allowed';
-                            };
-                        } 
-                    }
-                    */
-
                     color.setAlpha(alpha);
                     p.stroke(color);
                     p.line(beat, 0, beat, c.INST_HEIGHT);
                 });
-                Mouse.pop();
 
                 // draw tempo graph
                 p.stroke(240, 200, 200);
@@ -605,7 +569,6 @@ export default function measure(p) {
             p.textAlign(p.LEFT, p.TOP);
             p.text(inst.name, 10, c.INST_HEIGHT - 20);
             p.pop();
-            Mouse.pop();
         });
 
         // draw snaps
@@ -625,7 +588,6 @@ export default function measure(p) {
             let select = Window.selected.meas;
             let x = select.offset * Window.scale + Window.viewport;
             let y = Window.selected.inst*c.INST_HEIGHT - Window.scroll;
-            Mouse.push({ x, y });
 
             let spread = Math.abs(range.tempo[1] - range.tempo[0]);
             let tempo_slope = (select.end - select.start)/select.timesig;
@@ -636,7 +598,7 @@ export default function measure(p) {
             // MOVE THIS BLOCK TO BEAT DRAWING BLOCK WHEN QUEUING
             let handle;
             if (Mouse.drag.mode === 'tempo' && 'temp' in select) {
-                handle = [select.temp.beats[Mouse.drag.index]*Window.scale, Mouse.loc.y, 10, 10]; 
+                handle = [select.temp.beats[Mouse.drag.index]*Window.scale, y - c.PLAYBACK_HEIGHT, 10, 10]; 
                 Mouse.cursor = 'ns-resize';
             } else if (Mouse.drag.mode !== 'tick') {
                 for (let i=1; i < select.beats.length; i++) {
@@ -654,26 +616,12 @@ export default function measure(p) {
                         return (mouseloc < tempo_target + tolerance
                         && mouseloc > tempo_target - tolerance);
                     };
-
-                    /*if (Mouse.rolloverCheck([xloc, 0, xloc2, c.INST_HEIGHT], {
-                        type: 'tempo',
-                        tempo: tempo_slope*i + select.start,
-                        // this is a little sketchy but it works for now.
-                        beat: i > select.beats.length/2 ? select.timesig-1 : 0
-                    },
-                    func)) {
-                        handle = [xloc, yloc, 10, 10]; 
-                        break;
-                    }
-                    */
                 };
             };
             
             Window.drawEditorFrame([x, y], handle);
-            Mouse.pop();
 
         }
-        Mouse.pop();
 
 
             
@@ -681,71 +629,24 @@ export default function measure(p) {
         // draw cursor / insertMeas
         p.stroke(200);
         p.fill(240);
-        Mouse.push({x: c.PANES_WIDTH, y: c.PLAYBACK_HEIGHT });
 
-        let t_mouseX = p.mouseX - Mouse.loc.x;
-        let t_mouseY = p.mouseY - Mouse.loc.y;
-        //p.line(t_mouseX, 0, t_mouseX, c.INST_HEIGHT*instruments.length);
         p.line(p.mouseX-c.PANES_WIDTH, 0, p.mouseX-c.PANES_WIDTH, c.INST_HEIGHT*instruments.length);
         
-        let draw_beats = beat => {
-            let x = ('inst' in Window.insertMeas) ? 
-                (Window.insertMeas.temp_offset + beat) * Window.scale + Window.viewport :
-                t_mouseX + beat*Window.scale;
-            let y = ('inst' in Window.insertMeas) ?
-                Window.insertMeas.inst * c.INST_HEIGHT - Window.scroll :
-                Math.floor(0.01*t_mouseY)*c.INST_HEIGHT - Window.scroll;
-            p.line(x, y, x, y + c.INST_HEIGHT);
-        };
-        //Mouse.pop();
-
         // INSERT MODE
         if (Window.mode === 1) {
-            let inst = Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT)); //t_mouseY);
-            if (API.pollSelecting()) {
+            let inst = Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT));
+            // if placing/placed measure with the mouse
+            if (API.pollSelecting() || ('temp_offset' in Window.insertMeas)) {
                 if (inst < instruments.length && inst >= 0) {
-
-                    // ALL THIS CAN BE CACHED
-                    /*let offset = x_to_ms(p.mouseX - c.PANES_WIDTH); //(p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale;
-                    let crowd = crowding(instruments[inst].gap_cache, offset, Window.insertMeas.ms, { strict: true, center: true });
-                    let crowd_start = crowd.start[0];
-                    let crowd_end =  crowd.end[0];
-
-
-                    Debug.push(`mouse: ${crowd_start}, ${crowd_end}`);
-                    if (offset < crowd_start + c.SNAP_THRESHOLD) // && offset > crowd_start - Window.insertMeas.ms/2)
-                        offset = crowd_start
-                    else if (offset + Window.insertMeas.ms + c.SNAP_THRESHOLD > crowd_end)
-                        offset = crowd_end - Window.insertMeas.ms
-                    else
-                        offset = Window.insertMeas.cache.offset;
-
-                    let offset_x = Window.ms_to_x(offset);
-                    */
-
                     p.push();
                     p.translate(Window.insertMeas.cache.offset, inst*c.INST_HEIGHT);
                     p.rect(0, 0, Window.insertMeas.cache.ms, c.INST_HEIGHT);
-                    //Window.insertMeas.temp_offset = offset;
                     p.stroke(255, 0, 0);
                     if ('beats' in Window.insertMeas)
-                        Window.insertMeas.cache.beats.forEach(beat => {
-                            /*let x = Window.ms_to_x(Window.insertMeas.temp_offset + beat);
-                            let y = ('inst' in Window.insertMeas) ?
-                                Window.insertMeas.inst * c.INST_HEIGHT - Window.scroll :
-                                Math.floor(0.01*t_mouseY)*c.INST_HEIGHT - Window.scroll;
-                            p.line(x, y, x, y + c.INST_HEIGHT);
-                            */
-                            p.line(beat, 0, beat, c.INST_HEIGHT);
-                        });
+                        Window.insertMeas.cache.beats.forEach(beat => p.line(beat, 0, beat, c.INST_HEIGHT));
                     p.pop();
                 }
-            // if insertMeas has already been placed
-            } else if ('temp_offset' in Window.insertMeas) {
-                p.rect(Window.insertMeas.temp_offset*Window.scale + Window.viewport, Window.insertMeas.inst*c.INST_HEIGHT, Window.insertMeas.ms*Window.scale, c.INST_HEIGHT);
-                p.stroke(255, 0, 0);
-                Window.insertMeas.beats.forEach(draw_beats);
-            };
+            }
         };
 
         if (DEBUG) {
@@ -2173,34 +2074,6 @@ export default function measure(p) {
 
         // set cursor based on Mouse.rollover
         Mouse.eval_cursor(Window.mods, Window.selected.meas);
-
-        /*if (Mouse.drag.mode === '')
-            Mouse.rolloverCheck([0, 0, 
-            */
-        // checks for beat rollover
-        //// try Mouse.rollover
-                    /*if (!FLAG_TEMP && Mouse.rolloverCheck( 
-                        //[coord-c.ROLLOVER_TOLERANCE, 0, coord+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
-                        [beat-c.ROLLOVER_TOLERANCE, 0, beat+c.ROLLOVER_TOLERANCE, c.INST_HEIGHT],
-                        { type: 'beat', beat: index }
-                    )) {
-                        alpha = 100;
-                        if (Window.mods.mod && Window.selected.meas) {
-                            // change Mouse.rollover cursor
-                            Mouse.cursor = (Window.mods.shift) ?
-                                'text' : 'pointer';
-
-                            if (key in locked) {
-                                let bits = parse_bits(locked[key].beats);
-                                if ((bits.length >= 2 && (bits.indexOf(new_rollover.beat) === -1) && !Window.mods.shift)
-                                    || (bits.indexOf(new_rollover.beat) !== -1 && Window.mods.shift)
-                                )
-                                    Mouse.cursor = 'not-allowed';
-                            };
-                        } 
-                    }
-                    */
-
 
         return false;
     };
