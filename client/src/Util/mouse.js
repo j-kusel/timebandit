@@ -40,7 +40,11 @@ export default (p, Window) => {
             p.mouseDown = { x: p.mouseX, y: p.mouseY };
 
             // run all interruption checks and assign bool for cancellation
-            this.cancel = checks.some(check => check());
+            this.cancel = checks.some(check => {
+                let failed = check.func();
+                console.log(`${check.name}: ${failed}`);
+                return failed;
+            });
         }
 
         resetDrag() {
@@ -48,6 +52,7 @@ export default (p, Window) => {
         }
 
         select(type) {
+            // NEEDS TO INCLUDE SCROLL
             let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
 
             if (inst >= Window.insts)
@@ -90,14 +95,22 @@ export default (p, Window) => {
             // check for editor menus
             if (Window.mode === 2 && Window.selected.meas) {
                 let selStart = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
-                let menuStart = inst*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
+                let menuStart = (inst+1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
+
+                console.log(inst, selStart, menuStart);
+                console.log(p.mouseY, menuStart);
+
+                console.log(p.mouseY <menuStart + c.LOCK_HEIGHT);
+                console.log(p.mouseX <selStart);
+                console.log(p.mouseX >selStart + Window.selected.meas.ms*Window.scale);
                 if (p.mouseY > menuStart
                     && p.mouseY < menuStart + c.LOCK_HEIGHT
-                    && p.mouseX > selStart
-                    && p.mouseX < selStart + Window.selected.meas.ms*Window.scale
-                )
+                    && p.mouseX < selStart
+                    && p.mouseX > selStart + Window.selected.meas.ms*Window.scale
+                ) {
                     this.cancel = true;
                     return true;
+                }
             }
             this.cancel = false;
             return false;
@@ -140,12 +153,14 @@ export default (p, Window) => {
                 this.drag.mode = 'lock';
         }
 
-        checkTempo() {
-            if (this.rollover.type === 'tempo') {
+        checkTempo(mode) {
+            console.log('checking tempo', mode);
+            if ((this.rollover.type === 'tempo') && (mode === 2)) {
                 this.drag.mode = 'tempo';
                 Window.initialize_temp();
                 this.drag.grab = this.rollover.beat;
                 this.grabbed = this.rollover.beat;
+                console.log(this.drag);
                 return true;
             };
             return false;

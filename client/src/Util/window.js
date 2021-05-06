@@ -342,6 +342,7 @@ export default (p) => {
         }
 
         select(newSelected) {
+            console.log(newSelected);
             if (newSelected === 'clear') {
                 if (this.selected.inst === -1)
                     return false;

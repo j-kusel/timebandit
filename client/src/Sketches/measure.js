@@ -146,7 +146,7 @@ var insert = (list, item) => {
 var locked = {};
 
 
-var range = [0, 100];
+var range = { tempo: [0, 100] };
 
 export default function measure(p) {
     // monkey-patching Processing for a p.mouseDown function
@@ -248,6 +248,16 @@ export default function measure(p) {
     var tuts = tutorials(p, subscriber, API, Window);
 
     var calculate_cache = (instruments) => {
+        // MOVE THIS TO SOME SORT OF SCORE CACHE
+        let bottom = ('temprange' in range) ?
+            (range.temprange[0] || range.tempo[0]) :
+            range.tempo[0];
+        let top = ('temprange' in range) ?
+            (range.temprange[1] || range.tempo[1]) :
+            range.tempo[1];
+        let spread = top - bottom;
+
+        
         instruments.forEach(inst => {
             inst.ordered.forEach(meas => {
                 meas.cache = {
@@ -255,7 +265,55 @@ export default function measure(p) {
                     beats: meas.beats.map(b => b * Window.scale),
                     ticks: meas.ticks.map(t => t * Window.scale),
                     ms: meas.ms*Window.scale,
+                    graph: [],
+                    graph_ratios: [],
+                    markings: []
                 }
+
+                let ystart = c.INST_HEIGHT - (meas.start - bottom)/spread*c.INST_HEIGHT;
+                let yend = c.INST_HEIGHT - (meas.end - bottom)/spread*c.INST_HEIGHT;
+
+                let last = [0, ystart];
+                meas.cache.beats.slice(1).forEach((beat, i) => {
+                    let next = [
+                        beat, // * Window.scale,
+                        c.INST_HEIGHT - ((((i+1)/meas.timesig)*(meas.end-meas.start) + meas.start) - bottom)/spread*c.INST_HEIGHT
+                    ];
+                    meas.cache.graph.push(last.concat(next));
+
+                    let ratio = (last[1] - next[1])/(next[0] - last[0]);
+
+                    //console.log(last[1], ratio);
+
+                    meas.cache.graph_ratios.push(ratio);
+                    
+                    last = next;
+                });
+
+                // calculate tempo marking placement
+                let sigfig = Window.scale > 0.05 ? 2 : 0;
+                //let tempo_loc = { x: position(0) + c.TEMPO_PADDING };
+                let tempo_loc = { x: 0 + c.TEMPO_PADDING };
+                if (ystart > c.TEMPO_PT + c.TEMPO_PADDING)
+                    meas.cache.markings.push({
+                        textAlign: [p.LEFT, p.BOTTOM],
+                        text: [meas.start.toFixed(sigfig), c.TEMPO_PADDING, ystart - c.TEMPO_PADDING]
+                    })
+                else
+                    meas.cache.markings.push({
+                        textAlign: [p.LEFT, p.TOP],
+                        text: [meas.start.toFixed(sigfig), c.TEMPO_PADDING, ystart + c.TEMPO_PADDING]
+                    });
+                if (yend > c.TEMPO_PT + c.TEMPO_PADDING)
+                    meas.cache.markings.push({
+                        textAlign: [p.RIGHT, p.BOTTOM],
+                        text: [meas.end.toFixed(sigfig), meas.cache.ms - c.TEMPO_PADDING, yend - c.TEMPO_PADDING]
+                    })
+                else
+                    meas.cache.markings.push({
+                        textAlign: [p.RIGHT, p.TOP],
+                        text: [meas.end.toFixed(sigfig), meas.cache.ms - c.TEMPO_PADDING, yend + c.TEMPO_PADDING]
+                    });
             });
         });
         if ('beats' in Window.insertMeas) {
@@ -501,8 +559,9 @@ export default function measure(p) {
                 });
 
                 // draw tempo graph
+                // MOVING THIS TO CALCULATE_CACHE
                 p.stroke(240, 200, 200);
-                let bottom = ('temprange' in range) ?
+                /*let bottom = ('temprange' in range) ?
                     (range.temprange[0] || range.tempo[0]) :
                     range.tempo[0];
                 let top = ('temprange' in range) ?
@@ -522,11 +581,13 @@ export default function measure(p) {
                     p.line(last[0], last[1], next[0], next[1]);
                     last = next;
                 });
+                */
+                measure.cache.graph.forEach(graph => p.line(...graph));
 
                 // draw tempo markings
                 p.fill(100);
                 p.textSize(c.TEMPO_PT);
-                let sigfig = Window.scale > 0.05 ? 2 : 0;
+                /*let sigfig = Window.scale > 0.05 ? 2 : 0;
                 //let tempo_loc = { x: position(0) + c.TEMPO_PADDING };
                 let tempo_loc = { x: 0 + c.TEMPO_PADDING };
                 if (ystart > c.TEMPO_PT + c.TEMPO_PADDING) {
@@ -546,7 +607,11 @@ export default function measure(p) {
                     p.textAlign(p.RIGHT, p.TOP);
                     tempo_loc.y = yend + c.TEMPO_PADDING;
                 };
-                p.text(end.toFixed(sigfig), ms - c.TEMPO_PADDING, tempo_loc.y);
+                */
+                measure.cache.markings.forEach(m => {
+                    p.textAlign(...m.textAlign);
+                    p.text(...m.text);
+                });
 
                 // return from measure translate
                 p.pop();
@@ -1003,15 +1068,20 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
+        console.log(Mouse.rollover);
         let checks = [
-            API.modalCheck,
-            tuts._mouseBlocker,
-            () => Mouse.checkOrigin(p),
-            () => [buttons, core_buttons]
+            { name: 'API.modalCheck',
+            func: API.modalCheck,
+            },
+            { name: 'tuts._mouseBlocker',
+            func: tuts._mouseBlocker,
+            },
+            {name: 'Mouse.checkOrigin(p)', func: () => Mouse.checkOrigin(p)},
+                {func: () => [buttons, core_buttons]
                 .reduce((acc, arr) => acc.concat(arr), [])
-                .some(click => click()),
-            () => Mouse.checkTempo(),
-            () => (Window.insertMeas.confirmed),
+                .some(click => click())},
+                    {func: () => Mouse.checkTempo(Window.mode)},
+                        {func: () => (Window.insertMeas.confirmed)},
         ];
         Mouse.pressInit(p, checks);
 
@@ -1064,6 +1134,7 @@ export default function measure(p) {
         if (inst >= instruments.length || inst < 0)
             return;
 
+        console.log('selecting');
         Mouse.select();
 
         if (Window.selected.meas) {
@@ -1084,6 +1155,7 @@ export default function measure(p) {
         Mouse.drag.x = p.mouseX - p.mouseDown.x;
         Mouse.drag.y = p.mouseY - p.mouseDown.y;
 
+            console.log('tempo drag', Mouse.rollover, Mouse.drag);
         // printer drag
         if (Mouse.drag.mode === 'printer') {
             Window.printAdjust({ end: x_to_ms(p.mouseX) });
@@ -2041,11 +2113,14 @@ export default function measure(p) {
 
         // checking for rollover.
         // which instrument?
-        let inst_row = Math.floor((p.mouseY - c.PLAYBACK_HEIGHT + Window.scroll) /  c.INST_HEIGHT);
+        let y_loc = p.mouseY - c.PLAYBACK_HEIGHT + Window.scroll;
+        let row_calc = (y_loc) /  c.INST_HEIGHT;
+        let inst_row = Math.floor(y_loc/c.INST_HEIGHT);
         if (inst_row < instruments.length && inst_row >= 0) {
             let inst = instruments[inst_row];
             // translating to viewport
             let frameX = p.mouseX - c.PANES_WIDTH - Window.viewport;
+            let frameY = y_loc % c.INST_HEIGHT;
             // check for measure rollover
             if (!inst.ordered.some(meas => {
                 if ((frameX > meas.cache.offset)
@@ -2060,11 +2135,23 @@ export default function measure(p) {
                         ) {
                             Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind });
                             return true;
+                        } else if (ind<meas.cache.beats.length-1) { // last beat has no "graph"
+                            // translating to tempo graph segment
+                            let graph = meas.cache.graph[ind];
+                            if (frameXmeas > graph[0] && frameXmeas < graph[2]) {
+                                let y = graph[1] - (frameXmeas-beat)*meas.cache.graph_ratios[ind];
+                                if (frameY > y - c.ROLLOVER_TOLERANCE &&
+                                    frameY < y + c.ROLLOVER_TOLERANCE
+                                ) {
+                                    Mouse.setRollover({ type: 'tempo', inst: inst_row, meas, beat: ind });
+                                    return true;
+                                }
+                            }
+                            return false;
                         } else
                             return false;
-                    })) {
+                    }))
                         Mouse.setRollover({ type: 'measure', meas });
-                    }
                     return true;
                 } else
                     return false;
