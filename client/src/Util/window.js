@@ -24,6 +24,8 @@ export default (p) => {
             this.insertMeas = {};
             this.editMeas = {};
             this._lockingCandidate = null;
+            this.range = { tempo: [0, 100] };
+            this.rangeRefresh = () => {};
 
             this.printTemp = {};
 
@@ -42,6 +44,80 @@ export default (p) => {
          *  type
          * }
          */
+
+        calculate_tempo_cache(meas) {
+            let obj = {
+                graph: [],
+                graph_ratios: [],
+                markings: []
+            };
+
+            let FLAG_TEMP = ('temp' in meas);
+
+            let start = FLAG_TEMP ? meas.temp.start : meas.start;
+            let end = FLAG_TEMP ? meas.temp.end : meas.end;
+            
+            let range = this.range;
+
+            let bottom = ('temprange' in range) ?
+                (range.temprange[0] || range.tempo[0]) :
+                range.tempo[0];
+            let top = ('temprange' in range) ?
+                (range.temprange[1] || range.tempo[1]) :
+                range.tempo[1];
+            let spread = top - bottom;
+
+            let ystart = c.INST_HEIGHT - (start - bottom)/spread*c.INST_HEIGHT;
+            let yend = c.INST_HEIGHT - (end - bottom)/spread*c.INST_HEIGHT;
+
+            let last = [0, ystart];
+            meas.cache.beats.slice(1).forEach((beat, i) => {
+                let next = [
+                    beat, 
+                    c.INST_HEIGHT - ((((i+1)/meas.timesig)*(end-start) + start) - bottom)/spread*c.INST_HEIGHT
+                ];
+                obj.graph.push(last.concat(next));
+
+                let ratio = (last[1] - next[1])/(next[0] - last[0]);
+                obj.graph_ratios.push(ratio);
+                
+                last = next;
+            });
+
+            // calculate tempo marking placement
+            let sigfig = this.scale > 0.05 ? 2 : 0;
+            if (ystart > c.TEMPO_PT + c.TEMPO_PADDING)
+                obj.markings.push({
+                    textAlign: [p.LEFT, p.BOTTOM],
+                    text: [start.toFixed(sigfig), c.TEMPO_PADDING, ystart - c.TEMPO_PADDING]
+                })
+            else
+                obj.markings.push({
+                    textAlign: [p.LEFT, p.TOP],
+                    text: [start.toFixed(sigfig), c.TEMPO_PADDING, ystart + c.TEMPO_PADDING]
+                });
+            if (yend > c.TEMPO_PT + c.TEMPO_PADDING)
+                obj.markings.push({
+                    textAlign: [p.RIGHT, p.BOTTOM],
+                    text: [end.toFixed(sigfig), meas.cache.ms - c.TEMPO_PADDING, yend - c.TEMPO_PADDING]
+                })
+            else
+                obj.markings.push({
+                    textAlign: [p.RIGHT, p.TOP],
+                    text: [end.toFixed(sigfig), meas.cache.ms - c.TEMPO_PADDING, yend + c.TEMPO_PADDING]
+                });
+            return obj;
+        }
+
+        setRangeRefresh(refresh) {
+            this.rangeRefresh = refresh;
+        }
+
+        updateRange(new_range) {
+            Object.assign(this.range, new_range);
+            console.log(this.range);
+            this.rangeRefresh();
+        }
 
         updateCursorLoc() {
             let mouse = (p.mouseX - this.viewport)/this.scale - c.PANES_WIDTH;
@@ -146,7 +222,6 @@ export default (p) => {
 
 
         locking(candidate, beat) {
-            console.log(beat);
             if (typeof(beat) !== 'number')
                 return false;
             if ('locks' in candidate) {
@@ -158,7 +233,6 @@ export default (p) => {
                     candidate.locks[beat] = null;
             } else
                 candidate.locks = { [beat]: null }
-            console.log(candidate.locks);
             this._lockingCandidate = beat;
             return true;
         }
@@ -173,6 +247,7 @@ export default (p) => {
         }
 
         initialize_temp() {
+            console.log('INITIALIZED');
             let sel = this.selected.meas;
             this.selected.meas.temp = {
                 start: sel.start,
@@ -183,14 +258,15 @@ export default (p) => {
                 offset: sel.offset
             };
 
-            Object.assign(this.selected.meas.temp, {
-                cache: {
-                    offset: sel.offset*this.scale,
-                    beats: sel.beats.map(b => b*this.scale),
-                    ticks: sel.ticks.map(t => t*this.scale),
-                    ms: sel.ms*this.scale
-                }
-            });
+            let cache = {
+                offset: sel.offset*this.scale,
+                beats: sel.beats.map(b => b*this.scale),
+                ticks: sel.ticks.map(t => t*this.scale),
+                ms: sel.ms*this.scale
+            };
+
+            Object.assign(this.selected.meas, { cache });
+            Object.assign(this.selected.meas.cache, this.calculate_tempo_cache(sel));
 
         }
 
@@ -342,7 +418,6 @@ export default (p) => {
         }
 
         select(newSelected) {
-            console.log(newSelected);
             if (newSelected === 'clear') {
                 if (this.selected.inst === -1)
                     return false;
@@ -356,7 +431,6 @@ export default (p) => {
                 delete this.selected.meas.temp;
             }
             Object.assign(this.selected, newSelected);
-            console.log(this.selected);
             return true;
         }
      

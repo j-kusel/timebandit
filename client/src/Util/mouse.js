@@ -34,17 +34,23 @@ export default (p, Window) => {
             this.cursor = 'default';
         }
 
+        canceller(bool, cause) {
+            this.cancel = bool;
+            if (bool)
+                console.log('Click cancelled' + (cause ? `: ${cause}` : '.'));
+        }
+
         pressInit(p, checks) {
             // basic resets
             this.resetDrag();
             p.mouseDown = { x: p.mouseX, y: p.mouseY };
 
             // run all interruption checks and assign bool for cancellation
-            this.cancel = checks.some(check => {
+            this.canceller(checks.some(check => {
                 let failed = check.func();
                 console.log(`${check.name}: ${failed}`);
                 return failed;
-            });
+            }), 'pressInit');
         }
 
         resetDrag() {
@@ -56,7 +62,7 @@ export default (p, Window) => {
             let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
 
             if (inst >= Window.insts)
-                this.cancel = true
+                this.canceller(true, 'Selecting outside of instruments range (Mouse.select)')
             else {
                 let new_select = { inst };
 
@@ -64,7 +70,7 @@ export default (p, Window) => {
                 // even a successful check returns false.
                 if (type && type === 'inst') {
                     Window.select(new_select);
-                    this.cancel = false;
+                    this.canceller(false);
                     return false;
                 }
 
@@ -74,12 +80,13 @@ export default (p, Window) => {
                     new_select.beat = this.rollover.beat;
 
                 // cancel the rest of the mousePressed event if a selection is successful
-                this.cancel = Window.select(new_select);
+                this.canceller(Window.select(new_select), 'Selection was successful.');
                 return this.cancel;
             };
         };
 
         checkOrigin = (p) => {
+
             // return if outside canvas or over active menu
             if (p.mouseX === Infinity 
                 || p.mouseX < 0
@@ -87,7 +94,7 @@ export default (p, Window) => {
                 || p.mouseY < 0
                 || p.mouseY > p.height
             ) {
-                this.cancel = true;
+                this.canceller(true, 'Mouse clicked outside of canvas.');
                 return true;
             }
 
@@ -97,22 +104,16 @@ export default (p, Window) => {
                 let selStart = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
                 let menuStart = (inst+1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
 
-                console.log(inst, selStart, menuStart);
-                console.log(p.mouseY, menuStart);
-
-                console.log(p.mouseY <menuStart + c.LOCK_HEIGHT);
-                console.log(p.mouseX <selStart);
-                console.log(p.mouseX >selStart + Window.selected.meas.ms*Window.scale);
                 if (p.mouseY > menuStart
                     && p.mouseY < menuStart + c.LOCK_HEIGHT
                     && p.mouseX < selStart
                     && p.mouseX > selStart + Window.selected.meas.ms*Window.scale
                 ) {
-                    this.cancel = true;
+                    this.canceller(true, 'Mouse clicked over editor menu');
                     return true;
                 }
             }
-            this.cancel = false;
+            this.canceller(false);
             return false;
         };
 
@@ -155,6 +156,8 @@ export default (p, Window) => {
 
         checkTempo(mode) {
             console.log('checking tempo', mode);
+            if (!Window.selected.meas)
+                return false;
             if ((this.rollover.type === 'tempo') && (mode === 2)) {
                 this.drag.mode = 'tempo';
                 Window.initialize_temp();
@@ -247,7 +250,7 @@ export default (p, Window) => {
             if (buttons.some(click => click())) {
                 // what's the point of clearing buttons here?
                 buttons = [];
-                this.cancel = true;
+                this.canceller(true, 'Button pressed.');
                 return true;
             }
             return false;

@@ -249,7 +249,7 @@ class App extends Component {
                   );
 
               instruments[inst].measures[id] = newMeas;
-              return { instruments, ordered: ordered_cpy };
+              return { instruments, ordered: ordered_cpy, selected: { inst, meas: newMeas } };
           });
       };
 
