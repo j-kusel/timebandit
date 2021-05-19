@@ -1104,6 +1104,7 @@ export default function measure(p) {
             return;
 
 
+
         // retrieve the target measure and calculate the measure's gaps, if not cached
         let measure = Window.selected.meas;
         if (!('gaps' in measure))
@@ -1218,6 +1219,7 @@ export default function measure(p) {
         var PPQ_mod = Window.CONSTANTS.PPQ / Window.CONSTANTS.PPQ_tempo;
         // does this renaming really help things?
         var snap = Mouse.drag.grab;
+        console.log(snap);
 
         // tick_array is the total number of tempo updates for the measure
         var tick_array = Array.from({
@@ -1693,7 +1695,7 @@ export default function measure(p) {
 
         
         if (Mouse.drag.mode === 'tick') {
-            
+            console.log(Mouse.drag.grab);    
             // 'tick' drag is dependent on zoom, so we need to gather that info first.
             let beatscale = (-Mouse.drag.x*Window.scale); // /p.width
 
@@ -1902,7 +1904,6 @@ export default function measure(p) {
                     update.offset = crowd.end[0] - update.ms;
                     */
             }
-            return finalize();
 
             let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
             
