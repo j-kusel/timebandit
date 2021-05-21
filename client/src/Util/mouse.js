@@ -31,7 +31,31 @@ export default (p, Window) => {
             this.cancel = true;
             this.rollover = {};
             this._rollover = {};
+            this.lock_type = null;
             this.cursor = 'default';
+        }
+
+        checkLock() {
+            if (p.mouseX > p.mouseDown.x - 17 &&
+                p.mouseX < p.mouseDown.x + 18 &&
+                p.mouseY > p.mouseDown.y - 20 &&
+                p.mouseY < p.mouseDown.y + 0
+            ) {
+                this.lock_type = 'both'
+            } else if (p.mouseY > p.mouseDown.y - 10 &&
+                p.mouseY < p.mouseDown.y + 10
+            ) {
+                if (p.mouseX < p.mouseDown.x - 10 &&
+                    p.mouseX > p.mouseDown.x - 45
+                ) {
+                    this.lock_type = 'loc'
+                }
+                else if (p.mouseX < p.mouseDown.x + 45 &&
+                    p.mouseX > p.mouseDown.x + 10
+                ) {
+                    this.lock_type = 'tempo';
+                }
+            }
         }
 
         canceller(bool, cause) {

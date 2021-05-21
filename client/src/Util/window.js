@@ -115,7 +115,6 @@ export default (p) => {
 
         updateRange(new_range) {
             Object.assign(this.range, new_range);
-            console.log(this.range);
             this.rangeRefresh();
         }
 
@@ -297,6 +296,42 @@ export default (p) => {
             }
 
             this.updateViewCallback(this.viewport, this.scale, this.scroll);
+        }
+
+        drawLockMenu(type) {
+            p.push();
+            p.translate(p.mouseDown.x, p.mouseDown.y);
+
+            p.fill(primary);
+            p.stroke(primary);
+            p.rect(-45, -10, 35, 20);
+            p.rect(10, -10, 35, 20);
+            p.rect(-17, -20, 35, 20);
+            p.stroke(secondary)
+            p.fill(secondary)
+            p.textSize(10);
+            p.textAlign(p.CENTER, p.CENTER);
+            p.text('loc', -27, 0);
+            p.text('tempo', 27, 0);
+            p.text('both', 0, -10);
+
+            if (type === 'both') {
+                p.stroke(primary);
+                p.rect(-17, -20, 35, 20);
+                p.fill(primary);
+                p.text('both', 0, -10);
+            } else if (type === 'loc') {
+                p.stroke(primary);
+                p.rect(-45, -10, 35, 20);
+                p.fill(primary);
+                p.text('loc', -27, 0);
+            } else if (type === 'tempo') {
+                p.stroke(primary);
+                p.rect(10, -10, 35, 20);
+                p.fill(primary);
+                p.text('tempo', 27, 0);
+            }
+            p.pop();
         }
 
         drawPlayback() {
