@@ -27,6 +27,8 @@ const SLOW = process.env.NODE_ENV === 'development';
 var API = {};
 var K;
 
+var div;
+
 // finds adjacent measures and returns their location and distance
 var crowding = (gaps, position, ms, options) => {
     let center = (options && 'center' in options) ? options.center : false;
@@ -183,7 +185,6 @@ export default function measure(p) {
     var insertMeasSelecting = () => {
         let x_loc = x_to_ms(p.mouseX - c.PANES_WIDTH);
         if (Window.mode === 1) {
-            //let offset = x_to_ms(p.mouseX - c.PANES_WIDTH); //(p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale;
             let inst = Math.floor(0.01*(p.mouseY - c.PLAYBACK_HEIGHT));
             if (inst < instruments.length && inst >= 0) {
                 let crowd = crowding(instruments[inst].gap_cache, x_loc, Window.insertMeas.ms, { strict: true, center: true });
@@ -327,9 +328,6 @@ export default function measure(p) {
                 return false;
         });
 
-        /*var beat_lock = (Window.selected.meas && Window.selected.meas.id in locked && locked[Window.selected.meas.id].beats) ?
-            parse_bits(locked[Window.selected.meas.id].beats) : [];*/
-
         var beat_lock = {};
         if (Window.selected.meas && 'locks' in Window.selected.meas) {
             let lock_candidates = Object.keys(Window.selected.meas.locks);
@@ -377,8 +375,6 @@ export default function measure(p) {
         if ('beats' in Window.insertMeas)
             Window.insertMeas.cache = calculate_insertMeas_cache(Window.insertMeas);
 
-
-
         // rewrite this
         logger.log('Recalculating snap divisions...');
         snaps.divs = NUM.slice(1).reduce((acc, num, n_ind) => {
@@ -417,8 +413,6 @@ export default function measure(p) {
         if (SLOW)
             p.frameRate(10);
 
-
-
         Window.drawFrame();
 
         // push below playback bar
@@ -433,6 +427,7 @@ export default function measure(p) {
 
 
         // this instrument loop is 200 lines, that's ridiculous.
+        // now down to 115.
         instruments.forEach((inst, i_ind) => {
             // prototyping this new function
             Window.drawInst(inst, i_ind);
@@ -482,7 +477,6 @@ export default function measure(p) {
 
                 let step, lerp;
                 [step, lerp] = tick_zoom();
-                //let step = 4;
                 for (var i=0; i < ticks.length; i += (step === 1 ? step : step/2)) {
                     let loc = ticks[i];
                     // skip if offscreen

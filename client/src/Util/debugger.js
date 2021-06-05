@@ -47,6 +47,7 @@ export class Debugger {
                 [`Window.selected: ${'temp' in Window.selected.meas ? [Window.selected.meas.temp.start, Window.selected.meas.temp.end].join(' ') : 'no temp'}  beats - ${Window.selected.meas.ms.toFixed(1)} ms`] :
                 ['']
         ];
+        this.frameStack = [];
     }
 
     /**
@@ -57,7 +58,27 @@ export class Debugger {
         p.textSize(18);
         p.stroke(primary);
         p.fill(primary);
-        p.text(`${Math.round(p.frameRate())}fps`, p.width - 10, 5);
+        let fr = p.frameRate();
+        p.text(`${Math.round(fr)}fps`, p.width - 10, 5);
+        fr *= (15/60);
+        p.push();
+        p.translate(p.width - 50, 25);
+        p.line(0, 0, 40, 0);
+        p.line(0, 15, 40, 15);
+        p.strokeWeight(2);
+        this.frameStack.push(fr);
+        if (this.frameStack.length > 40)
+            this.frameStack.shift();
+
+        this.frameStack.reduce((acc, frame, ind) => {
+            p.line(ind, 15 - (acc.length ? acc.pop() : frame),
+                ind+1, 15 - frame);
+            acc.push(frame);
+            return acc
+        }, []);
+
+        p.pop();
+        
     }
 
     /**
