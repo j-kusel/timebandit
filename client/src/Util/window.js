@@ -31,6 +31,10 @@ export default (p) => {
 
             this.updateViewCallback = () => null;
 
+            this.editor = {};
+            this.editor_input = p.createInput('');
+            this.editor_input.style('z-index: 1');
+
             // monkey patch selection color
             let sel_color = p.color(colors.contrast);
             sel_color.setGreen(140);
@@ -45,11 +49,32 @@ export default (p) => {
          * }
          */
 
+        enter_editor(type, inst, meas) {
+            if (type === 'start' || type === 'end' || type === 'timesig') {
+                let next = meas[type].toString();
+                this.editor = {
+                    type, inst, meas,
+                    current: meas[type],
+                    next,
+                    pointer: next.length
+                };
+                //this.editor_input.html(meas[type]);
+                //this.editor_input.position();
+                return true;
+            }
+            return false;
+        }
+
+        exit_editor() {
+            this.editor = {};
+        }
+
         calculate_tempo_cache(meas) {
             let obj = {
                 graph: [],
                 graph_ratios: [],
-                markings: []
+                markings: [],
+                bounding: []
             };
 
             let FLAG_TEMP = ('temp' in meas);
@@ -84,28 +109,58 @@ export default (p) => {
                 last = next;
             });
 
+            let bounding = [];
+
             // calculate tempo marking placement
             let sigfig = this.scale > 0.05 ? 2 : 0;
-            if (ystart > c.TEMPO_PT + c.TEMPO_PADDING)
-                obj.markings.push({
+            let start_fixed = start.toFixed(sigfig);
+            let start_fixed_len = start_fixed.toString().length;
+            let end_fixed = end.toFixed(sigfig);
+            let end_fixed_len = end_fixed.toString().length;
+
+            let marking, bound;
+            if (ystart > c.TEMPO_PT + c.TEMPO_PADDING) {
+                marking = {
                     textAlign: [p.LEFT, p.BOTTOM],
-                    text: [start.toFixed(sigfig), c.TEMPO_PADDING, ystart - c.TEMPO_PADDING]
-                })
-            else
-                obj.markings.push({
+                    text: [start_fixed, c.TEMPO_PADDING, ystart - c.TEMPO_PADDING]
+                };
+                bound = [
+                    c.TEMPO_PADDING, marking.text[2] - c.TEMPO_PT, 
+                    c.TEMPO_PADDING + c.TEMPO_PT * start_fixed_len, marking.text[2]
+                ];
+            } else {
+                marking = {
                     textAlign: [p.LEFT, p.TOP],
-                    text: [start.toFixed(sigfig), c.TEMPO_PADDING, ystart + c.TEMPO_PADDING]
-                });
-            if (yend > c.TEMPO_PT + c.TEMPO_PADDING)
-                obj.markings.push({
+                    text: [start_fixed, c.TEMPO_PADDING, ystart + c.TEMPO_PADDING]
+                };
+                bound = [
+                    c.TEMPO_PADDING, marking.text[2], 
+                    c.TEMPO_PADDING + c.TEMPO_PT * start_fixed_len, marking.text[2] + c.TEMPO_PT
+                ];
+            }
+            obj.markings.push(marking);
+            obj.bounding.push(bound);
+            if (yend > c.TEMPO_PT + c.TEMPO_PADDING) {
+                marking = {
                     textAlign: [p.RIGHT, p.BOTTOM],
-                    text: [end.toFixed(sigfig), meas.cache.ms - c.TEMPO_PADDING, yend - c.TEMPO_PADDING]
-                })
-            else
-                obj.markings.push({
+                    text: [end_fixed, meas.cache.ms - c.TEMPO_PADDING, yend - c.TEMPO_PADDING]
+                };
+                bound = [
+                    marking.text[1] - c.TEMPO_PT * end_fixed_len, marking.text[2] - c.TEMPO_PT, 
+                    marking.text[1], marking.text[2]
+                ];
+            } else {
+                marking = {
                     textAlign: [p.RIGHT, p.TOP],
-                    text: [end.toFixed(sigfig), meas.cache.ms - c.TEMPO_PADDING, yend + c.TEMPO_PADDING]
-                });
+                    text: [end_fixed, meas.cache.ms - c.TEMPO_PADDING, yend + c.TEMPO_PADDING]
+                };
+                bound = [
+                    marking.text[1] - c.TEMPO_PT * end_fixed_len, marking.text[2], 
+                    marking.text[1], marking.text[2] + c.TEMPO_PT
+                ];
+            }
+            obj.markings.push(marking);
+            obj.bounding.push(bound);
             return obj;
         }
 
@@ -631,7 +686,7 @@ export default (p) => {
             p.pop();
         }
 
-        drawEditorFrame(coords, handle) {
+        /*drawEditorFrame(coords, handle) {
             p.push();
             let opac = p.color(primary);
             opac.setAlpha(180);
@@ -661,7 +716,7 @@ export default (p) => {
             //p.text(`${select.start} -> ${select.end} / ${select.timesig}`, 5, c.PANES_WIDTH);
                 
             p.pop();
-        }
+        }*/
     };
     return new _Window();
 

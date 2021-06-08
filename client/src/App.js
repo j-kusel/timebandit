@@ -366,17 +366,18 @@ class App extends Component {
             this.insertFocusStart.current.focus();
           } else {
               newState.insertMeas = {};
-              if (mode === 2) {
+              /*if (mode === 2) {
                 //['start', 'end', 'timesig'].forEach(x => newState['edit_'.concat(x)] = this.selected.meas[x]);
               }
               else {
+              */
                   ['start', 'end', 'timesig', 'offset'].forEach(x => {
                       newState[x] = '';
                       newState['edit_'.concat(x)] = '';
                   });
                   newState.temp_offset = false;
                   newState.editMeas = {};
-              }
+              //}
               this.setState(newState);
           };
       };
@@ -1199,7 +1200,7 @@ class App extends Component {
               }
           </div>
           
-          { (this.state.mode === 2 && this.state.selected.meas) &&
+          { /*(this.state.mode === 2 && this.state.selected.meas) &&
               <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset}
                 top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}
                 width={this.state.selected.meas.ms * this.state.scale}
@@ -1223,7 +1224,7 @@ class App extends Component {
                     </div>
                 </form>
               </Edit>
-          }
+          */}
 
 		  {/* PROCESSING COMPONENT */}
           <UI {...propsUI} />

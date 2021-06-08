@@ -1,5 +1,5 @@
 //import { SHIFT, ALT, SPACE, DEL, BACK, ESC, CTRL, MOD } from './keycodes.js';
-import { KeyH, KeyJ, KeyK, KeyL } from './keycodes.js';
+import { KeyH, KeyJ, KeyK, KeyL, LEFT, RIGHT, UP, DOWN } from './keycodes.js';
 //import { KeyC, KeyI, KeyV, KeyZ } from './keycodes.js';
 import { NUM } from './keycodes.js';
 
@@ -34,15 +34,22 @@ export default (p) => {
             return false;
         }
 
-        checkDirection() {
-            if (p.keyCode === KeyJ)
-                return 'DOWN';
-            if (p.keyCode === KeyK)
-                return 'UP';
-            if (p.keyCode === KeyH)
-                return 'LEFT';
-            if (p.keyCode === KeyL)
-                return 'RIGHT';
+        checkDirection(type) {
+            if (type === 'arrows') {
+                if (p.keyCode === LEFT)
+                    return 'LEFT';
+                if (p.keyCode === RIGHT)
+                    return 'RIGHT';
+            } else {
+                if (p.keyCode === KeyJ)
+                    return 'DOWN';
+                if (p.keyCode === KeyK)
+                    return 'UP';
+                if (p.keyCode === KeyH || p.keyCode === LEFT)
+                    return 'LEFT';
+                if (p.keyCode === KeyL || p.keyCode === RIGHT)
+                    return 'RIGHT';
+            }
             return false;
         }
     }

@@ -29,6 +29,8 @@ var K;
 
 var div;
 
+var input;
+
 // finds adjacent measures and returns their location and distance
 var crowding = (gaps, position, ms, options) => {
     let center = (options && 'center' in options) ? options.center : false;
@@ -272,6 +274,10 @@ export default function measure(p) {
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
         p.background(255);
+        /*input = p.createInput('');
+        input.style('z-index: 1');
+        input.elt.onchange = (e) => console.log('changed!', e);
+        */
     };
 
     p.windowResized = function () {
@@ -301,6 +307,7 @@ export default function measure(p) {
         Window.CONSTANTS = props.CONSTANTS;
         Window.CONSTANTS.K = 60000.0 / Window.CONSTANTS.PPQ;
         core_buttons = [];
+        // add insert tab button
         core_buttons.push(() => {
             let insert_x = (p.width - c.TOOLBAR_WIDTH) / 3.0;
             if (p.mouseX > insert_x &&
@@ -314,7 +321,8 @@ export default function measure(p) {
             } else
                 return false;
         });
-        core_buttons.push(() => {
+        // add editor tab button
+        /*core_buttons.push(() => {
             let insert_x = (p.width - c.TOOLBAR_WIDTH) / 3.0 + c.INSERT_WIDTH;
             if (p.mouseX > insert_x &&
                 p.mouseX < insert_x + c.INSERT_WIDTH &&
@@ -327,6 +335,7 @@ export default function measure(p) {
             } else
                 return false;
         });
+        */
 
         var beat_lock = {};
         if (Window.selected.meas && 'locks' in Window.selected.meas) {
@@ -523,13 +532,33 @@ export default function measure(p) {
 
                 // draw tempo markings
                 p.fill(100);
-                p.textSize(c.TEMPO_PT);
-                cache.markings.forEach(m => {
+                ['start', 'end'].forEach((mark, ind) => {
+                    let m = cache.markings[ind];
                     p.textAlign(...m.textAlign);
-                    p.text(...m.text);
-                });
+                    p.textSize(c.TEMPO_PT);
+                    let text = m.text.slice(0);
+                    if ('meas' in Window.editor && Window.editor.meas.id === measure.id && Window.editor.type === mark) {
+                        text[0] = Window.editor.next; 
+                        p.textSize(c.TEMPO_PT + 2);
 
-                // return from measure translate
+                        // handle blinking cursor
+                        let blink = p.millis() % 500;
+                        if (blink > 150) {
+                            p.push();
+                            p.stroke(0);
+                            let w = p.textWidth(Window.editor.next.slice(0, Window.editor.pointer))
+                                + m.text[1];
+                            // correct for 'end' textAlign
+                            if (ind)
+                                w -= p.textWidth(Window.editor.next);
+                            let bound = cache.bounding[ind];
+                            p.line(w, bound[1] - 2, w, bound[3] - 2);
+                            p.pop();
+                        }
+                    }
+                    p.text(...text);
+                });
+               // return from measure translate
                 p.pop();
 
             });
@@ -564,7 +593,7 @@ export default function measure(p) {
 
 
         // draw editor frame
-        if (Window.mode === 2 && Window.selected.meas) {
+        /*if (Window.mode === 2 && Window.selected.meas) {
             
             let select = Window.selected.meas;
             let x = select.offset * Window.scale + Window.viewport;
@@ -603,6 +632,7 @@ export default function measure(p) {
             Window.drawEditorFrame([x, y], handle);
 
         }
+        */
 
 
             
@@ -801,6 +831,10 @@ export default function measure(p) {
                 //printer.clear();
                 API.printoutSet(false);
             }
+            if (Window.editor.type) {
+                Window.exit_editor();
+                return;
+            }
             if (Window.mode === 0)
                 API.toggleInst(true);
             else {
@@ -810,8 +844,54 @@ export default function measure(p) {
             return;
         };
 
-        if (p.keyCode === ENTER && Window.insertMeas.confirmed)
-            return API.enterSelecting();
+        let num = NUM.indexOf(p.keyCode);
+        if (Window.editor.type) {
+            let dir = Keyboard.checkDirection();
+            if (num > -1) {
+                Window.editor.next = 
+                    Window.editor.next.slice(0, Window.editor.pointer)
+                    + num
+                    + Window.editor.next.slice(Window.editor.pointer);
+                Window.editor.pointer++;
+            } else if (p.keyCode === DEL || p.keyCode === BACK) {
+                if (Window.editor.pointer !== 0) {
+                    Window.editor.next =
+                        Window.editor.next.slice(0, Window.editor.pointer - 1)
+                        + Window.editor.next.slice(Window.editor.pointer);
+                    Window.editor.pointer--;
+                }
+                return;
+            } else if (dir === 'LEFT') {
+                Window.editor.pointer = Math.max(0, Window.editor.pointer - 1);
+                return;
+            } else if (dir === 'RIGHT') {
+                Window.editor.pointer = Math.min(Window.editor.pointer + 1, Window.editor.next.length);
+                return;
+            }
+        }
+
+        if (p.keyCode === ENTER) {
+            if (Window.insertMeas.confirmed) {
+                return API.enterSelecting();
+            }
+            if (Window.editor.type) {
+                // THIS NEEDS CROWDING VALIDATION
+                let type = Window.editor.type;
+                let selected = Window.editor.meas;
+                let updated = {
+                    inst: Window.editor.inst,
+                    start: selected.start,
+                    end: selected.end,
+                    timesig: selected.timesig
+                }
+                updated[type] = parseInt(Window.editor.next, 10);
+                Window.exit_editor();
+                // check if anything's changed
+                if (updated[type] !== selected[type])
+                    API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, measure.offset);
+                return;
+            }
+        }
             
 
         if (API.disableKeys()) 
@@ -840,7 +920,7 @@ export default function measure(p) {
             */
         };
 
-        let dir = Keyboard.checkDirection();
+        let dir = Keyboard.checkDirection('arrows');
         if (Window.selected.meas && dir) {
             if (dir === 'DOWN') {
                 if (Window.selected.inst >= instruments.length - 1)
@@ -881,12 +961,12 @@ export default function measure(p) {
             return;
         };
 
-        if (p.keyCode === KeyV) {
+        /*if (p.keyCode === KeyV) {
             Window.mode = 2;
             //API.displaySelected(Window.selected);
             API.updateMode(Window.mode);
             return;
-        };
+        };*/
 
 
         if ((p.keyCode === DEL || p.keyCode === BACK)) {
@@ -950,6 +1030,14 @@ export default function measure(p) {
         // ############################################## HOW DOES MOUSE.CANCEL EVEN WORK?
         if (Mouse.cancel)
             return;
+
+        if (Mouse.rollover.type === 'tempo_marking_start') {
+            Window.enter_editor('start', Mouse.rollover.inst, Mouse.rollover.meas)
+            return;
+        } else if (Mouse.rollover.type === 'tempo_marking_end') {
+            Window.enter_editor('end', Mouse.rollover.inst, Mouse.rollover.meas);
+            return;
+        }
 
 
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
@@ -1739,6 +1827,23 @@ export default function measure(p) {
                 ) {
                     // translating to measure
                     let frameXmeas = frameX - meas.cache.offset;
+
+                    // check markings
+                    // CACHE THE BOUNDING BOX #############
+
+                    let bounds = meas.cache.bounding;
+                    if (frameXmeas > bounds[0][0] && frameXmeas < bounds[0][2] && 
+                        frameY > bounds[0][1] && frameY < bounds[0][3]
+                    ) {
+                        Mouse.setRollover({ type: 'tempo_marking_start', inst: inst_row, meas });
+                        return true;
+                    } else if (frameXmeas > bounds[1][0] && frameXmeas < bounds[1][2] && 
+                        frameY > bounds[1][1] && frameY < bounds[1][3]
+                    ) {
+                        Mouse.setRollover({ type: 'tempo_marking_end', inst: inst_row, meas });
+                        return true;
+                    }
+
                     // check for beat rollover
                     if (!meas.cache.beats.some((beat, ind) => {
                         if ((frameXmeas > beat - c.ROLLOVER_TOLERANCE) &&
