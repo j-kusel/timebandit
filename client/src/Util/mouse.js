@@ -257,9 +257,6 @@ export default (p, Window) => {
         eval_cursor(mods, selected) {
             this.cursor = 'default';
             if (selected) {
-                // if rolling over an editor option
-                if (this.rollover.type === 'tempo_marking_start' || this.rollover.type === 'tempo_marking_end')
-                    this.cursor = 'text';
                 // if selected measure is in rollover
                 if ('meas' in this.rollover && this.rollover.meas.id === selected.id) {
                     if (Window.mods.mod && (this.rollover.type === 'beat')) {
@@ -270,6 +267,10 @@ export default (p, Window) => {
                         this.cursor = 'ew-resize';
                 }
             }
+            // if rolling over an editor option
+            if (this.rollover.type && this.rollover.type.indexOf('marking') > -1)
+                this.cursor = 'text';
+
             document.body.style.cursor = this.cursor;
         }
 

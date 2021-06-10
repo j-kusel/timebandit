@@ -32,8 +32,6 @@ export default (p) => {
             this.updateViewCallback = () => null;
 
             this.editor = {};
-            this.editor_input = p.createInput('');
-            this.editor_input.style('z-index: 1');
 
             // monkey patch selection color
             let sel_color = p.color(colors.contrast);
@@ -58,8 +56,6 @@ export default (p) => {
                     next,
                     pointer: next.length
                 };
-                //this.editor_input.html(meas[type]);
-                //this.editor_input.position();
                 return true;
             }
             return false;
@@ -160,6 +156,42 @@ export default (p) => {
                 ];
             }
             obj.markings.push(marking);
+            obj.bounding.push(bound);
+
+            // third bounding is the time signature
+            // this is conditional on the renderer being ready to measure text (p._setupDone)
+
+
+            let text_width = meas.timesig.toString().length * 14;
+            
+            
+            if (this.scale > 0.03) {
+                if (p._setupDone) {
+                    p.push();
+                    p.textSize(c.INST_HEIGHT*0.25);
+                    text_width = p.textWidth(meas.timesig.toString()) * 0.5;
+                    p.pop();
+                }
+                bound = [
+                    c.TIMESIG_PADDING - text_width,
+                    c.INST_HEIGHT * 0.25,
+                    c.TIMESIG_PADDING + text_width,
+                    c.INST_HEIGHT * 0.75
+                ];
+            } else {
+                if (p._setupDone) {
+                    p.push();
+                    p.textSize(c.INST_HEIGHT*0.1);
+                    text_width = (this.scale > 0.02) ?
+                        p.textWidth(meas.timesig.toString() + '/4')
+                        : p.textWidth(meas.timesig.toString()); 
+                    p.pop();
+                }
+                let HALF_PAD = c.TIMESIG_PADDING * 0.5;
+                bound = [0, 0, text_width, c.INST_HEIGHT*0.1]
+                    .map(b => b + HALF_PAD);
+            }
+
             obj.bounding.push(bound);
             return obj;
         }
@@ -484,27 +516,69 @@ export default (p) => {
             p.pop();
         }
 
-        drawTimesig(numerator, denominator) {
+        drawTimesig(numerator, denominator, meas) {
             let denom = typeof denominator === 'string' ?
                 denominator : parseInt(denominator, 10);
             p.push();
             p.fill(100);
+
+            let text = [];
+            let blink = false;
             if (this.scale > 0.03) {
-                p.translate(c.TIMESIG_PADDING, c.TIMESIG_PADDING);
+                p.translate(c.TIMESIG_PADDING, 0);
                 p.textSize(c.INST_HEIGHT*0.25);
                 p.textLeading(c.INST_HEIGHT*0.20);
-                p.textAlign(p.LEFT, p.CENTER);
-                p.text([numerator, denom].join('\n'), 0, c.INST_HEIGHT/2);
+                p.textAlign(p.CENTER, p.CENTER);
+                text = [[numerator, denom].join('\n'), 0, c.INST_HEIGHT/2];
             } else {
                 p.translate(c.TIMESIG_PADDING/2, c.TIMESIG_PADDING/2);
                 p.textSize(c.INST_HEIGHT*0.1);
                 p.textAlign(p.LEFT, p.TOP);
                 if (this.scale > 0.02)
-                    p.text([numerator, denom].join('/'), 0, 0)
+                    text = [[numerator, denom].join('/'), 0, 0];
                 else 
-                    p.text(numerator, 0, 0);
+                    text = [numerator, 0, 0];
             }
+            if ('meas' in this.editor && this.editor.meas.id === meas.id
+                && this.editor.type === 'timesig'
+            ) {
+                text[0] = (this.scale > 0.03) ?
+                    [this.editor.next, denom].join('\n') :
+                    ((this.scale > 0.02) ? [this.editor.next, denom].join('/') :
+                        this.editor.next);
+
+                blink = (p.millis() % 1000) > 500;
+            }
+            p.text(...text);
+
             p.pop();
+            if (blink) {
+                p.push();
+                p.stroke(0);
+                let textSize = this.scale > 0.03 ? c.INST_HEIGHT*0.25 : c.INST_HEIGHT * 0.1;
+                p.textSize(textSize);
+                let w = p.textWidth(this.editor.next.slice(0, this.editor.pointer));
+                let bound = this.editor.meas.cache.bounding[2];
+                if (this.scale > 0.03) {
+                    p.translate(c.TIMESIG_PADDING, 0);
+                    w -= p.textWidth(this.editor.next) * 0.5;
+                    p.line(w, bound[1], w, bound[1] + textSize);
+                } else {
+                    p.translate(c.TIMESIG_PADDING/2, 0);
+                    p.line(w, bound[1], w, bound[3]);
+                }
+                p.pop();
+            }
+
+            // showing bound with blink
+            /*if (blink) {
+                p.push();
+                p.stroke(0);
+                let bound = this.editor.meas.cache.bounding[2];
+                p.line(bound[0], bound[1], bound[2], bound[1]);
+                p.line(bound[0], bound[3], bound[2], bound[3]);
+                p.pop();
+            }*/
         }
 
         select(newSelected) {

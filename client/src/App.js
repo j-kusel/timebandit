@@ -249,6 +249,7 @@ class App extends Component {
                   );
 
               instruments[inst].measures[id] = newMeas;
+              console.log(newMeas);
               return { instruments, ordered: ordered_cpy, selected: { inst, meas: newMeas } };
           });
       };

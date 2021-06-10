@@ -65,7 +65,7 @@ class UI extends Component {
                 if (!(key in this.props.instruments[index].measures)) {
                     flag = true;
                 } else {
-                    ['start', 'end', 'offset'].forEach((attr) => {
+                    ['start', 'end', 'offset', 'timesig'].forEach((attr) => {
                         if (inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr])
                             flag = true;
                     });

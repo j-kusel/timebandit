@@ -274,6 +274,8 @@ export default function measure(p) {
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
         p.background(255);
+        p.textSize(10);
+        console.log(p.textWidth('P'));
         /*input = p.createInput('');
         input.style('z-index: 1');
         input.elt.onchange = (e) => console.log('changed!', e);
@@ -288,6 +290,7 @@ export default function measure(p) {
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         console.log('REDRAWING');
+
         instruments = props.instruments;
         Window.insertMeas = props.insertMeas;
         Window.selected = props.selected || ({ inst: -1, meas: undefined });
@@ -500,7 +503,7 @@ export default function measure(p) {
                 };
 
                 // draw timesig
-                Window.drawTimesig(measure.timesig, '4');
+                Window.drawTimesig(measure.timesig, '4', measure);
 
                 // draw beats
                 beats.forEach((beat, index) => {
@@ -542,8 +545,8 @@ export default function measure(p) {
                         p.textSize(c.TEMPO_PT + 2);
 
                         // handle blinking cursor
-                        let blink = p.millis() % 500;
-                        if (blink > 150) {
+                        let blink = p.millis() % 1000;
+                        if (blink > 500) {
                             p.push();
                             p.stroke(0);
                             let w = p.textWidth(Window.editor.next.slice(0, Window.editor.pointer))
@@ -558,7 +561,7 @@ export default function measure(p) {
                     }
                     p.text(...text);
                 });
-               // return from measure translate
+                // return from measure translate
                 p.pop();
 
             });
@@ -885,6 +888,7 @@ export default function measure(p) {
                     timesig: selected.timesig
                 }
                 updated[type] = parseInt(Window.editor.next, 10);
+                console.log(type, updated[type]);
                 Window.exit_editor();
                 // check if anything's changed
                 if (updated[type] !== selected[type])
@@ -1031,14 +1035,10 @@ export default function measure(p) {
         if (Mouse.cancel)
             return;
 
-        if (Mouse.rollover.type === 'tempo_marking_start') {
-            Window.enter_editor('start', Mouse.rollover.inst, Mouse.rollover.meas)
-            return;
-        } else if (Mouse.rollover.type === 'tempo_marking_end') {
-            Window.enter_editor('end', Mouse.rollover.inst, Mouse.rollover.meas);
+        if (Mouse.rollover.type.indexOf('marking') > -1) {
+            Window.enter_editor(Mouse.rollover.type.split('_')[0], Mouse.rollover.inst, Mouse.rollover.meas)
             return;
         }
-
 
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
         // printing mode
@@ -1832,17 +1832,17 @@ export default function measure(p) {
                     // CACHE THE BOUNDING BOX #############
 
                     let bounds = meas.cache.bounding;
-                    if (frameXmeas > bounds[0][0] && frameXmeas < bounds[0][2] && 
-                        frameY > bounds[0][1] && frameY < bounds[0][3]
-                    ) {
-                        Mouse.setRollover({ type: 'tempo_marking_start', inst: inst_row, meas });
+                    if (['start_tempo_marking', 'end_tempo_marking', 'timesig_marking'].some((type, ind) => {
+                        let bounds = meas.cache.bounding[ind];
+                        if (frameXmeas > bounds[0] && frameXmeas < bounds[2] && 
+                            frameY > bounds[1] && frameY < bounds[3]
+                        ) {
+                            Mouse.setRollover({ type, inst: inst_row, meas });
+                            return true;
+                        }
+                        return false;
+                    }))
                         return true;
-                    } else if (frameXmeas > bounds[1][0] && frameXmeas < bounds[1][2] && 
-                        frameY > bounds[1][1] && frameY < bounds[1][3]
-                    ) {
-                        Mouse.setRollover({ type: 'tempo_marking_end', inst: inst_row, meas });
-                        return true;
-                    }
 
                     // check for beat rollover
                     if (!meas.cache.beats.some((beat, ind) => {
@@ -1851,7 +1851,7 @@ export default function measure(p) {
                         ) {
                             Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind });
                             return true;
-                        } else if (ind<meas.cache.beats.length-1) { // last beat has no "graph"
+                        } else if (ind < meas.cache.beats.length-1) { // last beat has no "graph"
                             // translating to tempo graph segment
                             let graph = meas.cache.graph[ind];
                             if (frameXmeas > graph[0] && frameXmeas < graph[2]) {
