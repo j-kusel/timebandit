@@ -1,4 +1,5 @@
 const [SHIFT, ALT, SPACE, DEL, BACK, ESC] = [16, 18, 32, 46, 8, 27];
+const [TAB, ENTER] = [9, 13];
 let mac = window.navigator.platform.indexOf('Mac') >= 0;
 let chrome = window.navigator.userAgent.indexOf('Chrome') >= 0;
 let firefox = window.navigator.userAgent.indexOf('Firefox') >= 0;
@@ -15,6 +16,7 @@ for (let i=48; i < 58; i++)
 
 module.exports = {
     LEFT, UP, RIGHT, DOWN,
+    TAB, ENTER,
     SHIFT, ALT, SPACE, DEL, BACK, ESC, CTRL, MOD,
     KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL, KeyZ,
     NUM

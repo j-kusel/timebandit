@@ -82,7 +82,6 @@ var crowding = (gaps, position, ms, options) => {
 
 
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
-const [ENTER] = [13];
 //const [SHIFT, ALT] = [16, 18];
 const [KeyC, KeyI, KeyV] = [67, 73, 86];
 //const [KeyH, KeyJ, KeyK, KeyL] = [72, 74, 75, 76];
@@ -540,23 +539,26 @@ export default function measure(p) {
                     p.textAlign(...m.textAlign);
                     p.textSize(c.TEMPO_PT);
                     let text = m.text.slice(0);
-                    if ('meas' in Window.editor && Window.editor.meas.id === measure.id && Window.editor.type === mark) {
-                        text[0] = Window.editor.next; 
-                        p.textSize(c.TEMPO_PT + 2);
+                    if ('meas' in Window.editor && Window.editor.meas.id === measure.id) {
+                        let next = Window.editor.next[mark];
+                        text[0] = next; 
+                        if (Window.editor.type === mark) {
+                            p.textSize(c.TEMPO_PT + 2);
 
-                        // handle blinking cursor
-                        let blink = p.millis() % 1000;
-                        if (blink > 500) {
-                            p.push();
-                            p.stroke(0);
-                            let w = p.textWidth(Window.editor.next.slice(0, Window.editor.pointer))
-                                + m.text[1];
-                            // correct for 'end' textAlign
-                            if (ind)
-                                w -= p.textWidth(Window.editor.next);
-                            let bound = cache.bounding[ind];
-                            p.line(w, bound[1] - 2, w, bound[3] - 2);
-                            p.pop();
+                            // handle blinking cursor
+                            let blink = p.millis() % 1000;
+                            if (blink > 500) {
+                                p.push();
+                                p.stroke(0);
+                                let w = p.textWidth(next.slice(0, Window.editor.pointer))
+                                    + m.text[1];
+                                // correct for 'end' textAlign
+                                if (ind)
+                                    w -= p.textWidth(next);
+                                let bound = cache.bounding[ind];
+                                p.line(w, bound[1] - 2, w, bound[3] - 2);
+                                p.pop();
+                            }
                         }
                     }
                     p.text(...text);
@@ -849,49 +851,57 @@ export default function measure(p) {
 
         let num = NUM.indexOf(p.keyCode);
         if (Window.editor.type) {
+            let type = Window.editor.type;
+            let next = Window.editor.next[type];
+            let pointer = Window.editor.pointers[type];
             let dir = Keyboard.checkDirection();
             if (num > -1) {
-                Window.editor.next = 
-                    Window.editor.next.slice(0, Window.editor.pointer)
+                Window.editor.next[type] = 
+                    next.slice(0, pointer)
                     + num
-                    + Window.editor.next.slice(Window.editor.pointer);
-                Window.editor.pointer++;
+                    + next.slice(pointer);
+                Window.editor.pointers[type]++;
             } else if (p.keyCode === DEL || p.keyCode === BACK) {
-                if (Window.editor.pointer !== 0) {
-                    Window.editor.next =
-                        Window.editor.next.slice(0, Window.editor.pointer - 1)
-                        + Window.editor.next.slice(Window.editor.pointer);
-                    Window.editor.pointer--;
+                if (pointer !== 0) {
+                    Window.editor.next[type] =
+                        next.slice(0, pointer - 1)
+                        + next.slice(pointer);
+                    Window.editor.pointers[type]--;
                 }
                 return;
             } else if (dir === 'LEFT') {
-                Window.editor.pointer = Math.max(0, Window.editor.pointer - 1);
+                Window.editor.pointers[type] = Math.max(0, pointer - 1);
                 return;
             } else if (dir === 'RIGHT') {
-                Window.editor.pointer = Math.min(Window.editor.pointer + 1, Window.editor.next.length);
+                Window.editor.pointers[type] = Math.min(pointer + 1, next.length);
                 return;
             }
         }
 
-        if (p.keyCode === ENTER) {
+        if (p.keyCode === keycodes.TAB && Window.editor.type) {
+            e.preventDefault();
+            let types = ['start', 'end', 'timesig'];
+            let next = (types.indexOf(Window.editor.type) + 1) % 3;
+            Window.editor.type = types[next];
+            return;
+        }
+
+        if (p.keyCode === keycodes.ENTER) {
             if (Window.insertMeas.confirmed) {
+                e.preventDefault();
                 return API.enterSelecting();
             }
             if (Window.editor.type) {
+                e.preventDefault();
                 // THIS NEEDS CROWDING VALIDATION
                 let type = Window.editor.type;
                 let selected = Window.editor.meas;
-                let updated = {
-                    inst: Window.editor.inst,
-                    start: selected.start,
-                    end: selected.end,
-                    timesig: selected.timesig
-                }
-                updated[type] = parseInt(Window.editor.next, 10);
-                console.log(type, updated[type]);
+                let updated = Object.keys(Window.editor.next).reduce(
+                    (acc, key) => Object.assign(acc, { [key]: parseInt(Window.editor.next[key], 10) }), {});
+                updated.inst = Window.editor.inst;
                 Window.exit_editor();
                 // check if anything's changed
-                if (updated[type] !== selected[type])
+                if (['start', 'end', 'timesig'].some(p => (updated[p] !== selected[p])))
                     API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, measure.offset);
                 return;
             }

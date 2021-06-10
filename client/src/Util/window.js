@@ -48,14 +48,16 @@ export default (p) => {
          */
 
         enter_editor(type, inst, meas) {
-            if (type === 'start' || type === 'end' || type === 'timesig') {
-                let next = meas[type].toString();
-                this.editor = {
-                    type, inst, meas,
-                    current: meas[type],
-                    next,
-                    pointer: next.length
-                };
+            let types = ['start', 'end', 'timesig'];
+            if (types.indexOf(type) > -1) {
+                let next = {};
+                let pointers = {};
+                types.forEach(t => {
+                    let str = meas[t].toString();
+                    next[t] = str;
+                    pointers[t] = str.length;
+                });
+                this.editor = { type, inst, meas, next, pointers };
                 return true;
             }
             return false;
@@ -524,6 +526,7 @@ export default (p) => {
 
             let text = [];
             let blink = false;
+            let next;
             if (this.scale > 0.03) {
                 p.translate(c.TIMESIG_PADDING, 0);
                 p.textSize(c.INST_HEIGHT*0.25);
@@ -539,15 +542,14 @@ export default (p) => {
                 else 
                     text = [numerator, 0, 0];
             }
-            if ('meas' in this.editor && this.editor.meas.id === meas.id
-                && this.editor.type === 'timesig'
-            ) {
+            if ('meas' in this.editor && this.editor.meas.id === meas.id) {
+                next = this.editor.next.timesig;
                 text[0] = (this.scale > 0.03) ?
-                    [this.editor.next, denom].join('\n') :
-                    ((this.scale > 0.02) ? [this.editor.next, denom].join('/') :
-                        this.editor.next);
+                    [next, denom].join('\n') :
+                    ((this.scale > 0.02) ? [next, denom].join('/') :
+                        next);
 
-                blink = (p.millis() % 1000) > 500;
+                blink = (this.editor.type === 'timesig') && ((p.millis() % 1000) > 500);
             }
             p.text(...text);
 
@@ -557,11 +559,11 @@ export default (p) => {
                 p.stroke(0);
                 let textSize = this.scale > 0.03 ? c.INST_HEIGHT*0.25 : c.INST_HEIGHT * 0.1;
                 p.textSize(textSize);
-                let w = p.textWidth(this.editor.next.slice(0, this.editor.pointer));
+                let w = p.textWidth(next.slice(0, this.editor.pointers.timesig));
                 let bound = this.editor.meas.cache.bounding[2];
                 if (this.scale > 0.03) {
                     p.translate(c.TIMESIG_PADDING, 0);
-                    w -= p.textWidth(this.editor.next) * 0.5;
+                    w -= p.textWidth(next) * 0.5;
                     p.line(w, bound[1], w, bound[1] + textSize);
                 } else {
                     p.translate(c.TIMESIG_PADDING/2, 0);
