@@ -1,6 +1,40 @@
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
+import { crowding } from '../Util/index.js';
+import { NUM, LEFT, RIGHT, DEL, BACK } from './keycodes';
+
+let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
+    let old_slope = oldMeas.end - oldMeas.start;
+    let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
+    let lock_percent = beat_lock.beat / oldMeas.timesig;
+    if (type === 'start')
+        newMeas.end = (lock_tempo - newMeas.start)/lock_percent + newMeas.start
+    else if (type === 'end')
+        newMeas.start = newMeas.end - (newMeas.end - lock_tempo)/(1 - lock_percent);
+    return newMeas;
+
+}
+
+// generates measure.gaps in 'measure' drag mode
+var calcGaps = (measures, id) => {
+    var last = false;
+    // ASSUMES MEASURES ARE IN ORDER
+    return measures.reduce((acc, meas, i) => {
+        // skip measure in question
+        if (id && (meas.id === id))
+            return acc;
+        acc = [...acc, [
+            (last) ? last.offset + last.ms : -Infinity,
+            meas.offset
+        ]];
+        last = meas;
+        return acc;
+    }, [])
+        .concat([[ last.offset + last.ms, Infinity ]]);
+};
+
+
 
 export default (p) => {
     class _Window {
@@ -47,6 +81,26 @@ export default (p) => {
          * }
          */
 
+        completeCalc(start, slope, timesig) {
+            let tick_total = timesig * this.CONSTANTS.PPQ;
+            let inc = slope/tick_total;
+            let last = 0;
+            let ms = 0;
+            var PPQ_mod = this.CONSTANTS.PPQ / this.CONSTANTS.PPQ_tempo;
+            let beats = [];
+            let ticks = [];
+            for (let i=0; i<tick_total; i++) {
+                if (!(i%this.CONSTANTS.PPQ))
+                    beats.push(ms);
+                ticks.push(ms);
+                if (i%PPQ_mod === 0) 
+                    last = this.CONSTANTS.K / (start + inc*i);
+                ms += last;
+            };
+            beats.push(ms);
+            return { beats, ticks, ms }
+        }
+
         enter_editor(type, inst, meas) {
             let types = ['start', 'end', 'timesig'];
             if (types.indexOf(type) > -1) {
@@ -57,17 +111,173 @@ export default (p) => {
                     next[t] = str;
                     pointers[t] = str.length;
                 });
-                this.editor = { type, inst, meas, next, pointers };
+                this.editor = { type, inst, meas, next, pointers, timer: null };
                 return true;
             }
             return false;
+        }
+
+        change_editor(input) {
+            let num = NUM.indexOf(p.keyCode);
+
+            let type = this.editor.type;
+            let next = this.editor.next[type];
+            let pointer = this.editor.pointers[type];
+
+            if (num > -1) {
+                this.editor.next[type] = 
+                    next.slice(0, pointer)
+                    + num
+                    + next.slice(pointer);
+                this.editor.pointers[type]++;
+                this.editor.timer = p.frameCount + (2 * 10);
+            } else if (input === DEL || input === BACK) {
+                if (pointer !== 0) {
+                    this.editor.next[type] =
+                        next.slice(0, pointer - 1)
+                        + next.slice(pointer);
+                    this.editor.pointers[type]--;
+                    this.editor.timer = p.frameCount + (2 * 60);
+                }
+            } else if (input === LEFT)
+                this.editor.pointers[type] = Math.max(0, pointer - 1)
+            else if (input === RIGHT)
+                this.editor.pointers[type] = Math.min(pointer + 1, next.length);
+        }
+
+        recalc_editor() {
+            let selected = this.editor.meas;
+            let updated = Object.keys(this.editor.next).reduce(
+                (acc, key) => Object.assign(acc, { [key]: parseInt(this.editor.next[key], 10) }), {});
+            // check if anything's changed
+            if (['start', 'end', 'timesig'].some(p => (updated[p] !== selected[p]))) {
+                var beat_lock = {};
+                if ('locks' in selected && Object.keys(selected.locks).length) {
+                    let lock = Object.keys(selected.locks)[0];
+                    beat_lock.beat = parseInt(lock, 10);
+                    beat_lock.type =selected.locks[lock];
+
+                    // check if tempo locked somewhere
+                    if (selected.locks[lock] !== 'loc') {
+                        // if start has changed
+                        if (this.editor.type === 'start' && (updated.start !== selected.start))
+                            this.editor.next.end = tempo_edit(selected, updated, beat_lock, 'start').end.toString()
+                        // if end has changed
+                        else if (this.editor.type === 'end' && (updated.end !== selected.end))
+                            this.editor.next.start = tempo_edit(selected, updated, beat_lock, 'end').start.toString();
+                    }
+                }
+
+                // calculate with new changes.
+                // parse strings to numbers
+                let next = Object.keys(this.editor.next).reduce((acc, key) => 
+                    ({ ...acc, [key]: parseInt(this.editor.next[key], 10) }), {});
+                
+                let slope = next.end - next.start;
+                let calc = this.completeCalc(next.start, slope, next.timesig);
+                Object.assign(calc, next); 
+
+                // check for 'loc' locking and adjust offset
+                calc.offset = selected.offset;
+                if (beat_lock.type === 'loc' || beat_lock.type === 'both')
+                    calc.offset += selected.beats[beat_lock.beat] - calc.beats[beat_lock.beat];
+
+                // assign to measure temp
+                Object.assign(this.editor.meas, { temp: calc });
+
+                // cache and assign to measure
+                this.editor.meas.cache = this.calculate_cache(calc);
+                this.editor.meas.cache.temp = true;
+
+                console.log(this.editor.meas);
+
+                // update score tempo range
+                this.updateRange({
+                    temprange: [
+                        Math.min(parseInt(this.editor.next.start, 10), this.range.tempo[0]),
+                        Math.max(this.editor.next.end, this.range.tempo[1])
+                    ]
+                });
+            }
         }
 
         exit_editor() {
             this.editor = {};
         }
 
-        calculate_tempo_cache(meas) {
+        validate_editor(calcGaps) {
+            if (this.editor.meas)
+                this.validate_measure(this.editor.meas, calcGaps, true);
+        }
+
+        validate_measure(meas, calcGaps, tempflag) {
+            console.log(meas);
+            if (!meas.gaps)
+                meas.gaps = calcGaps(meas.inst, meas.id);
+
+
+            // i don't particularly like how invalid reference is set here
+            let [offset, ms, invalid] = tempflag ?
+                [meas.temp.offset, meas.temp.ms, meas.temp.invalid] :
+                [meas.offset, meas.ms, meas.invalid];
+
+            console.log(offset);
+
+            let crowd = crowding(meas.gaps, offset, ms, { strict: true, impossible: true });
+
+            console.log(crowd);
+
+            // is measure too big?
+            let gap = crowd.end[0] - crowd.start[0];
+
+            // invalid can be 'start', 'end', 'oversize'
+            if (ms > gap) {
+                console.log('too big');
+                invalid.oversize = true;    
+            }
+
+            if (crowd.end[1] < 0) {
+                invalid.end = crowd.end[1];
+                meas.cache.invalid.end = crowd.end[1] * this.scale;
+            }
+                //updated.offset += crowd.end[1];
+            // eventually this will need a left-expansion version
+            if (crowd.start[1] < 0) {
+                invalid.start = crowd.start[1];
+                meas.cache.invalid.start = crowd.start[1] * this.scale;
+                console.log(meas.cache.invalid);
+                //updated.offset -= crowd.start[1];
+            }
+
+        }
+
+        // GET RID OF SIDE EFFECTS
+        calculate_cache(meas) {
+            let cache = {
+                offset: meas.offset*this.scale,
+                beats: meas.beats.map(b => b * this.scale),
+                ticks: meas.ticks.map(t => t * this.scale),
+                ms: meas.ms*this.scale,
+                temp: false,
+                invalid: {}
+            }
+
+            if (!meas.invalid)
+                meas.invalid = {};
+
+            if (meas.invalid.start)
+                cache.invalid.start = meas.invalid.start * this.scale;
+            if (meas.invalid.end)
+                cache.invalid.end = meas.invalid.end * this.scale;
+            
+            //Object.assign(meas, { cache });
+            //Object.assign(meas.cache, this.calculate_tempo_cache(meas));
+
+            Object.assign(cache, this.calculate_tempo_cache(meas, cache));
+            return cache;
+        }
+
+        calculate_tempo_cache(meas, cache) {
             let obj = {
                 graph: [],
                 graph_ratios: [],
@@ -94,7 +304,7 @@ export default (p) => {
             let yend = c.INST_HEIGHT - (end - bottom)/spread*c.INST_HEIGHT;
 
             let last = [0, ystart];
-            meas.cache.beats.slice(1).forEach((beat, i) => {
+            cache.beats.slice(1).forEach((beat, i) => {
                 let next = [
                     beat, 
                     c.INST_HEIGHT - ((((i+1)/meas.timesig)*(end-start) + start) - bottom)/spread*c.INST_HEIGHT
@@ -141,7 +351,7 @@ export default (p) => {
             if (yend > c.TEMPO_PT + c.TEMPO_PADDING) {
                 marking = {
                     textAlign: [p.RIGHT, p.BOTTOM],
-                    text: [end_fixed, meas.cache.ms - c.TEMPO_PADDING, yend - c.TEMPO_PADDING]
+                    text: [end_fixed, cache.ms - c.TEMPO_PADDING, yend - c.TEMPO_PADDING]
                 };
                 bound = [
                     marking.text[1] - c.TEMPO_PT * end_fixed_len, marking.text[2] - c.TEMPO_PT, 
@@ -150,7 +360,7 @@ export default (p) => {
             } else {
                 marking = {
                     textAlign: [p.RIGHT, p.TOP],
-                    text: [end_fixed, meas.cache.ms - c.TEMPO_PADDING, yend + c.TEMPO_PADDING]
+                    text: [end_fixed, cache.ms - c.TEMPO_PADDING, yend + c.TEMPO_PADDING]
                 };
                 bound = [
                     marking.text[1] - c.TEMPO_PT * end_fixed_len, marking.text[2], 
@@ -334,9 +544,9 @@ export default (p) => {
             this._lockingCandidate = null;
         }
 
-        initialize_temp() {
+        initialize_temp(meas) {
             console.log('INITIALIZED');
-            let sel = this.selected.meas;
+            let sel = meas || this.selected.meas;
             this.selected.meas.temp = {
                 start: sel.start,
                 end: sel.end,
@@ -346,15 +556,16 @@ export default (p) => {
                 offset: sel.offset
             };
 
-            let cache = {
+            let cache = this.calculate_cache(sel);/*{
                 offset: sel.offset*this.scale,
                 beats: sel.beats.map(b => b*this.scale),
                 ticks: sel.ticks.map(t => t*this.scale),
                 ms: sel.ms*this.scale
             };
+            */
 
             Object.assign(this.selected.meas, { cache });
-            Object.assign(this.selected.meas.cache, this.calculate_tempo_cache(sel));
+            Object.assign(this.selected.meas.cache, this.calculate_tempo_cache(sel, cache));
 
         }
 

@@ -3,7 +3,7 @@
  * @module sketch
  */
 
-import { order_by_key, check_proximity_by_key, parse_bits } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, parse_bits, crowding } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
@@ -17,7 +17,7 @@ import _Keyboard from '../Util/keyboard.js';
 import { Debugger } from '../Util/debugger.js';
 import Printer from '../Util/printer.js';
 import keycodes from '../Util/keycodes.js';
-import { CTRL, MOD } from '../Util/keycodes.js';
+import { CTRL, MOD, LEFT, RIGHT } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
 
@@ -31,53 +31,18 @@ var div;
 
 var input;
 
-// finds adjacent measures and returns their location and distance
-var crowding = (gaps, position, ms, options) => {
-    let center = (options && 'center' in options) ? options.center : false;
-    let strict = (options && 'strict' in options) ? options.strict : false;
-    let final = position + ms;
-    let mid = position + ms/2;
-    if (final <= gaps[0][1]) 
-        return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
-    let last_gap = gaps.slice(-1)[0];
-    if (position > last_gap[0])
-        return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
-        
-    return gaps
-        .reduce((acc, gap, ind) => {
-            // does it even fit in the gap?
-            if (gap[1] - gap[0] < ms - (strict ? c.NUDGE_THRESHOLD*2 : 0))
-                return acc;
-            let start = [gap[0], position - gap[0]];
-            let end = [gap[1], gap[1] - final];
+let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
+    let old_slope = oldMeas.end - oldMeas.start;
+    let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
+    let lock_percent = beat_lock.beat / oldMeas.timesig;
+    if (type === 'start')
+        newMeas.end = (lock_tempo - newMeas.start)/lock_percent + newMeas.start
+    else if (type === 'end')
+        newMeas.start = newMeas.end - (newMeas.end - lock_tempo)/(1 - lock_percent);
+    return newMeas;
 
-            // attempt 3: is the start or end 
-
-            // trying something new... base closest gap on the center of the given spread,
-            // in relation to the start or end of available gaps.
-            if (center) {
-                let target = (gap[0]+acc.end[0])/2;
-                // if the previous gap start is -Infinity and 
-                //if ((!isFinite(acc.start[0]) && )
-                //    || mid < (gap[0]+acc.end[0])/2))
-                if (isFinite(target) && mid < target)
-                    return acc;
-            }
-
-            // is there ever an instance where these two aren't both triggered?
-
-            // 1. if the distance to the start of the gap is less than the previous,
-            // update the returned gap.
-            if (Math.abs(start[1]) < Math.abs(acc.start[1]) ||
-                (Math.abs(end[1]) < Math.abs(acc.end[1])))
-                return ({ start, end, gap: ind });
-            // 2. if the distance to the end of the gap is less than the previous,
-            // update the returned gap.
-            //if (Math.abs(end[1]) < Math.abs(acc.end[1]))
-            //    acc.end = end;
-            return acc;
-        }, { start: [0, Infinity], end: [0, Infinity], gap: -1 });
 }
+
 
 
 
@@ -198,7 +163,7 @@ export default function measure(p) {
                 else if (offset + Window.insertMeas.ms + c.SNAP_THRESHOLD > crowd_end)
                     Window.insertMeas.temp_offset = crowd_end - Window.insertMeas.ms
                 else
-                    Window.insertMeas.temp_offset = x_loc;;
+                    Window.insertMeas.temp_offset = x_loc;
                 Window.insertMeas.cache.offset = Window.ms_to_x(Window.insertMeas.temp_offset);
             }
         }
@@ -232,6 +197,46 @@ export default function measure(p) {
         return [step, lerp];
     }
 
+    // calculates only tempo change ticks.
+    // returns beats/tempo ticks and requested individual ticks according to key
+    var quickCalc = (start, slope, timesig, extract) => {
+        // tick_array is the total number of tempo updates for the measure
+        var tick_array = Array.from({
+            length: timesig * Window.CONSTANTS.PPQ_tempo
+        }, (__, i) => i);
+
+        var K = 60000.0 * timesig / slope;
+        var sigma = (n) => 1.0 / ((start * Window.CONSTANTS.PPQ_tempo * K / 60000.0) + n);
+        // convert extractions to ticks
+        if (extract === undefined)
+            extract = {};
+        let extract_tick_locations = Object.keys(extract)
+            .reduce((acc, key) => 
+                ({ ...acc, [extract[key] * Window.CONSTANTS.PPQ_tempo]: key })
+            , {});
+
+        let returned = { beats: [], ticks: [] };
+        // why was there a length conditional here for an object?
+        returned.ms = K * tick_array.reduce((sum, i) => {
+            if (i in extract_tick_locations)
+                returned[extract_tick_locations[i]] = sum*K;
+            return sum + sigma(i);
+        }, 0);
+        // catch last beat
+        // ... wait wtf does this even do
+        if (tick_array.length in extract_tick_locations)
+            returned[extract_tick_locations[tick_array.length]] = returned.ms;
+
+        // default snap target to end if nowhere else
+        // ####### this seems like it could be unpredictable behavior, not sure if i like it
+        // ####### commenting out for now!
+        /*if (!('snapped' in returned)) 
+            returned.snapped = returned.ms;
+            */
+        return returned;
+    };
+
+
 
     // debugger
     var Debug = new Debugger(p, Window, Mouse);
@@ -247,18 +252,6 @@ export default function measure(p) {
 
 
     var tuts = tutorials(p, subscriber, API, Window);
-
-    var calculate_cache = (meas) => {
-        let cache = {
-            offset: meas.offset*Window.scale,
-            beats: meas.beats.map(b => b * Window.scale),
-            ticks: meas.ticks.map(t => t * Window.scale),
-            ms: meas.ms*Window.scale,
-        }
-        Object.assign(meas, { cache });
-        Object.assign(meas.cache, Window.calculate_tempo_cache(meas));
-        return cache;
-    }
 
     var calculate_insertMeas_cache = (meas) => {
         let cache = {
@@ -378,7 +371,8 @@ export default function measure(p) {
         // calculate beat visual locations for all measures
         instruments.forEach(inst => {
             inst.ordered.forEach(meas => {
-                calculate_cache(meas);
+                meas.cache = Window.calculate_cache(meas);
+                console.log(meas.cache);
             });
         });
 
@@ -412,9 +406,9 @@ export default function measure(p) {
         
         Window.setRangeRefresh(() =>
             instruments.forEach(inst =>
-                inst.ordered.forEach(meas => 
-                    Object.assign(meas.cache, Window.calculate_tempo_cache(meas))
-                )
+                inst.ordered.forEach(meas => {
+                    Object.assign(meas.cache, Window.calculate_tempo_cache(meas, meas.cache))
+                })
             )
         );
 
@@ -423,6 +417,8 @@ export default function measure(p) {
     p.draw = function () {
         if (SLOW)
             p.frameRate(10);
+
+        // CHECK Window.editor.timer SOMEWHERE HERE
 
         Window.drawFrame();
 
@@ -435,8 +431,6 @@ export default function measure(p) {
         p.rect(0, 0, c.PANES_WIDTH, p.height);
         p.translate(c.PANES_WIDTH, 0);
 
-
-
         // this instrument loop is 200 lines, that's ridiculous.
         // now down to 115.
         instruments.forEach((inst, i_ind) => {
@@ -447,9 +441,14 @@ export default function measure(p) {
             p.push();
             p.translate(0, yloc);
 
+            // conflicts is an array of functions to draw conflict boxes
+            // once all measures are drawn
+            let conflicts = [];
+
             // moving into Window.drawMeas?
             inst.ordered.forEach((measure, m_ind) => {
                 let key = measure.id;
+
 
                 // set FLAG_TEMP if drawing a temporary measure?
                 let FLAG_TEMP = 'temp' in measure;
@@ -565,8 +564,19 @@ export default function measure(p) {
                 });
                 // return from measure translate
                 p.pop();
+                if (cache.invalid && 'start' in cache.invalid)
+                    conflicts.push(() => {
+                        p.push();
+                        p.translate(origin, 0);
+                        p.stroke(255, 0, 0);
+                        p.fill(255, 0, 0);
+                        p.rect(0, 0, -cache.invalid.start, c.INST_HEIGHT);
+                        p.pop();
+                    });
 
             });
+
+            conflicts.forEach(func => func());
 
             // does this need to be updated with new cache system?
 
@@ -790,6 +800,25 @@ export default function measure(p) {
                 });
             }
         }
+
+        // mouse timer animation
+        if (Window.editor.timer) {
+            p.push();
+            p.stroke(0);
+            p.fill(0);
+            p.translate(p.mouseX, p.mouseY);
+            p.arc(0, 0, 12, 12, 0, p.TWO_PI * ((Window.editor.timer - p.frameCount) / 120));
+
+            if (Window.editor.timer < p.frameCount) {
+                Window.recalc_editor();
+                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
+                Window.editor.timer = null;
+            }
+            p.pop();
+        }
+
+            
+
     }
 
     p.keyReleased = function(e) {
@@ -849,38 +878,17 @@ export default function measure(p) {
             return;
         };
 
-        let num = NUM.indexOf(p.keyCode);
-        if (Window.editor.type) {
-            let type = Window.editor.type;
-            let next = Window.editor.next[type];
-            let pointer = Window.editor.pointers[type];
-            let dir = Keyboard.checkDirection();
-            if (num > -1) {
-                Window.editor.next[type] = 
-                    next.slice(0, pointer)
-                    + num
-                    + next.slice(pointer);
-                Window.editor.pointers[type]++;
-            } else if (p.keyCode === DEL || p.keyCode === BACK) {
-                if (pointer !== 0) {
-                    Window.editor.next[type] =
-                        next.slice(0, pointer - 1)
-                        + next.slice(pointer);
-                    Window.editor.pointers[type]--;
-                }
-                return;
-            } else if (dir === 'LEFT') {
-                Window.editor.pointers[type] = Math.max(0, pointer - 1);
-                return;
-            } else if (dir === 'RIGHT') {
-                Window.editor.pointers[type] = Math.min(pointer + 1, next.length);
-                return;
-            }
+        if (Window.editor.type && ([...NUM, DEL, BACK, LEFT, RIGHT].indexOf(p.keyCode) > -1)) {
+            e.preventDefault();
+            Window.change_editor(p.keyCode);
+            return;
         }
+
 
         if (p.keyCode === keycodes.TAB && Window.editor.type) {
             e.preventDefault();
             let types = ['start', 'end', 'timesig'];
+            let type = Window.editor.type;
             let next = (types.indexOf(Window.editor.type) + 1) % 3;
             Window.editor.type = types[next];
             return;
@@ -893,16 +901,70 @@ export default function measure(p) {
             }
             if (Window.editor.type) {
                 e.preventDefault();
+                
                 // THIS NEEDS CROWDING VALIDATION
                 let type = Window.editor.type;
                 let selected = Window.editor.meas;
                 let updated = Object.keys(Window.editor.next).reduce(
                     (acc, key) => Object.assign(acc, { [key]: parseInt(Window.editor.next[key], 10) }), {});
-                updated.inst = Window.editor.inst;
-                Window.exit_editor();
                 // check if anything's changed
-                if (['start', 'end', 'timesig'].some(p => (updated[p] !== selected[p])))
-                    API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, measure.offset);
+                if (!['start', 'end', 'timesig'].some(p => (updated[p] !== selected[p])))
+                    return;
+
+
+                updated.inst = Window.editor.inst;
+                updated.offset = selected.offset;
+
+
+                var beat_lock = {};
+                if ('locks' in selected) {
+                    let lock = Object.keys(selected.locks)[0];
+                    beat_lock.beat = parseInt(lock, 10);
+                    beat_lock.type = selected.locks[lock];
+                }
+                
+                let extracts = {};
+                if (beat_lock.type === 'loc' || beat_lock.type === 'both')
+                    extracts.lock = beat_lock.beat;
+                if (beat_lock.type === 'tempo' || beat_lock.type === 'both')
+                    updated = tempo_edit(selected, updated, beat_lock, type);
+                let newMeas = quickCalc(updated.start, updated.end - updated.start, updated.timesig, extracts);
+                if (!('gaps' in selected))
+                    selected.gaps = calcGaps(instruments[updated.inst].ordered, selected.id);
+
+                let crowd = crowding(selected.gaps, selected.offset, newMeas.ms, { strict: true, impossible: true });
+
+                Window.exit_editor();
+
+                if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
+                    let lock_loc = selected.beats[beat_lock.beat] + selected.offset;
+                    let newOffset = lock_loc - newMeas.lock;
+                    console.log(lock_loc, newOffset);
+                    if ( // did measure expand?
+                        (newOffset < crowd.start[0]) || // does expansion crowd the start or
+                        (newMeas.ms - newMeas.lock + lock_loc > crowd.end[0]) // the end?
+                    ) {
+                        console.log('conflict');
+                        return;
+                    }
+                    updated.offset = newOffset;
+                } else {
+
+                    // too big?
+                    let gap = crowd.end[0] - crowd.start[0];
+
+                    if (newMeas.ms > gap) {
+                        console.log('too big');
+                        return;
+                    }
+
+                    if (crowd.end[1] < 0)
+                        updated.offset += crowd.end[1];
+                    // eventually this will need a left-expansion version
+                    if (crowd.start[1] < 0)
+                        updated.offset -= crowd.start[1];
+                }
+                API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.offset);
                 return;
             }
         }
@@ -1019,9 +1081,9 @@ export default function measure(p) {
         // if zooming, recalculate location cache
         if (zoom) {
             instruments.forEach(inst => {
-                inst.ordered.forEach(meas => {
-                    calculate_cache(meas);     
-                })
+                inst.ordered.forEach(meas =>
+                    meas.cache = Window.calculate_cache(('temp' in meas) ? meas.temp : meas)
+                )
             })
         }
         if (API.pollSelecting())
@@ -1200,7 +1262,7 @@ export default function measure(p) {
             };
             Object.assign(measure, { cache });
 
-            let tempo_cache = Window.calculate_tempo_cache(measure);
+            let tempo_cache = Window.calculate_tempo_cache(measure, measure.cache);
 
             Object.assign(measure.cache, tempo_cache);
             API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
@@ -1260,58 +1322,9 @@ export default function measure(p) {
         // does this renaming really help things?
         var snap = Mouse.drag.grab;
 
-        // tick_array is the total number of tempo updates for the measure
-        var tick_array = Array.from({
-            length: Window.selected.meas.timesig * Window.CONSTANTS.PPQ_tempo
-        }, (__, i) => i);
 
-        // calculates only tempo change ticks.
-        // returns beats/tempo ticks and requested individual ticks according to key
-        var quickCalc = (start, slope, timesig, extract) => {
-            var K = 60000.0 * timesig / slope;
-            var sigma = (n) => 1.0 / ((start * Window.CONSTANTS.PPQ_tempo * K / 60000.0) + n);
-            // convert extractions to ticks
-            let extract_tick_locations = Object.keys(extract)
-                .reduce((acc, key) => 
-                    ({ ...acc, [extract[key] * Window.CONSTANTS.PPQ_tempo]: key })
-                , {});
 
-            let returned = { beats: [], ticks: [] };
-            returned.ms = K * tick_array.reduce((sum, i) => {
-                if (i in extract_tick_locations)
-                    returned[extract_tick_locations[i]] = sum*K;
-                return sum + sigma(i);
-            }, 0);
-            // catch last beat
-            if (tick_array.length in extract_tick_locations)
-                returned[extract_tick_locations[tick_array.length]] = returned.ms;
 
-            // default snap target to end if nowhere else
-            // ####### this seems like it could be unpredictable behavior, not sure if i like it
-            if (!('snapped' in returned)) 
-                returned.snapped = returned.ms;
-            return returned;
-        };
-
-        var completeCalc = (start, slope, timesig) => {
-            let tick_total = timesig * Window.CONSTANTS.PPQ;
-            let inc = slope/tick_total;
-            let last = 0;
-            let ms = 0;
-            var PPQ_mod = Window.CONSTANTS.PPQ / Window.CONSTANTS.PPQ_tempo;
-            let beats = [];
-            let ticks = [];
-            for (let i=0; i<tick_total; i++) {
-                if (!(i%Window.CONSTANTS.PPQ))
-                    beats.push(ms);
-                ticks.push(ms);
-                if (i%PPQ_mod === 0) 
-                    last = Window.CONSTANTS.K / (start + inc*i);
-                ms += last;
-            };
-            beats.push(ms);
-            return { beats, ticks, ms }
-        }
 
         // LENGTH GRADIENT DESCENT
         var nudge_factory = (measure, target, snap, beat_lock, locks, type) => {
@@ -1327,7 +1340,7 @@ export default function measure(p) {
             let nudge = (gap, alpha, depth, even) => {
                 if (depth > 99 || Math.abs(gap) < c.NUDGE_THRESHOLD) {
                     // last full calculation
-                    let calc = completeCalc(start, slope, measure.timesig);
+                    let calc = Window.completeCalc(start, slope, measure.timesig);
                     ms = calc.ms;
                     return { start, end, slope, offset, ms, beats: calc.beats, ticks: calc.ticks, snap };
                 }
@@ -1490,7 +1503,7 @@ export default function measure(p) {
                 if (update.start < 10 || update.end < 10) 
                     return;
 
-                let calc = completeCalc(update.start, update.end-update.start, measure.timesig);
+                let calc = Window.completeCalc(update.start, update.end-update.start, measure.timesig);
                 Object.assign(update, calc);
             // this should work for type === 'both' - DRY this up later
             } else if (beat_lock.type) {
@@ -1506,7 +1519,7 @@ export default function measure(p) {
                 if (update.start < 10 || update.end < 10) 
                     return;
                 
-                let calc = completeCalc(update.start, fresh_slope*measure.timesig, measure.timesig);
+                let calc = Window.completeCalc(update.start, fresh_slope*measure.timesig, measure.timesig);
                 Object.assign(update, calc);
             }
 
@@ -1640,7 +1653,7 @@ export default function measure(p) {
 
 
             //let { ms, locked, grabbed } = quickCalc(temp_start, slope, measure.timesig, { locked: beat_lock.beat, grabbed: snap });
-            let calc = completeCalc(update.start, update.end-update.start, measure.timesig);
+            let calc = Window.completeCalc(update.start, update.end-update.start, measure.timesig);
             Object.assign(update, calc);
 
             // i don't really think this is necessary, but i was going

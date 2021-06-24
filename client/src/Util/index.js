@@ -1,3 +1,58 @@
+import c from '../config/CONFIG.json';
+
+// finds adjacent measures and returns their location and distance
+var crowding = (gaps, position, ms, options) => {
+    let center = (options && 'center' in options) ? options.center : false;
+    let strict = (options && 'strict' in options) ? options.strict : false;
+    let impossible = (options && 'impossible' in options) ? options.impossible : false;
+    let final = position + ms;
+    let mid = position + ms/2;
+    if (final <= gaps[0][1]) {
+        console.log('first ', final, gaps[0][1]);
+        return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
+    }
+    let last_gap = gaps.slice(-1)[0];
+    if (position > last_gap[0]) {
+        console.log('last');
+        return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
+    }
+        
+    return gaps
+        .reduce((acc, gap, ind) => {
+            // does it even fit in the gap?
+            if (!impossible && (gap[1] - gap[0] < ms - (strict ? c.NUDGE_THRESHOLD*2 : 0)))
+                return acc;
+            let start = [gap[0], position - gap[0]];
+            let end = [gap[1], gap[1] - final];
+
+            // attempt 3: is the start or end 
+
+            // trying something new... base closest gap on the center of the given spread,
+            // in relation to the start or end of available gaps.
+            if (center) {
+                let target = (gap[0]+acc.end[0])/2;
+                // if the previous gap start is -Infinity and 
+                //if ((!isFinite(acc.start[0]) && )
+                //    || mid < (gap[0]+acc.end[0])/2))
+                if (isFinite(target) && mid < target)
+                    return acc;
+            }
+
+            // is there ever an instance where these two aren't both triggered?
+
+            // 1. if the distance to the start of the gap is less than the previous,
+            // update the returned gap.
+            if (Math.abs(start[1]) < Math.abs(acc.start[1]) ||
+                (Math.abs(end[1]) < Math.abs(acc.end[1])))
+                return ({ start, end, gap: ind });
+            // 2. if the distance to the end of the gap is less than the previous,
+            // update the returned gap.
+            //if (Math.abs(end[1]) < Math.abs(acc.end[1]))
+            //    acc.end = end;
+            return acc;
+        }, { start: [0, Infinity], end: [0, Infinity], gap: -1 });
+}
+
 var MeasureCalc = (features, options) => {
     let start, end, timesig;
     let PPQ, PPQ_tempo;
@@ -72,6 +127,6 @@ var parse_bits = (n) => {
     return bits;
 };
 
-export { MeasureCalc, order_by_key, check_proximity_by_key, bit_toggle, parse_bits };
+export { MeasureCalc, order_by_key, check_proximity_by_key, bit_toggle, parse_bits, crowding };
 
 
