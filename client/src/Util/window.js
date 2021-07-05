@@ -203,10 +203,12 @@ export default (p) => {
 
                 // update score tempo range
                 let [start, end] = [this.editor.next.start, this.editor.next.end].map(n => parseFloat(n));
+                let [min, max] = start <= end ?
+                    [start, end] : [end, start];
                 this.updateRange({
                     temprange: [
-                        Math.min(start, end, this.range.tempo[0]),
-                        Math.max(start, end, this.range.tempo[1])
+                        Math.min(min, this.range.tempo[0]),
+                        Math.max(max, this.range.tempo[1])
                     ]
                 });
             }
@@ -420,6 +422,7 @@ export default (p) => {
         }
 
         updateRange(new_range) {
+            console.log(new_range);
             Object.assign(this.range, new_range);
             this.rangeRefresh();
         }

@@ -120,6 +120,17 @@ export default function measure(p) {
     p.mouseDown = false;
 
     var instruments = [];
+    var gatherRanges = (except) =>
+        instruments.reduce((acc, inst) => {
+            Object.keys(inst.measures).forEach(key => {
+                let meas = inst.measures[key];
+                if (except && meas.id === except)
+                    return acc;
+                acc.min = Math.min(acc.min, meas.start, meas.end);
+                acc.max = Math.max(acc.max, meas.start, meas.end);
+            });
+            return acc;
+        }, { min: Infinity, max: -Infinity });
 
     // temporary holding for editing measures
     var copied;
@@ -921,64 +932,14 @@ export default function measure(p) {
                 let type = Window.editor.type;
                 let selected = Window.editor.meas;
                 let updated = Object.keys(Window.editor.next).reduce(
-                    (acc, key) => Object.assign(acc, { [key]: parseInt(Window.editor.next[key], 10) }), {});
+                    (acc, key) => Object.assign(acc, { [key]: parseFloat(Window.editor.next[key]) }), {});
+                updated.offset = Window.editor.temp_offset;
                 // check if anything's changed
-                if (!['start', 'end', 'timesig'].some(p => (updated[p] !== selected[p])))
+                if (!['start', 'end', 'timesig', 'offset'].some(p => (updated[p] !== selected[p])))
                     return;
-
-
                 updated.inst = Window.editor.inst;
-                updated.offset = selected.offset;
-
-
-                var beat_lock = {};
-                if ('locks' in selected) {
-                    let lock = Object.keys(selected.locks)[0];
-                    beat_lock.beat = parseInt(lock, 10);
-                    beat_lock.type = selected.locks[lock];
-                }
-                
-                let extracts = {};
-                if (beat_lock.type === 'loc' || beat_lock.type === 'both')
-                    extracts.lock = beat_lock.beat;
-                if (beat_lock.type === 'tempo' || beat_lock.type === 'both')
-                    updated = tempo_edit(selected, updated, beat_lock, type);
-                let newMeas = quickCalc(updated.start, updated.end - updated.start, updated.timesig, extracts);
-                if (!('gaps' in selected))
-                    selected.gaps = calcGaps(instruments[updated.inst].ordered, selected.id);
-
-                let crowd = crowding(selected.gaps, selected.offset, newMeas.ms, { strict: true, impossible: true });
 
                 Window.exit_editor();
-
-                if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
-                    let lock_loc = selected.beats[beat_lock.beat] + selected.offset;
-                    let newOffset = lock_loc - newMeas.lock;
-                    console.log(lock_loc, newOffset);
-                    if ( // did measure expand?
-                        (newOffset < crowd.start[0]) || // does expansion crowd the start or
-                        (newMeas.ms - newMeas.lock + lock_loc > crowd.end[0]) // the end?
-                    ) {
-                        console.log('conflict');
-                        return;
-                    }
-                    updated.offset = newOffset;
-                } else {
-
-                    // too big?
-                    let gap = crowd.end[0] - crowd.start[0];
-
-                    if (newMeas.ms > gap) {
-                        console.log('too big');
-                        return;
-                    }
-
-                    if (crowd.end[1] < 0)
-                        updated.offset += crowd.end[1];
-                    // eventually this will need a left-expansion version
-                    if (crowd.start[1] < 0)
-                        updated.offset -= crowd.start[1];
-                }
                 API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.offset);
                 return;
             }
@@ -1266,12 +1227,15 @@ export default function measure(p) {
                 return acc;
             }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
-        const finalize = (recalc) => {
+        const finalize = (moved) => {
             // need a skip here to prevent unnecessary cache calculations
-            //if (recalc) {
-                let temprange = [Math.min(update.start, Window.range.tempo[0]), Math.max(update.end, Window.range.tempo[1])];
+            if (!moved) {
+                let ranges = gatherRanges(measure.id);
+                let [min, max] = update.start <= update.end ?
+                    [update.start, update.end] : [update.end, update.start];
+                let temprange = [Math.min(min, ranges.min), Math.max(max, ranges.max)];
                 Window.updateRange({ temprange });
-            //}
+            }
             Object.assign(measure.temp, update);
             measure.temp.invalid = {};
             let cache = Window.calculate_cache(measure.temp);
@@ -1318,7 +1282,7 @@ export default function measure(p) {
                         snaps.snapped_inst = {};
                 };
 
-                return finalize();
+                return finalize(true);
             }
             let meas = Window.editor.type ? measure.temp : measure;
             let position = meas.offset + Mouse.drag.x/Window.scale;
@@ -1356,7 +1320,7 @@ export default function measure(p) {
                     snaps.snapped_inst = {};
             };
             
-            return finalize();
+            return finalize(true);
         };
 
         // the following are necessary for 'tempo'/'tick' drags
