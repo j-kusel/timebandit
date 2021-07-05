@@ -227,10 +227,15 @@ class App extends Component {
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
           logger.log(`Updating measure ${id} in instrument ${inst}.`);  
-          let oldMeas = this.state.instruments[inst].measures[id].offset;
+          let oldMeas = this.state.instruments[inst].measures[id];
+          
 
-          offset = offset || oldMeas;
+          offset = (typeof offset === 'number') ? offset : oldMeas.offset;
           var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+
+          // preserve locks
+          if ('locks' in oldMeas)
+              calc.locks = Object.assign({}, oldMeas.locks);
 
           // re-order measures
           self.setState(oldState => {

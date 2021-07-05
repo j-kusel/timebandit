@@ -159,7 +159,8 @@ export default (p, Window) => {
         }
 
         measureMode() {
-            Window.initialize_temp();
+            if (!(Window.editor.type && ('temp' in Window.editor.meas)))
+                Window.initialize_temp();
             this.drag.mode = 'measure';
         }
 
@@ -173,7 +174,8 @@ export default (p, Window) => {
             if (parse_bits(locked[Window.selected.meas.id].beats).length < 2 || parse_bits(locked[Window.selected.meas.id].beats).indexOf(this.rollover.beat) !== -1)
                 locked[Window.selected.meas.id].beats = bit_toggle(locked[Window.selected.meas.id].beats, this.rollover.beat);
                 */
-            console.log(this.rollover.beat);
+            if (Window.editor.type)
+                console.log(Window.editor.meas.temp);
             if (Window.locking(Window.selected.meas, this.rollover.beat))
                 this.drag.mode = 'lock';
         }

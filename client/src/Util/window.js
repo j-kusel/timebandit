@@ -5,9 +5,11 @@ import { crowding } from '../Util/index.js';
 import { NUM, LEFT, RIGHT, DEL, BACK } from './keycodes';
 
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
+    //console.log(oldMeas);
     let old_slope = oldMeas.end - oldMeas.start;
     let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
     let lock_percent = beat_lock.beat / oldMeas.timesig;
+    console.log(old_slope, lock_tempo, lock_percent);
     if (type === 'start')
         newMeas.end = (lock_tempo - newMeas.start)/lock_percent + newMeas.start
     else if (type === 'end')
@@ -111,7 +113,7 @@ export default (p) => {
                     next[t] = str;
                     pointers[t] = str.length;
                 });
-                this.editor = { type, inst, meas, next, pointers, timer: null };
+                this.editor = { type, inst, meas, next, pointers, timer: null, temp_offset: meas.offset };
                 return true;
             }
             return false;
@@ -146,19 +148,22 @@ export default (p) => {
         }
 
         recalc_editor() {
-            let selected = this.editor.meas;
+            let locks = this.editor.meas.locks;
+            let selected = this.editor.meas.temp || this.editor.meas;
             let updated = Object.keys(this.editor.next).reduce(
-                (acc, key) => Object.assign(acc, { [key]: parseInt(this.editor.next[key], 10) }), {});
+                (acc, key) => Object.assign(acc, { [key]: parseFloat(this.editor.next[key]) }), {});
             // check if anything's changed
             if (['start', 'end', 'timesig'].some(p => (updated[p] !== selected[p]))) {
                 var beat_lock = {};
-                if ('locks' in selected && Object.keys(selected.locks).length) {
-                    let lock = Object.keys(selected.locks)[0];
+                if (locks && Object.keys(locks).length) {
+                    let lock = Object.keys(locks)[0];
                     beat_lock.beat = parseInt(lock, 10);
-                    beat_lock.type =selected.locks[lock];
+                    beat_lock.type = locks[lock];
 
                     // check if tempo locked somewhere
-                    if (selected.locks[lock] !== 'loc') {
+                    if (locks[lock] !== 'loc') {
+                        console.log(selected);
+                        console.log(updated);
                         // if start has changed
                         if (this.editor.type === 'start' && (updated.start !== selected.start))
                             this.editor.next.end = tempo_edit(selected, updated, beat_lock, 'start').end.toString()
@@ -171,17 +176,22 @@ export default (p) => {
                 // calculate with new changes.
                 // parse strings to numbers
                 let next = Object.keys(this.editor.next).reduce((acc, key) => 
-                    ({ ...acc, [key]: parseInt(this.editor.next[key], 10) }), {});
+                    ({ ...acc, [key]: parseFloat(this.editor.next[key]) }), {});
                 
+                console.log(this.editor.next);
+                console.log(next);
                 let slope = next.end - next.start;
                 let calc = this.completeCalc(next.start, slope, next.timesig);
                 Object.assign(calc, next); 
 
                 // check for 'loc' locking and adjust offset
-                calc.offset = selected.offset;
+                //calc.offset = this.editor.temp_offset;
+                console.log(this.editor.temp_offset);
                 if (beat_lock.type === 'loc' || beat_lock.type === 'both')
-                    calc.offset += selected.beats[beat_lock.beat] - calc.beats[beat_lock.beat];
+                    //calc.offset += selected.beats[beat_lock.beat] - calc.beats[beat_lock.beat];
+                    this.editor.temp_offset += selected.beats[beat_lock.beat] - calc.beats[beat_lock.beat];
 
+                calc.offset = this.editor.temp_offset;
                 // assign to measure temp
                 Object.assign(this.editor.meas, { temp: calc });
 
@@ -192,10 +202,11 @@ export default (p) => {
                 console.log(this.editor.meas);
 
                 // update score tempo range
+                let [start, end] = [this.editor.next.start, this.editor.next.end].map(n => parseFloat(n));
                 this.updateRange({
                     temprange: [
-                        Math.min(parseInt(this.editor.next.start, 10), this.range.tempo[0]),
-                        Math.max(this.editor.next.end, this.range.tempo[1])
+                        Math.min(start, end, this.range.tempo[0]),
+                        Math.max(start, end, this.range.tempo[1])
                     ]
                 });
             }
@@ -211,7 +222,6 @@ export default (p) => {
         }
 
         validate_measure(meas, calcGaps, tempflag) {
-            console.log(meas);
             if (!meas.gaps)
                 meas.gaps = calcGaps(meas.inst, meas.id);
 
@@ -221,11 +231,8 @@ export default (p) => {
                 [meas.temp.offset, meas.temp.ms, meas.temp.invalid] :
                 [meas.offset, meas.ms, meas.invalid];
 
-            console.log(offset);
 
             let crowd = crowding(meas.gaps, offset, ms, { strict: true, impossible: true });
-
-            console.log(crowd);
 
             // is measure too big?
             let gap = crowd.end[0] - crowd.start[0];
@@ -553,7 +560,8 @@ export default (p) => {
                 ms: sel.ms,
                 ticks: sel.ticks,
                 beats: sel.beats,
-                offset: sel.offset
+                offset: sel.offset,
+                timesig: sel.timesig
             };
 
             let cache = this.calculate_cache(sel);/*{

@@ -32,5 +32,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.swp
+*.swo
 /node_modules
 /src/sass

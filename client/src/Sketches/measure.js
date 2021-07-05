@@ -372,7 +372,6 @@ export default function measure(p) {
         instruments.forEach(inst => {
             inst.ordered.forEach(meas => {
                 meas.cache = Window.calculate_cache(meas);
-                console.log(meas.cache);
             });
         });
 
@@ -564,18 +563,34 @@ export default function measure(p) {
                 });
                 // return from measure translate
                 p.pop();
-                if (cache.invalid && 'start' in cache.invalid)
-                    conflicts.push(() => {
-                        p.push();
-                        p.translate(origin, 0);
-                        p.stroke(255, 0, 0);
-                        p.fill(255, 0, 0);
-                        p.rect(0, 0, -cache.invalid.start, c.INST_HEIGHT);
-                        p.pop();
-                    });
+                if (cache.invalid) {
+                    let conflictColor = p.color(colors.accent);
+                    conflictColor.setAlpha(150);
+                    if ('start' in cache.invalid)
+                        conflicts.push(() => {
+                            p.push();
+                            p.translate(origin, 0);
+                            p.stroke(conflictColor);
+                            conflictColor.setAlpha(100);
+                            p.fill(conflictColor);
+                            p.rect(0, 0, -cache.invalid.start, c.INST_HEIGHT);
+                            p.pop();
+                        });
+                    if ('end' in cache.invalid)
+                        conflicts.push(() => {
+                            p.push();
+                            p.translate(origin + ms, 0);
+                            p.stroke(conflictColor);
+                            conflictColor.setAlpha(100);
+                            p.fill(conflictColor);
+                            p.rect(0, 0, cache.invalid.end, c.INST_HEIGHT);
+                            p.pop();
+                        });
+                }
 
             });
 
+            // draw all conflict boxes
             conflicts.forEach(func => func());
 
             // does this need to be updated with new cache system?
@@ -1219,9 +1234,10 @@ export default function measure(p) {
 
         // initialize update
         var update = {
-            beats: [], ticks: [], offset: measure.offset,
-            start: measure.start,
-            end: measure.end
+            beats: [], ticks: [],
+            offset: measure.temp.offset || measure.offset,
+            start: measure.temp.start || measure.start,
+            end: measure.temp.end || measure.end
         };
 
         // find snap point closest to a position in other instruments
@@ -1250,36 +1266,70 @@ export default function measure(p) {
                 return acc;
             }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
-        const finalize = () => {
-            let temprange = [Math.min(update.start, Window.range.tempo[0]), Math.max(update.end, Window.range.tempo[1])];
-            Window.updateRange({ temprange });
+        const finalize = (recalc) => {
+            // need a skip here to prevent unnecessary cache calculations
+            //if (recalc) {
+                let temprange = [Math.min(update.start, Window.range.tempo[0]), Math.max(update.end, Window.range.tempo[1])];
+                Window.updateRange({ temprange });
+            //}
             Object.assign(measure.temp, update);
-            let cache = {
-                offset: measure.temp.offset*Window.scale,
-                beats: measure.temp.beats.map(b => b*Window.scale),
-                ticks: measure.temp.ticks.map(t => t*Window.scale),
-                ms: measure.temp.ms*Window.scale
-            };
+            measure.temp.invalid = {};
+            let cache = Window.calculate_cache(measure.temp);
             Object.assign(measure, { cache });
-
-            let tempo_cache = Window.calculate_tempo_cache(measure, measure.cache);
+            let tempo_cache = Window.calculate_tempo_cache(measure, cache);
 
             Object.assign(measure.cache, tempo_cache);
-            API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
+            //API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
             return;
         };
 
         // if we're just dragging measures, we have all we need now.
         if (Mouse.drag.mode === 'measure') {
-            let position = measure.offset + Mouse.drag.x/Window.scale;
-            let close = snap_eval(position, measure.beats);
+            if (Window.editor.type) {
+                let position = Window.editor.temp_offset + Mouse.drag.x/Window.scale;
+                let temp = measure.temp;
+                let close = snap_eval(position, measure.beats);
+                let crowd = crowding(measure.gaps, position, temp.ms, { center: true });
+                Object.assign(update, {
+                    ticks: temp.ticks.slice(0),
+                    beats: temp.beats.slice(0),
+                    offset: position
+                });
+                // initialize flag to prevent snapping when there's no space anyways
+                let check_snap = true;
+                if (Math.abs(crowd.start[1]) < Math.abs(crowd.end[1])) {
+                    if (crowd.start[1] - c.SNAP_THRESHOLD*2 < 0) {
+                        update.offset = crowd.start[0];
+                        check_snap = false;
+                    }
+                } else {
+                    if (crowd.end[1] - c.SNAP_THRESHOLD*2 < 0) {
+                        update.offset = crowd.end[0] - temp.ms;
+                        check_snap = false;
+                    }
+                }
+
+                if (check_snap && close.index !== -1) {
+                    let gap = close.target - (temp.beats[close.index] + position);
+                    if (Math.abs(gap) < 50) {
+                        snaps.snapped_inst = { ...close, origin: Window.editor.inst };
+                        update.offset = position + gap;
+                    } else
+                        snaps.snapped_inst = {};
+                };
+
+                return finalize();
+            }
+            let meas = Window.editor.type ? measure.temp : measure;
+            let position = meas.offset + Mouse.drag.x/Window.scale;
+            let close = snap_eval(position, meas.beats);
 
             // determine whether start or end are closer
             // negative numbers signify conflicts
-            let crowd = crowding(measure.gaps, position, measure.ms, { center: true });
+            let crowd = crowding(measure.gaps, position, meas.ms, { center: true });
             Object.assign(update, {
-                ticks: measure.ticks.slice(0),
-                beats: measure.beats.slice(0),
+                ticks: meas.ticks.slice(0),
+                beats: meas.beats.slice(0),
                 offset: position
             });
 
@@ -1292,13 +1342,13 @@ export default function measure(p) {
                 }
             } else {
                 if (crowd.end[1] - c.SNAP_THRESHOLD*2 < 0) {
-                    update.offset = crowd.end[0] - measure.ms;
+                    update.offset = crowd.end[0] - meas.ms;
                     check_snap = false;
                 }
             }
 
             if (check_snap && close.index !== -1) {
-                let gap = close.target - (measure.beats[close.index] + position);
+                let gap = close.target - (meas.beats[close.index] + position);
                 if (Math.abs(gap) < 50) {
                     snaps.snapped_inst = { ...close, origin: Window.selected.inst };
                     update.offset = position + gap;
@@ -1770,7 +1820,7 @@ export default function measure(p) {
         }
         
         // handle threshold
-        if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X &&
+        /*if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X &&
             Math.abs(Mouse.drag.y) < c.DRAG_THRESHOLD_X
         ) {
             if (Window.selected.meas)
@@ -1778,6 +1828,7 @@ export default function measure(p) {
             Mouse.resetDrag();
             return;
         };
+        */
 
         if (!(Window.selected.meas)) {
             Mouse.resetDrag();
@@ -1800,7 +1851,10 @@ export default function measure(p) {
         };
 
         if (Mouse.drag.mode === 'measure') {
-            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.start, measure.end, measure.beats.length - 1, measure.temp.offset);
+            if (Window.editor.type)
+                Window.editor.temp_offset = Window.editor.meas.temp.offset
+            else
+                API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.start, measure.end, measure.beats.length - 1, measure.temp.offset);
             Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
             return;
         };

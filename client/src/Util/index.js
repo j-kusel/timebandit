@@ -1,18 +1,24 @@
 import c from '../config/CONFIG.json';
 
 // finds adjacent measures and returns their location and distance
-var crowding = (gaps, position, ms, options) => {
-    let center = (options && 'center' in options) ? options.center : false;
-    let strict = (options && 'strict' in options) ? options.strict : false;
-    let impossible = (options && 'impossible' in options) ? options.impossible : false;
+var crowding = (gaps, position, ms, { center=false, strict=false, context=false, impossible=false } = {}) => {
     let final = position + ms;
-    let mid = position + ms/2;
-    if (final <= gaps[0][1]) {
+    let context_final = context ?
+        context.position + context.ms : final;
+    let mid = position + ms*0.5;
+    let context_mid = context ?
+        context.position + context.ms*0.5 : mid;
+    let offset = context ?
+        context.position : position;
+    let context_ms = context ?
+        context.ms : ms;
+
+    if (context_final <= gaps[0][1]) {
         console.log('first ', final, gaps[0][1]);
         return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
     }
     let last_gap = gaps.slice(-1)[0];
-    if (position > last_gap[0]) {
+    if (offset > last_gap[0]) {
         console.log('last');
         return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
     }
@@ -20,7 +26,7 @@ var crowding = (gaps, position, ms, options) => {
     return gaps
         .reduce((acc, gap, ind) => {
             // does it even fit in the gap?
-            if (!impossible && (gap[1] - gap[0] < ms - (strict ? c.NUDGE_THRESHOLD*2 : 0)))
+            if (!impossible && (gap[1] - gap[0] < context_ms - (strict ? c.NUDGE_THRESHOLD*2 : 0)))
                 return acc;
             let start = [gap[0], position - gap[0]];
             let end = [gap[1], gap[1] - final];
@@ -34,7 +40,7 @@ var crowding = (gaps, position, ms, options) => {
                 // if the previous gap start is -Infinity and 
                 //if ((!isFinite(acc.start[0]) && )
                 //    || mid < (gap[0]+acc.end[0])/2))
-                if (isFinite(target) && mid < target)
+                if (isFinite(target) && context_mid < target)
                     return acc;
             }
 
