@@ -7,7 +7,7 @@ import { order_by_key, check_proximity_by_key, parse_bits, crowding } from '../U
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
-import { primary, secondary, /*secondary_light2*/ } from '../config/CONFIG.json';
+import { primary, /*secondary, secondary_light2*/ } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
 //import { secondary, secondary_light, } from '../config/CONFIG.json';
 import _ from 'lodash';
@@ -25,26 +25,6 @@ const DEBUG = process.env.NODE_ENV === 'development';
 const SLOW = process.env.NODE_ENV === 'development';
 
 var API = {};
-var K;
-
-var div;
-
-var input;
-
-let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
-    let old_slope = oldMeas.end - oldMeas.start;
-    let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
-    let lock_percent = beat_lock.beat / oldMeas.timesig;
-    if (type === 'start')
-        newMeas.end = (lock_tempo - newMeas.start)/lock_percent + newMeas.start
-    else if (type === 'end')
-        newMeas.start = newMeas.end - (newMeas.end - lock_tempo)/(1 - lock_percent);
-    return newMeas;
-
-}
-
-
-
 
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
 //const [SHIFT, ALT] = [16, 18];
@@ -110,10 +90,6 @@ var insert = (list, item) => {
     return insert(left, item).concat(right);
 }; */
 
-// holds arrays of beats by measure id key, MOVE THIS LATER
-var locked = {};
-
-
 
 export default function measure(p) {
     // monkey-patching Processing for a p.mouseDown function
@@ -123,14 +99,8 @@ export default function measure(p) {
 
     var lock_persist = () => null;
     var reset_lock_persist = () => lock_persist = (() => console.log('not set'));
-    var set_lock_persist = (inst, id, locks) => {
-        console.log('setting');
-        lock_persist = /*() => console.log('OHHH YEAHHHH');*/ () => {
-            console.log('persisting');
-            let obj = Object.assign(instruments[inst].measures[id], locks);
-            console.log(obj);
-        };
-    }
+    var set_lock_persist = (inst, id, locks) =>
+        lock_persist = () => Object.assign(instruments[inst].measures[id], locks);
 
     var gatherRanges = (except) =>
         instruments.reduce((acc, inst) => {
@@ -202,7 +172,6 @@ export default function measure(p) {
         }
         // BREAK OUT INTO FUNCTION
         let scales = [5, 1, 0.075, 0.05, 0.025];
-        let which = null;
         let lerp = 0;
         scales.some((scale, index) => {
             if (Window.scale > scale) {
@@ -473,16 +442,9 @@ export default function measure(p) {
             inst.ordered.forEach((measure, m_ind) => {
                 let key = measure.id;
 
-
-                // set FLAG_TEMP if drawing a temporary measure?
-                let FLAG_TEMP = 'temp' in measure;
-
                 let cache = measure.cache;
                 var [ticks, beats, offset, ms] = 
                     [cache.ticks, cache.beats, cache.offset, cache.beats.slice(-1)[0]];
-                var [start, end] = FLAG_TEMP ?
-                    [measure.temp.start || measure.start, measure.temp.end || measure.end] :
-                    [measure.start, measure.end];
                 var [graph] = [cache.graph];
 
 
@@ -928,9 +890,7 @@ export default function measure(p) {
         if (p.keyCode === keycodes.TAB && Window.editor.type) {
             e.preventDefault();
             let types = ['start', 'end', 'timesig'];
-            let type = Window.editor.type;
-            let next = (types.indexOf(Window.editor.type) + 1) % 3;
-            Window.editor.type = types[next];
+            Window.editor.type = types[(types.indexOf(Window.editor.type) + 1) % 3];
             return;
         }
 
@@ -943,7 +903,6 @@ export default function measure(p) {
                 e.preventDefault();
                 
                 // THIS NEEDS CROWDING VALIDATION
-                let type = Window.editor.type;
                 let selected = Window.editor.meas;
                 let updated = Object.keys(Window.editor.next).reduce(
                     (acc, key) => Object.assign(acc, { [key]: parseFloat(Window.editor.next[key]) }), {});
@@ -972,7 +931,6 @@ export default function measure(p) {
             if (p.keyCode === KeyC
                 && Window.selected.meas
             ) {
-
                 logger.log(`Copying measure ${Window.selected.meas.id}.`);
                 copied = Window.selected.meas; //instruments[Window.selected.inst].measures[Window.selected.meas];
                 return;
@@ -1515,8 +1473,6 @@ export default function measure(p) {
         if (Mouse.drag.mode === 'tempo') {
             let spread = Window.range.tempo[1] - Window.range.tempo[0];
             let change = Mouse.drag.y / c.INST_HEIGHT * spread;
-            var beat_lock = Object.keys(measure.locks).length ?
-                ({ beat: parseInt(lock_candidates[0], 10), type: Window.selected.meas.locks[lock_candidates[0]] }) : {};
             
             // can't drag a grabbed beat.
             if (beat_lock.beat === Mouse.grabbed)
@@ -1586,7 +1542,6 @@ export default function measure(p) {
             let beatscale = (-Mouse.drag.x*Window.scale);
 
             let slope = measure.end - measure.start;
-            var temp_start;
 
             let perc = Math.abs(slope) < c.FLAT_THRESHOLD ?
                 ((Window.selected.dir === 1) ? -c.FLAT_THRESHOLD : c.FLAT_THRESHOLD) :
@@ -1799,7 +1754,6 @@ export default function measure(p) {
         // checking for rollover.
         // which instrument?
         let y_loc = p.mouseY - c.PLAYBACK_HEIGHT + Window.scroll;
-        let row_calc = (y_loc) /  c.INST_HEIGHT;
         let inst_row = Math.floor(y_loc/c.INST_HEIGHT);
         if (inst_row < instruments.length && inst_row >= 0) {
             let inst = instruments[inst_row];
