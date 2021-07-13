@@ -7,17 +7,17 @@ import { order_by_key, check_proximity_by_key, parse_bits, crowding } from '../U
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
-import { primary, secondary, secondary_light2 } from '../config/CONFIG.json';
+import { primary, secondary, /*secondary_light2*/ } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
 //import { secondary, secondary_light, } from '../config/CONFIG.json';
-//import _ from 'lodash';
+import _ from 'lodash';
 import _Window from '../Util/window.js';
 import _Mouse from '../Util/mouse.js';
 import _Keyboard from '../Util/keyboard.js';
 import { Debugger } from '../Util/debugger.js';
 import Printer from '../Util/printer.js';
 import keycodes from '../Util/keycodes.js';
-import { CTRL, MOD, LEFT, RIGHT } from '../Util/keycodes.js';
+import { /*CTRL,*/ MOD, LEFT, RIGHT, PERIOD } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
 
@@ -120,6 +120,18 @@ export default function measure(p) {
     p.mouseDown = false;
 
     var instruments = [];
+
+    var lock_persist = () => null;
+    var reset_lock_persist = () => lock_persist = (() => console.log('not set'));
+    var set_lock_persist = (inst, id, locks) => {
+        console.log('setting');
+        lock_persist = /*() => console.log('OHHH YEAHHHH');*/ () => {
+            console.log('persisting');
+            let obj = Object.assign(instruments[inst].measures[id], locks);
+            console.log(obj);
+        };
+    }
+
     var gatherRanges = (except) =>
         instruments.reduce((acc, inst) => {
             Object.keys(inst.measures).forEach(key => {
@@ -295,6 +307,8 @@ export default function measure(p) {
         console.log('REDRAWING');
 
         instruments = props.instruments;
+        lock_persist();
+        reset_lock_persist();
         Window.insertMeas = props.insertMeas;
         Window.selected = props.selected || ({ inst: -1, meas: undefined });
         Window.editMeas = props.editMeas;
@@ -892,7 +906,7 @@ export default function measure(p) {
                 API.printoutSet(false);
             }
             if (Window.editor.type) {
-                Window.exit_editor();
+                Window.exit_editor(true, gatherRanges);
                 return;
             }
             if (Window.mode === 0)
@@ -904,7 +918,7 @@ export default function measure(p) {
             return;
         };
 
-        if (Window.editor.type && ([...NUM, DEL, BACK, LEFT, RIGHT].indexOf(p.keyCode) > -1)) {
+        if (Window.editor.type && ([...NUM, DEL, BACK, LEFT, RIGHT, PERIOD].indexOf(p.keyCode) > -1)) {
             e.preventDefault();
             Window.change_editor(p.keyCode);
             return;
@@ -936,10 +950,11 @@ export default function measure(p) {
                 updated.offset = Window.editor.temp_offset;
                 // check if anything's changed
                 if (!['start', 'end', 'timesig', 'offset'].some(p => (updated[p] !== selected[p])))
-                    return;
+                    return Window.exit_editor(true, gatherRanges);
                 updated.inst = Window.editor.inst;
 
                 Window.exit_editor();
+                set_lock_persist(updated.inst, selected.id, Object.assign({}, { locks: selected.locks }));
                 API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.offset);
                 return;
             }
@@ -1083,12 +1098,30 @@ export default function measure(p) {
         if (Mouse.cancel)
             return;
 
+        // all editor mode functions should be grouped together here.
+        // quitting editor?
+        if (Window.editor.type && (
+            !('meas' in Mouse.rollover) || !(Mouse.rollover.meas.id === Window.editor.meas.id)
+        )) {
+            Window.exit_editor(true, gatherRanges);
+            return;
+        }
+
         if (Mouse.rollover.type.indexOf('marking') > -1) {
-            Window.enter_editor(Mouse.rollover.type.split('_')[0], Mouse.rollover.inst, Mouse.rollover.meas)
+            let type = Mouse.rollover.type.split('_')[0];
+            if (Window.editor.type && Window.editor.type !== type) {
+                Window.recalc_editor();
+                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
+                Window.editor.timer = null;
+                Window.editor.type = type
+            } else
+                Window.enter_editor(type, Mouse.rollover.inst, Mouse.rollover.meas);
             return;
         }
 
         let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
+
+
         // printing mode
         if (API.printoutCheck()) {
             if (Mouse.rollover.type === 'printerDrag') {
@@ -1196,9 +1229,9 @@ export default function measure(p) {
         // initialize update
         var update = {
             beats: [], ticks: [],
-            offset: measure.temp.offset || measure.offset,
-            start: measure.temp.start || measure.start,
-            end: measure.temp.end || measure.end
+            offset: measure.offset,
+            start: measure.start,
+            end: measure.end
         };
 
         // find snap point closest to a position in other instruments
@@ -1249,6 +1282,10 @@ export default function measure(p) {
 
         // if we're just dragging measures, we have all we need now.
         if (Mouse.drag.mode === 'measure') {
+            // initialize update
+            if ('temp' in measure)
+                Object.assign(update, _.pick(measure.temp, ['offset', 'start', 'end']));
+
             if (Window.editor.type) {
                 let position = Window.editor.temp_offset + Mouse.drag.x/Window.scale;
                 let temp = measure.temp;
@@ -1282,7 +1319,7 @@ export default function measure(p) {
                         snaps.snapped_inst = {};
                 };
 
-                return finalize(true);
+                return finalize(update, true);
             }
             let meas = Window.editor.type ? measure.temp : measure;
             let position = meas.offset + Mouse.drag.x/Window.scale;
@@ -1320,7 +1357,7 @@ export default function measure(p) {
                     snaps.snapped_inst = {};
             };
             
-            return finalize(true);
+            return finalize(update, true);
         };
 
         // the following are necessary for 'tempo'/'tick' drags
@@ -1331,14 +1368,6 @@ export default function measure(p) {
         var beat_lock = lock_candidates.length ?
             ({ beat: parseInt(lock_candidates[0], 10), type: Window.selected.meas.locks[lock_candidates[0]] }) :
             {};
-
-        var PPQ_mod = Window.CONSTANTS.PPQ / Window.CONSTANTS.PPQ_tempo;
-        // does this renaming really help things?
-        var snap = Mouse.drag.grab;
-
-
-
-
 
         // LENGTH GRADIENT DESCENT
         var nudge_factory = (measure, target, snap, beat_lock, locks, type) => {
@@ -1400,9 +1429,7 @@ export default function measure(p) {
                         offset = beat_lock.absolute - locked;
                     } else {
                         // why is THIS LINE so difficult???
-                        offset = (/*measure.temp.offset || */measure.offset) + measure.beats[beat_lock.beat] - locked;
-                        // changed recently, check this out if there are problems
-                        //offset = measure.offset + measure.beats[beat_lock.beat] - locked;
+                        offset = measure.offset + measure.beats[beat_lock.beat] - locked;
                     }
                 } else
                     // if nothing's locked, add half the distance from the previous length
@@ -1485,17 +1512,6 @@ export default function measure(p) {
 
 
         // begin tweaks
-
-        // if we move this to a separate function, what globals does it depend on?
-        // measure
-        // lock_candidates
-        // locks, i guess
-        // crowd_cache
-        // crowding
-        // Window.CONSTANTS.K
-        // nudge_cache
-        // 
-        // y-drag
         if (Mouse.drag.mode === 'tempo') {
             let spread = Window.range.tempo[1] - Window.range.tempo[0];
             let change = Mouse.drag.y / c.INST_HEIGHT * spread;
@@ -1544,7 +1560,7 @@ export default function measure(p) {
                 console.log('Getting too big! Nudge #1');
                 update = tweak_crowd_size(update);
                 update.offset = crowd.start[0];
-                return finalize();
+                return finalize(update);
             }
 
             // shift offset depending on 'loc' lock
@@ -1559,15 +1575,11 @@ export default function measure(p) {
                 update = tweak_crowd_next(update);
             }
 
-            return finalize();
+            return finalize(update);
         }
       
-        if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X) {
-            //delete measure.temp;
+        if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X)
             return;
-        } 
-
-
         
         if (Mouse.drag.mode === 'tick') {
             // 'tick' drag is dependent on zoom, so we need to gather that info first.
@@ -1613,42 +1625,13 @@ export default function measure(p) {
                 update.end += amp_lock/2;
             }
 
-            // NEED TO RETHINK THIS WHOLE SYSTEM
-            // these should be generalized to other drag modes.
-            // if START is locked
-            // change slope, preserve start
-            /*
-            if (locks & (1 << 1)) {
-                //slope += amp_lock;
-                update.end += amp_lock;
-            }
-            // if END is locked
-            // change slope, preserve end by changing start to compensate
-            else if (locks & (1 << 2)) {
-                //slope -= amp_lock;
-                update.start += amp_lock;
-            // if SLOPE is locked
-            // split change between start and end
-            } else if (locks & (1 << 4)) {
-                //slope += amp_lock/2; 
-                update.start += amp_lock/2;
-                update.end += amp_lock/2;
-            } else {
-                // right now it defaults to preserving slope
-                update.start += amp_lock/2;
-                update.end += amp_lock/2;
-                //slope += amp_lock/2; 
-                //update.start = measure.start + amp_lock/2;
-            };
-            */
-
             const SNAP_THRESH = 2.0;
             // if DIRECTION is locked
             if (locks & (1 << 3)) {
                 // flat measure can't change direction
                 if (!Window.selected.dir)
                     return;
-                let slope = update.end - update.start
+                let slope = update.end - update.start;
                 if (slope * Window.selected.dir < SNAP_THRESH) {
                     measure.temp.slope = 0;
                     if (locks & (1 << 2))
@@ -1656,39 +1639,12 @@ export default function measure(p) {
                     else if (locks & (1 << 1))
                         update.end = measure.start;
                 }
-                /*inc = (Window.selected.dir === 1) ?
-                    Math.max(inc, 0) : inc;
-                if (locks & (1 << 2))
-                    measure.temp.start = (Window.selected.dir === 1) ?
-                        Math.min(measure.temp.start, measure.end) :
-                        Math.max(measure.temp.start, measure.end);
-                        */
             };
 
 
-            //let { ms, locked, grabbed } = quickCalc(temp_start, slope, measure.timesig, { locked: beat_lock.beat, grabbed: snap });
             let calc = Window.completeCalc(update.start, update.end-update.start, measure.timesig);
             Object.assign(update, calc);
 
-            // i don't really think this is necessary, but i was going
-            // for a scale-based drag threshold. better ways to implement this.
-            /*if (Math.abs(calc.ms - measure.ms) < c.DRAG_THRESHOLD_X) {
-                measure.temp.offset = measure.offset;
-                measure.temp.start = measure.start;
-                slope = measure.end - measure.start;
-                return;
-            };
-            */
-
-
-            /*let temp_offset = locked ?
-                measure.offset + measure.beats[beat_lock.beat] - locked :
-                measure.offset;
-                */
-            /*update.offset = beat_lock.type ?
-                measure.offset + measure.beats[beat_lock.beat] - calc.beats[beat_lock.beat] :
-                update.offset;
-                */
 
             // shift offset depending on 'loc' lock
             update.offset += (!beat_lock.type || beat_lock.type === 'tempo') ?
@@ -1696,7 +1652,7 @@ export default function measure(p) {
                 measure.beats[beat_lock.beat] - update.beats[beat_lock.beat];
 
 
-            let loc = calc.beats[snap] + update.offset;
+            let loc = calc.beats[Mouse.drag.grab] + update.offset;
 
             // LEAVING OFF HERE
 
@@ -1704,7 +1660,7 @@ export default function measure(p) {
             //crowd = crowding(measure.gaps, update.offset, calc.ms);
             if (update.ms > crowd.end[0] - crowd.start[0]) {
                 update = tweak_crowd_size(update);
-                return finalize();
+                return finalize(update);
             } 
 
             // check if the adjustment crowds the previous or next measures
@@ -1713,10 +1669,10 @@ export default function measure(p) {
                 (beat_lock.beat === 0 || beat_lock.beat === measure.timesig);
             if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD && !loc_lock) {
                 update = tweak_crowd_previous(update);
-                return finalize();
+                return finalize(update);
             } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD && !loc_lock) {
                 update = tweak_crowd_next(update);
-                return finalize();
+                return finalize(update);
             }
 
             let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
@@ -1735,7 +1691,7 @@ export default function measure(p) {
                             //'rot_left' : 'rot_right'
                         0;
 
-                    let nudge = nudge_factory(measure, snap_to, snap, beat_lock, locks, type); 
+                    let nudge = nudge_factory(measure, snap_to, Mouse.drag.grab, beat_lock, locks, type); 
                     nudge_cache = nudge(gap, 0.001, 0);
                     nudge_cache.type = 5;
                 };
@@ -1743,7 +1699,7 @@ export default function measure(p) {
             } else
                 nudge_cache = false;
 
-            return finalize();
+            return finalize(update);
         }
 
     };
@@ -1756,7 +1712,6 @@ export default function measure(p) {
                 return;
             }
         }
-        console.log('NOT CANCELLING');
 
         if (Mouse.drag.mode === 'printer') {
             Mouse.resetDrag();
@@ -1768,7 +1723,7 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'lock') {
             Window.lockConfirm(Window.selected.meas, Mouse.lock_type);
-            Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
+            Mouse.resetDrag();
             return;
         }
 
@@ -1783,55 +1738,45 @@ export default function measure(p) {
             return;
         }
         
-        // handle threshold
-        /*if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X &&
-            Math.abs(Mouse.drag.y) < c.DRAG_THRESHOLD_X
-        ) {
-            if (Window.selected.meas)
-                delete Window.selected.meas.temp;
-            Mouse.resetDrag();
-            return;
-        };
-        */
-
         if (!(Window.selected.meas)) {
             Mouse.resetDrag();
             return;
         }
 
-        let measure = Window.selected.meas;
+        // process drag results
+        let selected = Window.selected.meas;
         if (Window.range.temprange) {
             Window.updateRange({ tempo: Window.range.temprange });
             delete Window.range.temprange;
         }
 
-        if (Mouse.drag.mode === 'tempo') {
-            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.temp.start, measure.temp.end, measure.beats.length - 1, measure.temp.offset);
-            if (Window.selected.meas) {
-                delete Window.selected.meas.temp;
-            }
-            Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
-            return;
-        };
+        // request that locks persist after API updateMeasure()
+        if ('locks' in selected)
+            set_lock_persist(selected.inst, selected.id, Object.assign({}, { locks:  selected.locks }));
 
-        if (Mouse.drag.mode === 'measure') {
+        if (Mouse.drag.mode === 'tempo') {
+            API.updateMeasure(selected.inst, selected.id, selected.temp.start, selected.temp.end, selected.beats.length - 1, selected.temp.offset);
+            if (selected)
+                delete Window.selected.meas.temp;
+            Mouse.resetDrag();
+        } else if (Mouse.drag.mode === 'measure') {
             if (Window.editor.type)
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
-            else
-                API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.start, measure.end, measure.beats.length - 1, measure.temp.offset);
-            Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
+            else {
+                API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.start, selected.end, selected.beats.length - 1, selected.temp.offset);
+            }
+            Mouse.resetDrag();
             return;
-        };
-
-        if (Mouse.drag.mode === 'tick') {
-            let end = measure.temp.end;
-            measure.temp.ticks = [];
-            Object.assign(Mouse.drag, { x: 0, y: 0, mode: '' });
+        } else if (Mouse.drag.mode === 'tick') {
+            let end = selected.temp.end;
+            selected.temp.ticks = [];
+            Mouse.resetDrag();
             if (end < 10)
                 return;
-            
-            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, measure.temp.start, end, measure.beats.length - 1, measure.temp.offset);
+            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.temp.start, end, selected.beats.length - 1, selected.temp.offset);
         };
+
+        return;
     }
 
     p.mouseMoved = function(event) {

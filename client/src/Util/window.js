@@ -2,7 +2,7 @@ import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
 import { crowding } from '../Util/index.js';
-import { NUM, LEFT, RIGHT, DEL, BACK } from './keycodes';
+import { NUM, LEFT, RIGHT, DEL, BACK, PERIOD } from './keycodes';
 
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     //console.log(oldMeas);
@@ -132,19 +132,24 @@ export default (p) => {
                     + num
                     + next.slice(pointer);
                 this.editor.pointers[type]++;
-                this.editor.timer = p.frameCount + (2 * 10);
+            } else if (input === PERIOD) {
+                this.editor.next[type] = 
+                    next.slice(0, pointer)
+                    + '.'
+                    + next.slice(pointer);
+                this.editor.pointers[type]++;
             } else if (input === DEL || input === BACK) {
                 if (pointer !== 0) {
                     this.editor.next[type] =
                         next.slice(0, pointer - 1)
                         + next.slice(pointer);
                     this.editor.pointers[type]--;
-                    this.editor.timer = p.frameCount + (2 * 60);
                 }
             } else if (input === LEFT)
                 this.editor.pointers[type] = Math.max(0, pointer - 1)
             else if (input === RIGHT)
                 this.editor.pointers[type] = Math.min(pointer + 1, next.length);
+            this.editor.timer = p.frameCount + (2 * 10);
         }
 
         recalc_editor() {
@@ -214,7 +219,12 @@ export default (p) => {
             }
         }
 
-        exit_editor() {
+        exit_editor(revert, reversion_cb) {
+            if (revert) {
+                delete this.editor.meas.temp;
+                this.editor.meas.cache = this.calculate_cache(this.editor.meas);
+                reversion_cb();
+            }
             this.editor = {};
         }
 
