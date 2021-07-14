@@ -41,9 +41,9 @@ export default (p) => {
                 if (p.keyCode === RIGHT)
                     return 'RIGHT';
             } else {
-                if (p.keyCode === KeyJ)
+                if (p.keyCode === KeyJ || p.keyCode === DOWN)
                     return 'DOWN';
-                if (p.keyCode === KeyK)
+                if (p.keyCode === KeyK || p.keyCode === UP)
                     return 'UP';
                 if (p.keyCode === KeyH || p.keyCode === LEFT)
                     return 'LEFT';

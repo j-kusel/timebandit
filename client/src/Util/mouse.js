@@ -29,7 +29,7 @@ export default (p, Window) => {
                 mode: '',
             };
             this.cancel = true;
-            this.rollover = {};
+            this.rollover = { type: '' };
             this._rollover = {};
             this.lock_type = null;
             this.cursor = 'default';
@@ -174,8 +174,6 @@ export default (p, Window) => {
             if (parse_bits(locked[Window.selected.meas.id].beats).length < 2 || parse_bits(locked[Window.selected.meas.id].beats).indexOf(this.rollover.beat) !== -1)
                 locked[Window.selected.meas.id].beats = bit_toggle(locked[Window.selected.meas.id].beats, this.rollover.beat);
                 */
-            if (Window.editor.type)
-                console.log(Window.editor.meas.temp);
             if (Window.locking(Window.selected.meas, this.rollover.beat))
                 this.drag.mode = 'lock';
         }

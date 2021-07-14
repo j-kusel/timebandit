@@ -18,7 +18,7 @@ import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
 import { InputGroup, FormControl, Container, Row, Col } from 'react-bootstrap';
-import { TBButton, Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Edit, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
+import { TBButton, Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
 import { ExportModal, SettingsModal, WarningModal, NewFileModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
@@ -163,8 +163,8 @@ class App extends Component {
 		  'handleTut',
 		  'handleLock',
 		  'handleNumInput',
-		  'handleNumEdit',
-		  'handleNameInput',
+		  //'handleNumEdit',
+		  //'handleNameInput',
 		  'handleOffset',
 		  'selectPPQ',
 		  'selectTempoPPQ',
@@ -176,7 +176,7 @@ class App extends Component {
 		  'save', 'load', 'upload', 'reset', 'settings',
           'printout',
 		  'handleNew', 'handleOpen',
-		  'confirmEdit',
+		  //'confirmEdit',
 		  'toggleTutorials',
 		  'toggleExports',
           'focusInsertSubmit'
@@ -610,7 +610,7 @@ class App extends Component {
       };
   };
 
-  handleNumEdit(e) {
+  /*handleNumEdit(e) {
       if (this.state.mouseBlocker())
           return;
 
@@ -650,8 +650,9 @@ class App extends Component {
           this.setState(newState);
       };
   }
+  */
 
-  confirmEdit(e) {
+  /*confirmEdit(e) {
       if (this.state.mouseBlocker())
           return;
 
@@ -667,6 +668,7 @@ class App extends Component {
           }
       });
   }
+  */
 
   handleNameInput(e) {
       if (this.state.mouseBlocker())
@@ -1108,7 +1110,7 @@ class App extends Component {
         />
     ));
 
-    let edit_inputs = ['start', 'end', 'timesig'].map((name) => 
+    /*let edit_inputs = ['start', 'end', 'timesig'].map((name) => 
         <FormInput
             id={name}
             type="text"
@@ -1120,7 +1122,7 @@ class App extends Component {
             style={{ float: 'left' }}
             onChange={this.handleNumEdit}
         />
-    );
+    );*/
 
     let instPane = <form onSubmit={this.handleInst} className="inst-form" autoComplete="off">
 			<StyledInputGroup>

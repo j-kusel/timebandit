@@ -945,7 +945,7 @@ export default function measure(p) {
             */
         };
 
-        let dir = Keyboard.checkDirection('arrows');
+        let dir = Keyboard.checkDirection();
         if (Window.selected.meas && dir) {
             if (dir === 'DOWN') {
                 if (Window.selected.inst >= instruments.length - 1)
@@ -1688,12 +1688,9 @@ export default function measure(p) {
         nudge_cache = false;
         crowd_cache = false;
 
-        if (p.mouseY < 0 || p.mouseY > p.height) {
-            Mouse.drag.mode = '';
-            return;
-        }
-        
-        if (!(Window.selected.meas)) {
+        if (!(Window.selected.meas)
+            || p.mouseY < 0 || p.mouseY > p.height
+        ) {
             Mouse.resetDrag();
             return;
         }
