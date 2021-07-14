@@ -20,7 +20,6 @@ class UI extends Component {
 
         /*
             console.log(nextProps.mode !== this.props.mode);
-            console.log(nextProps.panels !== this.props.panels);
             console.log(!_.isEqual(nextProps.insertMeas, this.props.insertMeas));
             console.log(!_.isEqual(nextProps.editMeas, this.props.editMeas));
             console.log(!_.isEqual(nextProps.API.registerTuts, this.props.API.registerTuts));
@@ -29,7 +28,7 @@ class UI extends Component {
             console.log(nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ);
         */
         if (nextProps.mode !== this.props.mode ||
-            nextProps.panels !== this.props.panels ||
+            nextProps.newInst !== this.props.newInst ||
             !_.isEqual(nextProps.insertMeas, this.props.insertMeas) ||
             !_.isEqual(nextProps.editMeas, this.props.editMeas) ||
             // does registerTuts work here?
@@ -42,8 +41,6 @@ class UI extends Component {
 
         /*if (nextProps.mode !== this.props.mode)
             {console.log('MODE'); return true;}
-        if (nextProps.panels !== this.props.panels)
-            {console.log('PANELS'); return true;}
         if (!_.isEqual(nextProps.insertMeas, this.props.insertMeas))
             {console.log('INSERTMEAS'); return true;}
 
@@ -79,7 +76,7 @@ class UI extends Component {
         return (
             <div>
                 <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} editMeas={this.props.editMeas} insertMeas={this.props.insertMeas} panels={this.props.panels} mode={this.props.mode} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} editMeas={this.props.editMeas} insertMeas={this.props.insertMeas} newInst={this.props.newInst} mode={this.props.mode} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
                 </P5Container>
             </div>
         );

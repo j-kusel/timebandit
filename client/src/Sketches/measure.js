@@ -257,9 +257,6 @@ export default function measure(p) {
 
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
-        p.background(255);
-        p.textSize(10);
-        console.log(p.textWidth('P'));
         /*input = p.createInput('');
         input.style('z-index: 1');
         input.elt.onchange = (e) => console.log('changed!', e);
@@ -281,7 +278,7 @@ export default function measure(p) {
         Window.insertMeas = props.insertMeas;
         Window.selected = props.selected || ({ inst: -1, meas: undefined });
         Window.editMeas = props.editMeas;
-        Window.panels = props.panels;
+        Window.newInst = props.newInst;
         Window.mode = props.mode;
         Window.insts = props.instruments.length;
         Object.assign(API, props.API);
@@ -734,7 +731,7 @@ export default function measure(p) {
         Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc: Window.cursor_loc, isPlaying });
         Window.drawToolbar(Window.range);
 
-        if (Window.panels) {
+        if (Window.newInst) {
             p.fill(255, 0, 0, 10);
             p.rect(0, c.PLAYBACK_HEIGHT + c.INST_HEIGHT*instruments.length - Window.scroll, p.width, c.INST_HEIGHT);
         };

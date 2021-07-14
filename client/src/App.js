@@ -1181,7 +1181,7 @@ class App extends Component {
 			measures: Object.assign({}, inst.measures), 
 			name: inst.name
 		})),
-		panels: this.state.newInst,
+		newInst: this.state.newInst,
 	  editMeas: this.state.editMeas,
 	  insertMeas: this.state.insertMeas,
 	  API: this.API,
