@@ -17,6 +17,7 @@ import _Keyboard from '../Util/keyboard.js';
 import { Debugger } from '../Util/debugger.js';
 import Printer from '../Util/printer.js';
 import keycodes from '../Util/keycodes.js';
+import { NUM, LETTERS } from '../Util/keycodes.js';
 import { /*CTRL,*/ MOD, LEFT, RIGHT, PERIOD } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
@@ -25,6 +26,7 @@ const DEBUG = process.env.NODE_ENV === 'development';
 const SLOW = process.env.NODE_ENV === 'development';
 
 var API = {};
+var input;
 
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
 //const [SHIFT, ALT] = [16, 18];
@@ -32,9 +34,6 @@ const [KeyC, KeyI, KeyV] = [67, 73, 86];
 //const [KeyH, KeyJ, KeyK, KeyL] = [72, 74, 75, 76];
 //const [KeyZ] = [90];
 //const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
-const NUM = []
-for (let i=48; i < 58; i++)
-    NUM.push(i);
 
 // generates measure.gaps in 'measure' drag mode
 var calcGaps = (measures, id) => {
@@ -257,10 +256,6 @@ export default function measure(p) {
 
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
-        /*input = p.createInput('');
-        input.style('z-index: 1');
-        input.elt.onchange = (e) => console.log('changed!', e);
-        */
     };
 
     p.windowResized = function () {
@@ -587,11 +582,41 @@ export default function measure(p) {
                     x, (Math.max(snaps.snapped_inst.origin, snaps.snapped_inst.inst) + 1)*c.INST_HEIGHT);
             };
 
-            let nameColor = p.color('rgba(0,0,0,0.25)');
+            p.push();
+            p.translate(10, c.INST_HEIGHT - 20);
+            p.textSize(12);
+
+            let MOUSE_OVER = (
+                'type' in Mouse.rollover && 
+                Mouse.rollover.type === 'instName_marking' &&
+                Mouse.rollover.inst === i_ind
+            );
+            let SAME_INST = 'inst' in Window.instName && Window.instName.inst === i_ind;
+            let name_text = inst.name;
+            let blink = false;
+
+            let textWidth;
+            if (SAME_INST) {
+                blink = (p.millis() % 1000) > 500;
+                name_text = Window.instName.next;
+                textWidth = p.textWidth(name_text.slice(0, Window.instName.pointer));
+                let boxColor = p.color(colors.accent);
+                boxColor.setAlpha(100);
+                p.stroke(boxColor);
+                p.fill(boxColor);
+                p.rect(-3, -3, textWidth + 8, 17);
+            }
+
+            let nameColor = (SAME_INST || MOUSE_OVER) ?
+                p.color(colors.accent) :
+                p.color('rgba(0,0,0,0.25)');
             p.stroke(nameColor);
             p.fill(nameColor);
             p.textAlign(p.LEFT, p.TOP);
-            p.text(inst.name, 10, c.INST_HEIGHT - 20);
+            p.text(name_text, 0, 0);
+            if (blink)
+                p.line(textWidth, 0, textWidth, 12);
+            p.pop();
             p.pop();
         });
 
@@ -864,6 +889,10 @@ export default function measure(p) {
                 //printer.clear();
                 API.printoutSet(false);
             }
+            if ('inst' in Window.instName) {
+                Window.exit_instName();
+                return;
+            }
             if (Window.editor.type) {
                 Window.exit_editor(true, gatherRanges);
                 return;
@@ -877,10 +906,16 @@ export default function measure(p) {
             return;
         };
 
-        if (Window.editor.type && ([...NUM, DEL, BACK, LEFT, RIGHT, PERIOD].indexOf(p.keyCode) > -1)) {
-            e.preventDefault();
-            Window.change_editor(p.keyCode);
-            return;
+        if ([...NUM, ...Object.keys(LETTERS).map(l => parseInt(l, 10)), DEL, BACK, LEFT, RIGHT, PERIOD].indexOf(p.keyCode) > -1) {
+            if (Window.editor.type) {
+                e.preventDefault();
+                Window.change_editor(p.keyCode);
+                return;
+            } else if ('inst' in Window.instName) {
+                e.preventDefault();
+                Window.change_instName(p.keyCode);
+                return;
+            }
         }
 
 
@@ -895,6 +930,12 @@ export default function measure(p) {
             if (Window.insertMeas.confirmed) {
                 e.preventDefault();
                 return API.enterSelecting();
+            }
+            if ('inst' in Window.instName) {
+                Window.exit_instName((instName) => {
+                    if (Window.instName.next)
+                        instruments[Window.instName.inst].name = Window.instName.next;
+                });
             }
             if (Window.editor.type) {
                 e.preventDefault();
@@ -1062,9 +1103,12 @@ export default function measure(p) {
             return;
         }
 
+        // handle editor markings
         if (Mouse.rollover.type.indexOf('marking') > -1) {
             let type = Mouse.rollover.type.split('_')[0];
-            if (Window.editor.type && Window.editor.type !== type) {
+            if (type === 'instName')
+                Window.enter_instName(Mouse.rollover.inst, instruments[Mouse.rollover.inst].name)
+            else if (Window.editor.type && Window.editor.type !== type) {
                 Window.recalc_editor();
                 Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
                 Window.editor.timer = null;
@@ -1754,8 +1798,20 @@ export default function measure(p) {
             // translating to viewport
             let frameX = p.mouseX - c.PANES_WIDTH - Window.viewport;
             let frameY = y_loc % c.INST_HEIGHT;
+            // check for inst name rollover
+            //
+            p.push();
+            p.textSize(12);
+            let nameWidth = p.textWidth(inst.name);
+            p.pop();
+            if ((frameY >= c.INST_HEIGHT - 20) &&
+                (frameX <= nameWidth + 10) &&
+                (frameY <= c.INST_HEIGHT - 12) &&
+                (frameX >= 10)
+            ) {
+                Mouse.setRollover({ type: 'instName_marking', inst: inst_row });
             // check for measure rollover
-            if (!inst.ordered.some(meas => {
+            } else if (!inst.ordered.some(meas => {
                 if ((frameX > meas.cache.offset)
                     && (frameX < meas.cache.offset + meas.cache.ms)
                 ) {

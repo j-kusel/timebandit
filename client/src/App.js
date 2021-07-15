@@ -164,7 +164,7 @@ class App extends Component {
 		  'handleLock',
 		  'handleNumInput',
 		  //'handleNumEdit',
-		  //'handleNameInput',
+		  'handleNameInput',
 		  'handleOffset',
 		  'selectPPQ',
 		  'selectTempoPPQ',

@@ -10,9 +10,12 @@ const MOD = firefox ?
     (mac ? 224 : 17) : 91;
 const [KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL, KeyZ] = [67, 73, 86, 72, 74, 75, 76, 90];
 const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
-const NUM = []
+const NUM = [];
 for (let i=48; i < 58; i++)
     NUM.push(i);
+const LETTERS = {};
+const alpha = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
+alpha.forEach((c, i) => LETTERS[i+65] = c);
 
 module.exports = {
     LEFT, UP, RIGHT, DOWN,
@@ -20,5 +23,5 @@ module.exports = {
     TAB, ENTER,
     SHIFT, ALT, SPACE, DEL, BACK, ESC, CTRL, MOD,
     KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL, KeyZ,
-    NUM
+    NUM, LETTERS
 };

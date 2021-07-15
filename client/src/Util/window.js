@@ -2,7 +2,7 @@ import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
 import { crowding } from '../Util/index.js';
-import { NUM, LEFT, RIGHT, DEL, BACK, PERIOD } from './keycodes';
+import { NUM, LETTERS, LEFT, RIGHT, DEL, BACK, PERIOD } from './keycodes';
 
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     //console.log(oldMeas);
@@ -68,6 +68,7 @@ export default (p) => {
             this.updateViewCallback = () => null;
 
             this.editor = {};
+            this.instName = {};
 
             // monkey patch selection color
             let sel_color = p.color(colors.contrast);
@@ -103,6 +104,34 @@ export default (p) => {
             return { beats, ticks, ms }
         }
 
+        enter_instName(inst, oldName) {
+            /*var input = p.createInput(oldName);
+            input.style(`
+                z-index: 1;
+                border-width: 0;
+                border: none;
+                outline: none;
+                background: transparent;
+                font-size: 12pt;
+            `);
+            input.position(10, (c.INST_HEIGHT*(inst+1))-20);
+            input.elt.onchange = (e) => console.log('changed!', e);
+            */
+
+            this.instName = {
+                inst,
+                oldName,
+                next: oldName,
+                pointer: oldName.length
+            };
+        }
+
+        exit_instName(cb) {
+            if (cb)
+                cb(this.instName);
+            this.instName = {};
+        }
+
         enter_editor(type, inst, meas) {
             let types = ['start', 'end', 'timesig'];
             if (types.indexOf(type) > -1) {
@@ -118,6 +147,41 @@ export default (p) => {
             }
             return false;
         }
+
+        change_instName(input) {
+
+            console.log(input, DEL, BACK);
+            let num = NUM.indexOf(p.keyCode);
+            let letter = LETTERS[p.keyCode];
+
+            let entry = ''
+            if (num > -1)
+                entry = num
+            else if (letter)
+                entry = letter;
+
+            let next = this.instName.next;
+            let pointer = this.instName.pointer;
+            if (entry) {
+                this.instName.next = next.slice(0, pointer)
+                    + entry
+                    + next.slice(pointer)
+                this.instName.pointer++;
+            } else if (input === DEL || input === BACK) {
+                if (pointer !== 0) {
+                    this.instName.next =
+                        next.slice(0, pointer - 1)
+                        + next.slice(pointer);
+                    this.instName.pointer--;
+                }
+            } else if (input === LEFT)
+                this.instName.pointer = Math.max(0, pointer - 1)
+            else if (input === RIGHT)
+                this.instName.pointer = Math.min(pointer + 1, next.length);
+        }
+
+
+
 
         change_editor(input) {
             let num = NUM.indexOf(p.keyCode);
