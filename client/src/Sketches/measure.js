@@ -1078,6 +1078,7 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
+        console.log(Mouse.rollover);
         let checks = [
             { name: 'API.modalCheck', func: API.modalCheck, },
             { name: 'tuts._mouseBlocker', func: tuts._mouseBlocker, },
@@ -1085,7 +1086,7 @@ export default function measure(p) {
             { name: '[buttons, core_buttons]' , func: () => [...buttons, ...core_buttons]
                 .some(click => click())
             },
-            { name: 'Mouse.checkTempo(Window.mode)', func: () => Mouse.checkTempo(Window.mode)},
+            //{ name: 'Mouse.checkTempo(Window.mode)', func: () => Mouse.checkTempo(Window.mode)},
             { name: 'Window.insertMeas.confirmed', func: () => (Window.insertMeas.confirmed)},
         ];
         Mouse.pressInit(p, checks);
@@ -1173,7 +1174,10 @@ export default function measure(p) {
                 else
                     Mouse.measureMode();
             } else if (Window.mods.mod) {
-                Mouse.beatLock();
+                if (Mouse.rollover.type === 'beat')
+                    Mouse.beatLock()
+                else if (Mouse.rollover.type === 'tempo')
+                    Mouse.checkTempo();
             }
         };
 
@@ -1260,6 +1264,7 @@ export default function measure(p) {
             }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
         const finalize = (moved) => {
+            console.log(update);
             // need a skip here to prevent unnecessary cache calculations
             if (!moved) {
                 let ranges = gatherRanges(measure.id);
@@ -1514,10 +1519,11 @@ export default function measure(p) {
         if (Mouse.drag.mode === 'tempo') {
             let spread = Window.range.tempo[1] - Window.range.tempo[0];
             let change = Mouse.drag.y / c.INST_HEIGHT * spread;
-            
+
             // can't drag a grabbed beat.
-            if (beat_lock.beat === Mouse.grabbed)
-                return;
+            // ...wait, why not?
+            /*if (beat_lock.beat === Mouse.grabbed)
+                return;*/
 
             // we need to first conditionally check the new length!
             // if nothing is tempo-locked
@@ -1535,20 +1541,30 @@ export default function measure(p) {
             // this should work for type === 'both' - DRY this up later
             } else if (beat_lock.type) {
                 // must "rotate" slope line around a preserved pivot point
+                //
+                // this new algo feels more sensible but still might be too sensitive
                 let slope = (measure.end - measure.start)/measure.timesig;
-                let new_slope = slope*Mouse.grabbed - change;
                 let pivot = slope * beat_lock.beat;
+                let new_slope = slope + change * (Mouse.grabbed >= beat_lock.beat ? -1 : 1);
+                let new_pivot = new_slope * beat_lock.beat;
+                update.start = measure.start + (pivot - new_pivot);
+                update.end = new_slope * measure.timesig + update.start;
+                /*
+                let new_slope = slope*Mouse.grabbed - change;
                 let fresh_slope = (new_slope - pivot) / (Mouse.grabbed - beat_lock.beat);
                 update.start = (new_slope + measure.start) - fresh_slope*Mouse.grabbed;
                 update.end = (fresh_slope*measure.timesig) + update.start;
+                */
 
                 // no ridiculous values... yet
                 if (update.start < 10 || update.end < 10) 
                     return;
                 
-                let calc = Window.completeCalc(update.start, fresh_slope*measure.timesig, measure.timesig);
+                let calc = Window.completeCalc(update.start, update.end - update.start, measure.timesig);
                 Object.assign(update, calc);
             }
+
+            console.log(Object.assign({}, update));
 
             
             // IS THE THING JUST TOO BIG?
@@ -1557,7 +1573,7 @@ export default function measure(p) {
                 console.log('Getting too big! Nudge #1');
                 update = tweak_crowd_size(update);
                 update.offset = crowd.start[0];
-                return finalize(update);
+                return finalize();
             }
 
             // shift offset depending on 'loc' lock
@@ -1572,7 +1588,7 @@ export default function measure(p) {
                 update = tweak_crowd_next(update);
             }
 
-            return finalize(update);
+            return finalize();
         }
       
         if (Math.abs(Mouse.drag.x) < c.DRAG_THRESHOLD_X)
@@ -1656,7 +1672,7 @@ export default function measure(p) {
             //crowd = crowding(measure.gaps, update.offset, calc.ms);
             if (update.ms > crowd.end[0] - crowd.start[0]) {
                 update = tweak_crowd_size(update);
-                return finalize(update);
+                return finalize();
             } 
 
             // check if the adjustment crowds the previous or next measures
@@ -1665,10 +1681,10 @@ export default function measure(p) {
                 (beat_lock.beat === 0 || beat_lock.beat === measure.timesig);
             if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD && !loc_lock) {
                 update = tweak_crowd_previous(update);
-                return finalize(update);
+                return finalize();
             } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD && !loc_lock) {
                 update = tweak_crowd_next(update);
-                return finalize(update);
+                return finalize();
             }
 
             let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
@@ -1695,7 +1711,7 @@ export default function measure(p) {
             } else
                 nudge_cache = false;
 
-            return finalize(update);
+            return finalize();
         }
 
     };
@@ -1749,8 +1765,8 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'tempo') {
             API.updateMeasure(selected.inst, selected.id, selected.temp.start, selected.temp.end, selected.beats.length - 1, selected.temp.offset);
-            if (selected)
-                delete Window.selected.meas.temp;
+            /*if (selected)
+                delete Window.selected.meas.temp;*/
             Mouse.resetDrag();
         } else if (Mouse.drag.mode === 'measure') {
             if (Window.editor.type)

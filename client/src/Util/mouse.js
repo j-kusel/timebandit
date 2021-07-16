@@ -178,19 +178,14 @@ export default (p, Window) => {
                 this.drag.mode = 'lock';
         }
 
-        checkTempo(mode) {
-            console.log('checking tempo', mode);
+        checkTempo() {
+            console.log('checking tempo');
             if (!Window.selected.meas)
                 return false;
-            if ((this.rollover.type === 'tempo') && (mode === 2)) {
-                this.drag.mode = 'tempo';
-                Window.initialize_temp();
-                this.drag.grab = this.rollover.beat;
-                this.grabbed = this.rollover.beat;
-                console.log(this.drag);
-                return true;
-            };
-            return false;
+            this.drag.mode = 'tempo';
+            Window.initialize_temp();
+            this.drag.grab = this.rollover.beat;
+            this.grabbed = this.rollover.beat;
         }
 
         setRollover(meta) {
