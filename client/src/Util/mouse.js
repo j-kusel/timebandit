@@ -179,7 +179,6 @@ export default (p, Window) => {
         }
 
         checkTempo() {
-            console.log('checking tempo');
             if (!Window.selected.meas)
                 return false;
             this.drag.mode = 'tempo';

@@ -213,7 +213,8 @@ export default (p) => {
                 this.editor.pointers[type] = Math.max(0, pointer - 1)
             else if (input === RIGHT)
                 this.editor.pointers[type] = Math.min(pointer + 1, next.length);
-            this.editor.timer = p.frameCount + (2 * 10);
+            this.editor.timer = this.editor.next[type] ?
+                p.frameCount + (2 * 10) : null;
         }
 
         recalc_editor() {
@@ -222,7 +223,11 @@ export default (p) => {
             let updated = Object.keys(this.editor.next).reduce(
                 (acc, key) => Object.assign(acc, { [key]: parseFloat(this.editor.next[key]) }), {});
             // check if anything's changed
-            if (['start', 'end', 'timesig'].some(p => (updated[p] !== selected[p]))) {
+            if (['start', 'end', 'timesig'].some(p => {
+                return (
+                (updated[p] !== selected[p]) &&
+                updated[p]
+            )})) {
                 var beat_lock = {};
                 if (locks && Object.keys(locks).length) {
                     let lock = Object.keys(locks)[0];
