@@ -533,7 +533,7 @@ class App extends Component {
           start: parseInt(this.state.start, 10),
           end: parseInt(this.state.end, 10),
           timesig: parseInt(this.state.timesig, 10),
-          offset: this.state.offset ? parseInt(this.state.offset, 10) : selected.ms + selected.offset,
+          offset: this.state.offset ? parseFloat(this.state.offset) : selected.ms + selected.offset,
       };
 
       var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });

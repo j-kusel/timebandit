@@ -1231,7 +1231,7 @@ export default function measure(p) {
         if (!('gaps' in measure))
             measure.gaps = calcGaps(instruments[Window.selected.inst].ordered, Window.selected.meas.id);
         if (!crowd_cache)
-            crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true });
+            crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true, context: { position: measure.offset, ms: measure.ms } });
         var crowd = crowd_cache;
 
         // initialize update
@@ -1269,7 +1269,6 @@ export default function measure(p) {
             }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
         const finalize = (moved) => {
-            console.log(update);
             // need a skip here to prevent unnecessary cache calculations
             if (!moved) {
                 let ranges = gatherRanges(measure.id);
@@ -1328,7 +1327,7 @@ export default function measure(p) {
                         snaps.snapped_inst = {};
                 };
 
-                return finalize(update, true);
+                return finalize(true);
             }
             let meas = Window.editor.type ? measure.temp : measure;
             let position = meas.offset + Mouse.drag.x/Window.scale;
@@ -1336,7 +1335,7 @@ export default function measure(p) {
 
             // determine whether start or end are closer
             // negative numbers signify conflicts
-            let crowd = crowding(measure.gaps, position, meas.ms, { center: true });
+            let crowd = crowding(measure.gaps, position, meas.ms, { center: true, context: { position: measure.offset, ms: measure.ms }});
             Object.assign(update, {
                 ticks: meas.ticks.slice(0),
                 beats: meas.beats.slice(0),
@@ -1366,7 +1365,7 @@ export default function measure(p) {
                     snaps.snapped_inst = {};
             };
             
-            return finalize(update, true);
+            return finalize(true);
         };
 
         // the following are necessary for 'tempo'/'tick' drags
@@ -1487,9 +1486,7 @@ export default function measure(p) {
                     nudge_cache.offset = crowd.start[0];
                     nudge_cache.type = 2;
                 }
-                console.log(update);
-                let a = Object.assign(update, nudge_cache);
-                console.log(a);
+                Object.assign(update, nudge_cache);
             } else 
                 update.offset = crowd.start[0];
             return update;
@@ -1568,8 +1565,6 @@ export default function measure(p) {
                 let calc = Window.completeCalc(update.start, update.end - update.start, measure.timesig);
                 Object.assign(update, calc);
             }
-
-            console.log(Object.assign({}, update));
 
             
             // IS THE THING JUST TOO BIG?
