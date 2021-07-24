@@ -12,7 +12,7 @@ export default (p, registration, API, Window, blockerSet) => {
             console.log(id);
             tut.current = id;
         },
-        highlight: { x: () => p.width/3.0, y: () => p.height/3.0, x2: () => p.width*2.0/3.0, y2: () => p.height*2.0/3.0 },
+        //highlight: { x: () => p.width/3.0, y: () => p.height/3.0, x2: () => p.width*2.0/3.0, y2: () => p.height*2.0/3.0 },
         coords: { x: () => p.width/3, y: () => p.height/3, x2: () => p.width*2/3, y2: () => p.height*2/3 },
         preparation: () => {
             API.newFile();
@@ -105,7 +105,7 @@ export default (p, registration, API, Window, blockerSet) => {
         preparation: () => {
             Window.select('clear');
             API.newFile();
-            API.newInstrument('default2');
+            API.newInstrument('default');
             API.displaySelected({ inst: 0, meas: undefined });
             API.updateMode(1);
         },

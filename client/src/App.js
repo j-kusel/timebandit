@@ -224,6 +224,17 @@ class App extends Component {
           );
           this.setState({ mouseBlocker: obj._mouseBlocker, tutorials });
       }
+      
+      var updateInst = (inst, { name } = {}) => {
+          if (inst < this.state.instruments.length) {
+              if (name)
+                  this.setState(oldState => {
+                      let instruments = oldState.instruments;
+                      instruments[inst].name = name;
+                      return { instruments };
+                  });
+          }
+      }
 
       var updateMeasure = (inst, id, start, end, timesig, offset) => {
           logger.log(`Updating measure ${id} in instrument ${inst}.`);  
@@ -438,7 +449,7 @@ class App extends Component {
           return measure;
       };
 
-      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, enterSelecting, get, deleteMeasure, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**

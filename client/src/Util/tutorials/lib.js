@@ -179,21 +179,26 @@ var init = (p, hook) => {
                 p.stroke("rgba(140, 114, 114, 0)");
                 // four boxes around 
                 // initialize functions if need be
-                let { x, y, x2, y2 } = Object.keys(this.highlight).reduce((acc, key) =>
-                    ({ ...acc, [key]: typeof(this.highlight[key]) === 'function' ?
-                        this.highlight[key]() : this.highlight[key]
-                    }),
-                {});
-                p.rect(0, 0, p.width, y);
-                p.rect(0, y, x, y2-y);
-                p.rect(x2, y, p.width-x2, y2-y);
-                p.rect(0, y2, p.width, p.height-y2);
+                if (!this.highlight)
+                    p.rect(0, 0, p.width, p.height)
+                else {
+                    let { x, y, x2, y2 } = Object.keys(this.highlight).reduce((acc, key) =>
+                        ({ ...acc, [key]: typeof(this.highlight[key]) === 'function' ?
+                            this.highlight[key]() : this.highlight[key]
+                        }),
+                    {});
+                    p.rect(0, 0, p.width, y);
+                    p.rect(0, y, x, y2-y);
+                    p.rect(x2, y, p.width-x2, y2-y);
+                    p.rect(0, y2, p.width, p.height-y2);
 
-                ({ x, y, x2, y2 } = Object.keys(this.coords).reduce((acc, key) =>
-                    ({ ...acc, [key]: typeof(this.coords[key]) === 'function' ?
-                        this.coords[key]() : this.coords[key]
-                    }),
-                {}));
+                    ({ x, y, x2, y2 } = Object.keys(this.coords).reduce((acc, key) =>
+                        ({ ...acc, [key]: typeof(this.coords[key]) === 'function' ?
+                            this.coords[key]() : this.coords[key]
+                        }),
+                    {}));
+                }
+                p.pop();
 
                 /*
                 p.translate(x, y);
@@ -288,21 +293,6 @@ var init = (p, hook) => {
             this.description = desc;
             return this;
         }
-
-        /* DEPRECATED
-        mouseChecker() {
-            return (!this.current) ||
-                (p.mouseX > this.current.highlight.x()
-                && p.mouseX < this.current.highlight.x2()
-                && p.mouseY > this.current.highlight.y()
-                && p.mouseY < this.current.highlight.y2()) ||
-                (p.mouseX > this.current.coords.x()
-                && p.mouseX < this.current.coords.x2()
-                && p.mouseY > this.current.coords.y()
-                && p.mouseY < this.current.coords.y2())
-        }
-        */
-
 
     }
 

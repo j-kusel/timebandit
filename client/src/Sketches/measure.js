@@ -99,7 +99,10 @@ export default function measure(p) {
     var lock_persist = () => null;
     var reset_lock_persist = () => lock_persist = (() => console.log('not set'));
     var set_lock_persist = (inst, id, locks) =>
-        lock_persist = () => Object.assign(instruments[inst].measures[id], locks);
+        lock_persist = () =>
+            inst < instruments.length ?
+                Object.assign(instruments[inst].measures[id], locks) : null;
+                            
 
     var gatherRanges = (except) =>
         instruments.reduce((acc, inst) => {
@@ -268,6 +271,8 @@ export default function measure(p) {
         console.log('REDRAWING');
 
         instruments = props.instruments;
+        if (instruments.length)
+            console.log(instruments[0].name);
         lock_persist();
         reset_lock_persist();
         Window.insertMeas = props.insertMeas;
@@ -932,10 +937,13 @@ export default function measure(p) {
                 return API.enterSelecting();
             }
             if ('inst' in Window.instName) {
+                e.preventDefault();
                 Window.exit_instName((instName) => {
                     if (Window.instName.next)
-                        instruments[Window.instName.inst].name = Window.instName.next;
+                        API.updateInst(Window.instName.inst, { name: Window.instName.next });
+                        //instruments[Window.instName.inst].name = Window.instName.next;
                 });
+                return;
             }
             if (Window.editor.type) {
                 e.preventDefault();
@@ -1067,6 +1075,8 @@ export default function measure(p) {
 
         // if zooming, recalculate location cache
         if (zoom) {
+            if ('beats' in Window.insertMeas)
+                Window.insertMeas.cache = calculate_insertMeas_cache(Window.insertMeas);
             instruments.forEach(inst => {
                 inst.ordered.forEach(meas =>
                     meas.cache = Window.calculate_cache(('temp' in meas) ? meas.temp : meas)
@@ -1078,7 +1088,6 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
-        console.log(Mouse.rollover);
         let checks = [
             { name: 'API.modalCheck', func: API.modalCheck, },
             { name: 'tuts._mouseBlocker', func: tuts._mouseBlocker, },
@@ -1812,7 +1821,8 @@ export default function measure(p) {
         if (inst_row < instruments.length && inst_row >= 0) {
             let inst = instruments[inst_row];
             // translating to viewport
-            let frameX = p.mouseX - c.PANES_WIDTH - Window.viewport;
+            let X = p.mouseX - c.PANES_WIDTH;
+            let frameX = X - Window.viewport;
             let frameY = y_loc % c.INST_HEIGHT;
             // check for inst name rollover
             //
@@ -1821,9 +1831,9 @@ export default function measure(p) {
             let nameWidth = p.textWidth(inst.name);
             p.pop();
             if ((frameY >= c.INST_HEIGHT - 20) &&
-                (frameX <= nameWidth + 10) &&
+                (X <= nameWidth + 10) &&
                 (frameY <= c.INST_HEIGHT - 12) &&
-                (frameX >= 10)
+                (X >= 10)
             ) {
                 Mouse.setRollover({ type: 'instName_marking', inst: inst_row });
             // check for measure rollover

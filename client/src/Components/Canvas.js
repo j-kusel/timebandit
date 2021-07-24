@@ -54,22 +54,23 @@ class UI extends Component {
         if (nextProps.CONSTANTS.PPQ !== this.props.CONSTANTS.PPQ)
         {console.log('CONSTANTS'); return true;}
         */
+
+        // OR assignment short-circuits all expensive equality checks
+        // ...but CREATE REACT APP DOESN'T INCLUDE @babel/process-env!! never mind
         let flag = false;
-        nextProps.instruments.forEach((inst, index) => {
-            if (Object.keys(inst.measures).length !== Object.keys(this.props.instruments[index].measures).length)
-                flag = true;
-            Object.keys(inst.measures).forEach((key) => {
-                if (!(key in this.props.instruments[index].measures)) {
-                    flag = true;
-                } else {
-                    ['start', 'end', 'offset', 'timesig'].forEach((attr) => {
-                        if (inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr])
-                            flag = true;
-                    });
-                };
-            })
+        return nextProps.instruments.some((inst, index) => {
+            let oldInst = this.props.instruments[index];
+            flag = flag || (inst.name !== oldInst.name);
+            flag = flag || (Object.keys(inst.measures).length !== Object.keys(oldInst.measures).length);
+            flag = flag || Object.keys(inst.measures).some((key) => {
+                flag = flag || (!(key in this.props.instruments[index].measures));
+                flag = flag || ['start', 'end', 'offset', 'timesig'].some((attr) =>
+                    inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr]
+                );
+                return flag;
+            });
+            return flag;
         });
-        return flag;
     };
 
     render() {

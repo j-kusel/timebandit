@@ -14,12 +14,10 @@ var crowding = (gaps, position, ms, { center=false, strict=false, context=false,
         context.ms : ms;
 
     if (context_final <= gaps[0][1]) {
-        console.log('first ', final, gaps[0][1]);
         return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
     }
     let last_gap = gaps.slice(-1)[0];
     if (offset > last_gap[0]) {
-        console.log('last');
         return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
     }
         
