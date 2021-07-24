@@ -322,7 +322,6 @@ class App extends Component {
       };
 
       var newFile = () => {
-          console.log('newFile');
           self.setState({
               selected: { inst: -1, meas: undefined },
               instruments: [],
@@ -427,7 +426,11 @@ class App extends Component {
       var newInstrument = (name) =>
           this.setState(oldState => {
               let instruments = oldState.instruments;
-              instruments.push({ name, measures: {}, audioId: uuidv4() });
+              let audioId = uuidv4();
+              let frequency = instruments.length ?
+                  audio.getFrequency(instruments[instruments.length-1].audioId) * 2 : 440;
+              audio.newInst(audioId, { type: 'sine', frequency })
+              instruments.push({ name, measures: {}, audioId });
               return ({ instruments });
           });
 
@@ -959,11 +962,7 @@ class App extends Component {
 
       this.setState((oldState) => 
           ({ 
-              instruments:
-                  [{
-                      name: 'default',
-                      measures: {}
-                  }],
+              instruments: [],
               PPQ: this.state.reservePPQ,
               PPQ_tempo: this.state.reservePPQ_tempo,
               PPQ_mod: this.state.reservePPQ / this.state.reservePPQ_tempo,

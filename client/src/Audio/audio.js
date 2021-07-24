@@ -93,6 +93,7 @@ class _AudioInst {
 }
 
 const newInst = (id, options) => {
+    console.log('creating new Inst ', id);
     insts[id] = new _AudioInst(id, options);
 };
 

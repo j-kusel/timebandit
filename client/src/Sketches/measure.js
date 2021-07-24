@@ -146,7 +146,8 @@ export default function measure(p) {
     var insertMeasSelecting = () => {
         let x_loc = x_to_ms(p.mouseX - c.PANES_WIDTH);
         if (Window.mode === 1) {
-            let inst = Math.floor(0.01*(p.mouseY - c.PLAYBACK_HEIGHT));
+            let inst = Math.floor(0.01*(p.mouseY - c.PLAYBACK_HEIGHT - Window.scroll));
+            Window.insertMeas.inst = inst;
             if (inst < instruments.length && inst >= 0) {
                 let crowd = crowding(instruments[inst].gap_cache, x_loc, Window.insertMeas.ms, { strict: true, center: true });
                 let crowd_start = crowd.start[0];
@@ -160,6 +161,7 @@ export default function measure(p) {
                 else
                     Window.insertMeas.temp_offset = x_loc;
                 Window.insertMeas.cache.offset = Window.ms_to_x(Window.insertMeas.temp_offset);
+
             }
         }
     }
@@ -688,20 +690,13 @@ export default function measure(p) {
         p.line(p.mouseX-c.PANES_WIDTH, 0, p.mouseX-c.PANES_WIDTH, c.INST_HEIGHT*instruments.length);
         
         // INSERT MODE
-        if (Window.mode === 1) {
-            let inst = Math.floor(0.01*(p.mouseY-c.PLAYBACK_HEIGHT));
-            // if placing/placed measure with the mouse
-            if (API.pollSelecting() || ('temp_offset' in Window.insertMeas)) {
-                if (inst < instruments.length && inst >= 0) {
-                    p.push();
-                    p.translate(Window.insertMeas.cache.offset, inst*c.INST_HEIGHT);
-                    p.rect(0, 0, Window.insertMeas.cache.ms, c.INST_HEIGHT);
-                    p.stroke(255, 0, 0);
-                    if ('beats' in Window.insertMeas)
-                        Window.insertMeas.cache.beats.forEach(beat => p.line(beat, 0, beat, c.INST_HEIGHT));
-                    p.pop();
-                }
-            }
+        if (Window.mode === 1 && 'beats' in Window.insertMeas) {
+            p.push();
+            p.translate(Window.insertMeas.cache.offset, Window.insertMeas.inst*c.INST_HEIGHT);
+            p.rect(0, 0, Window.insertMeas.cache.ms, c.INST_HEIGHT);
+            p.stroke(255, 0, 0);
+            Window.insertMeas.cache.beats.forEach(beat => p.line(beat, 0, beat, c.INST_HEIGHT));
+            p.pop();
         };
 
         if (DEBUG) {
@@ -1096,7 +1091,7 @@ export default function measure(p) {
                 .some(click => click())
             },
             //{ name: 'Mouse.checkTempo(Window.mode)', func: () => Mouse.checkTempo(Window.mode)},
-            { name: 'Window.insertMeas.confirmed', func: () => (Window.insertMeas.confirmed)},
+            //{ name: 'Window.insertMeas.confirmed', func: () => (Window.insertMeas.confirmed)},
         ];
         Mouse.pressInit(p, checks);
 
@@ -1128,7 +1123,6 @@ export default function measure(p) {
             return;
         }
 
-        let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
 
 
         // printing mode
@@ -1164,13 +1158,15 @@ export default function measure(p) {
             return;
         }
 
-        if (API.pollSelecting() && !Mouse.select('inst')) {
-            API.confirmSelecting(inst, Window.insertMeas.temp_offset);
+        if (API.pollSelecting() /*&& !Mouse.select('inst')*/) {
+            console.log('confirming');
+            //Window.insertMeas.inst = inst;
+            API.confirmSelecting(Window.insertMeas.inst, Window.insertMeas.temp_offset);
             e.preventDefault();
-            Window.insertMeas.inst = inst;
             return;
         }
 
+        let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
         if (inst >= instruments.length || inst < 0)
             return;
 
