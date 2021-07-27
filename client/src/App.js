@@ -520,13 +520,15 @@ class App extends Component {
       e.preventDefault();
       if (this.state.mouseBlocker())
           return;
-      if (this.state.selected.inst === undefined) {
-          alert('select an instrument first!');
-          return;
-      }
            
       let inst = (this.state.insertInst >= 0) ?
           this.state.insertInst : this.state.selected.inst;
+
+      if (inst === undefined) {
+          alert('select an instrument first!');
+          return;
+      }
+
       
       let selected = this.state.selected.meas;
       let newMeasure = {
