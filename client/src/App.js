@@ -728,7 +728,7 @@ class App extends Component {
           // an unfortunate by-product of the midi protocol.
 
           // this works so well it should be adapted to the independent export!
-          let tick_perc = this.state.PPQ / 1000.0; // Parts-Per-Quarter (per beat) / 1000ms per beat
+          let tick_perc = this.state.PPQ / (60000.0 / 300); // Parts-Per-Quarter (per beat) / 1000ms per beat
 
           let extremes = this.state.instruments.reduce((acc, inst) => {
               Object.keys(inst.measures).forEach(key => {
@@ -746,7 +746,7 @@ class App extends Component {
               // iterate through measures, adding offsets
               let last = 0; 
               let beats = [];
-              let tempi = [{ tempo: 60, timesig: 4 }];
+              let tempi = [{ tempo: 300, timesig: 4 }];
 
               order_by_key(inst.measures, 'offset').forEach((meas, m_ind) => {
                   // calculate number of ticks to rest for first beat
@@ -784,7 +784,6 @@ class App extends Component {
               return ({ tempi, beats, name: inst.name });
           });
 
-          console.log(tracks);
           midi(tracks, this.state.PPQ, this.state.PPQ_tempo);
           return;
       }
@@ -818,11 +817,15 @@ class App extends Component {
                   let gap = meas.offset - (last.offset + last.ms);
                   if (gap > CONFIG.DELTA_THRESHOLD) {
                       // in the future, may want to use 300BPM instead of last.end for greater accuracy
-                      delta = parseInt((last.end / 60000.0) * gap * this.state.PPQ, 10);
-                      acc.push({ delta, tempo: last.end });
+                      let gap_tempo = /*last.end*/ 300;
+                      delta = parseInt((gap_tempo / 60000.0) * gap * this.state.PPQ, 10);
+                      acc.push({ delta, tempo: gap_tempo });
                       // if we're not adding final beats of measures, need to delay first measure after gaps
                       // by one "beat" (PPQ);
                       delta += this.state.PPQ;
+
+                      // testing a gap offset correction here
+                      delta -= 1;
                   }
               } else {
                   // or default to ? bpm for initial gap
@@ -853,11 +856,10 @@ class App extends Component {
           
           beats.push({ duration: 'T1', pitch: ['C4'], wait: rest });
           tempi.push({ tempo: last.end });
-          console.log(tempi);
-          console.log(beats);
           return ({ tempi, beats, name: inst.name });
       });
       
+      console.log(tracks);
       midi(tracks, this.state.PPQ, this.state.PPQ_tempo);
 
   };
