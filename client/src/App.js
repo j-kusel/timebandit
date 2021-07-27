@@ -479,10 +479,15 @@ class App extends Component {
       if (this.state.mouseBlocker())
           return;
 
+      let audioId = uuidv4();
+      let frequency = this.state.instruments.length ?
+          audio.getFrequency(this.state.instruments[this.state.instruments.length-1].audioId) * 2 : 440;
+      audio.newInst(audioId, { type: 'sine', frequency })
+
       let newInst = {
           name: this.state.instName,
           measures: {},
-          audioId: uuidv4()
+          audioId
       }
 
       this.setState((oldState) => {
