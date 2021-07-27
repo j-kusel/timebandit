@@ -99,6 +99,7 @@ export default (p, Window) => {
                 }
 
                 new_select.meas = this.rollover.meas;
+                console.log(this.rollover.meas);
 
                 if (type && type === 'beat')
                     new_select.beat = this.rollover.beat;

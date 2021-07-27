@@ -273,6 +273,7 @@ export default function measure(p) {
         console.log('REDRAWING');
 
         instruments = props.instruments;
+            
         if (instruments.length)
             console.log(instruments[0].name);
         lock_persist();
@@ -1190,6 +1191,7 @@ export default function measure(p) {
     }
 
     p.mouseDragged = function(event) {
+        console.log(Window.selected.meas);
         Mouse.drag.x = p.mouseX - p.mouseDown.x;
         Mouse.drag.y = p.mouseY - p.mouseDown.y;
 
@@ -1242,6 +1244,7 @@ export default function measure(p) {
             end: measure.end
         };
 
+
         // find snap point closest to a position in other instruments
         var closest = (position, inst, div) =>
             Object.keys(snaps.divs[div]).reduce((acc, key, ind, keys) => {
@@ -1281,9 +1284,7 @@ export default function measure(p) {
             measure.temp.invalid = {};
             let cache = Window.calculate_cache(measure.temp);
             Object.assign(measure, { cache });
-            let tempo_cache = Window.calculate_tempo_cache(measure, cache);
 
-            Object.assign(measure.cache, tempo_cache);
             //API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
             return;
         };
@@ -1581,8 +1582,11 @@ export default function measure(p) {
                 (measure.ms - update.ms)/2 : 
                 measure.beats[beat_lock.beat] - update.beats[beat_lock.beat];
 
+            console.log(update.offset);
+
             // check if the adjustment crowds the previous or next measures
             if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD) {
+                //console.log(update.offset, crowd.start[0]);
                 update = tweak_crowd_previous(update);
             } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD) {
                 update = tweak_crowd_next(update);
@@ -1772,6 +1776,7 @@ export default function measure(p) {
             if (Window.editor.type)
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
             else {
+                console.log(Window.selected.meas.id);
                 API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.start, selected.end, selected.beats.length - 1, selected.temp.offset);
             }
             Mouse.resetDrag();
