@@ -501,7 +501,6 @@ export default (p) => {
         }
 
         updateRange(new_range) {
-            console.log(new_range);
             Object.assign(this.range, new_range);
             this.rangeRefresh();
         }
@@ -898,6 +897,7 @@ export default (p) => {
                 delete this.selected.meas.temp;
             }
             Object.assign(this.selected, newSelected);
+            //this.selected = newSelected;
             return true;
         }
      

@@ -274,12 +274,11 @@ export default function measure(p) {
 
         instruments = props.instruments;
             
-        if (instruments.length)
-            console.log(instruments[0].name);
         lock_persist();
         reset_lock_persist();
         Window.insertMeas = props.insertMeas;
-        Window.selected = props.selected || ({ inst: -1, meas: undefined });
+        //console.log(Window.selected.meas === Mouse.rollover.meas);
+        //Window.selected = props.selected || ({ inst: -1, meas: undefined });
         Window.editMeas = props.editMeas;
         Window.newInst = props.newInst;
         Window.mode = props.mode;
@@ -365,6 +364,7 @@ export default function measure(p) {
         // calculate beat visual locations for all measures
         instruments.forEach(inst => {
             inst.ordered.forEach(meas => {
+                console.log(meas === inst.measures[meas.id]);
                 meas.cache = Window.calculate_cache(meas);
             });
         });
@@ -445,6 +445,9 @@ export default function measure(p) {
                 let cache = measure.cache;
                 var [ticks, beats, offset, ms] = 
                     [cache.ticks, cache.beats, cache.offset, cache.beats.slice(-1)[0]];
+                if (Mouse.rollover.meas && Mouse.rollover.meas.id === key)
+                    Debug.push(`${cache.offset}`);
+
                 var [graph] = [cache.graph];
 
 
@@ -1191,7 +1194,6 @@ export default function measure(p) {
     }
 
     p.mouseDragged = function(event) {
-        console.log(Window.selected.meas);
         Mouse.drag.x = p.mouseX - p.mouseDown.x;
         Mouse.drag.y = p.mouseY - p.mouseDown.y;
 
@@ -1236,13 +1238,6 @@ export default function measure(p) {
             crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true, context: { position: measure.offset, ms: measure.ms } });
         var crowd = crowd_cache;
 
-        // initialize update
-        var update = {
-            beats: [], ticks: [],
-            offset: measure.offset,
-            start: measure.start,
-            end: measure.end
-        };
 
 
         // find snap point closest to a position in other instruments
@@ -1271,7 +1266,17 @@ export default function measure(p) {
                 return acc;
             }, { index: -1, target: Infinity, gap: Infinity, inst: -1 });
 
+
+        // initialize update
+        var update = {
+            beats: [], ticks: [],
+            offset: measure.offset,
+            start: measure.start,
+            end: measure.end
+        };
+
         const finalize = (moved) => {
+
             // need a skip here to prevent unnecessary cache calculations
             if (!moved) {
                 let ranges = gatherRanges(measure.id);
@@ -1281,6 +1286,7 @@ export default function measure(p) {
                 Window.updateRange({ temprange });
             }
             Object.assign(measure.temp, update);
+        
             measure.temp.invalid = {};
             let cache = Window.calculate_cache(measure.temp);
             Object.assign(measure, { cache });
@@ -1291,11 +1297,13 @@ export default function measure(p) {
 
         // if we're just dragging measures, we have all we need now.
         if (Mouse.drag.mode === 'measure') {
-            // initialize update
-            if ('temp' in measure)
-                Object.assign(update, _.pick(measure.temp, ['offset', 'start', 'end']));
 
             if (Window.editor.type) {
+
+                // initialize update
+                if ('temp' in measure)
+                    Object.assign(update, _.pick(measure.temp, ['offset', 'start', 'end']));
+
                 let position = Window.editor.temp_offset + Mouse.drag.x/Window.scale;
                 let temp = measure.temp;
                 let close = snap_eval(position, measure.beats);
@@ -1336,13 +1344,19 @@ export default function measure(p) {
 
             // determine whether start or end are closer
             // negative numbers signify conflicts
-            let crowd = crowding(measure.gaps, position, meas.ms, { center: true, context: { position: measure.offset, ms: measure.ms }});
+            //
+            // i think context here was to solve an invalidation display
+            // problem when using the editor because the crowding algorithm
+            // is still broken
+            let crowd = crowding(measure.gaps, position, meas.ms, { center: true/*, context: { position: measure.offset, ms: measure.ms }*/});
             Object.assign(update, {
                 ticks: meas.ticks.slice(0),
                 beats: meas.beats.slice(0),
                 offset: position
             });
-
+            console.log(position);
+            
+            console.log(update.offset);
             // initialize flag to prevent snapping when there's no space anyways
             let check_snap = true;
             if (Math.abs(crowd.start[1]) < Math.abs(crowd.end[1])) {
@@ -1479,6 +1493,8 @@ export default function measure(p) {
         const tweak_crowd_previous = (update) => {
             console.log("Crowding previous measure! Nudge #2");
             if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
+                if (beat_lock.beat === 0)
+                    return update;
                 if (!nudge_cache || nudge_cache.type !== 2) {
                     measure.temp.offset = crowd.start[0];
                     let rot = update.offset > crowd.start[0] ? 'rot_left' : 'rot_right';
@@ -1497,6 +1513,8 @@ export default function measure(p) {
             console.log("Crowding next measure! Nudge #3");
             // check for interference with the next measure
             if (beat_lock.type === 'loc' || beat_lock.type === 'both') {
+                if (beat_lock.beat === measure.timesig)
+                    return update;
                 if (!nudge_cache || nudge_cache.type !== 3) {
                     measure.temp.offset = update.offset;
                     // the strategy here is to lock the standard beat, 
@@ -1547,11 +1565,17 @@ export default function measure(p) {
                 //
                 // this new algo feels more sensible but still might be too sensitive
                 let slope = (measure.end - measure.start)/measure.timesig;
-                let pivot = slope * beat_lock.beat;
-                let new_slope = slope + change * (Mouse.grabbed >= beat_lock.beat ? -1 : 1);
-                let new_pivot = new_slope * beat_lock.beat;
-                update.start = measure.start + (pivot - new_pivot);
-                update.end = new_slope * measure.timesig + update.start;
+                let slope_change = change * (Mouse.grabbed >= beat_lock.beat ? -1 : 1);
+
+                if (beat_lock.beat === 0)
+                    update.end += slope_change
+                else {
+                    let new_slope = slope + slope_change;
+                    let pivot = slope * beat_lock.beat;
+                    let new_pivot = new_slope * beat_lock.beat;
+                    update.start = measure.start + (pivot - new_pivot);
+                    update.end = new_slope * measure.timesig + update.start;
+                }
                 /*
                 let new_slope = slope*Mouse.grabbed - change;
                 let fresh_slope = (new_slope - pivot) / (Mouse.grabbed - beat_lock.beat);
@@ -1582,11 +1606,9 @@ export default function measure(p) {
                 (measure.ms - update.ms)/2 : 
                 measure.beats[beat_lock.beat] - update.beats[beat_lock.beat];
 
-            console.log(update.offset);
 
             // check if the adjustment crowds the previous or next measures
             if (update.offset < crowd.start[0] + c.SNAP_THRESHOLD) {
-                //console.log(update.offset, crowd.start[0]);
                 update = tweak_crowd_previous(update);
             } else if (update.offset + update.ms > crowd.end[0] - c.SNAP_THRESHOLD) {
                 update = tweak_crowd_next(update);
@@ -1721,6 +1743,8 @@ export default function measure(p) {
     };
 
     p.mouseReleased = function(event) {
+
+        console.log(Window.selected.meas === Mouse.rollover.meas);
         p.mouseDown = false;
         if (Mouse.cancel) {
             Mouse.cancel = false;
