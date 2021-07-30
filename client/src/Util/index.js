@@ -13,11 +13,14 @@ var crowding = (gaps, position, ms, { center=false, strict=false, context=false,
     let context_ms = context ?
         context.ms : ms;
 
-    if (context_final <= gaps[0][1]) {
+    // changing the criteria for first/last -
+    // this seems to work well for editor validation but we may
+    // still have problems down the line
+    if (context_final <= gaps[0][1] || offset <= gaps[0][1]) {
         return { start: [-Infinity, Infinity], end: [gaps[0][1], gaps[0][1] - (final)] };
     }
     let last_gap = gaps.slice(-1)[0];
-    if (offset > last_gap[0]) {
+    if (offset > last_gap[0] || context_final > last_gap[0]) {
         return { start: [last_gap[0], position - last_gap[0]], end: [Infinity, Infinity] };
     }
         
@@ -28,8 +31,6 @@ var crowding = (gaps, position, ms, { center=false, strict=false, context=false,
                 return acc;
             let start = [gap[0], position - gap[0]];
             let end = [gap[1], gap[1] - final];
-
-            // attempt 3: is the start or end 
 
             // trying something new... base closest gap on the center of the given spread,
             // in relation to the start or end of available gaps.

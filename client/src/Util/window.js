@@ -314,6 +314,7 @@ export default (p) => {
 
 
             let crowd = crowding(meas.gaps, offset, ms, { strict: true, impossible: true });
+            console.log(crowd);
 
             // is measure too big?
             let gap = crowd.end[0] - crowd.start[0];

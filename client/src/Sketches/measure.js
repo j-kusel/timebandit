@@ -947,8 +947,17 @@ export default function measure(p) {
             if (Window.editor.type) {
                 e.preventDefault();
                 
-                // THIS NEEDS CROWDING VALIDATION
                 let selected = Window.editor.meas;
+
+                // force calculation/validation if timer still running
+                if (Window.editor.timer) {
+                    Window.editor.timer = null;
+                    Window.recalc_editor();
+                    Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
+                }
+
+                if ('start' in selected.temp.invalid || 'end' in selected.temp.invalid)
+                    return;
                 let updated = Object.keys(Window.editor.next).reduce(
                     (acc, key) => Object.assign(acc, { [key]: parseFloat(Window.editor.next[key]) }), {});
                 updated.offset = Window.editor.temp_offset;
@@ -1354,9 +1363,7 @@ export default function measure(p) {
                 beats: meas.beats.slice(0),
                 offset: position
             });
-            console.log(position);
             
-            console.log(update.offset);
             // initialize flag to prevent snapping when there's no space anyways
             let check_snap = true;
             if (Math.abs(crowd.start[1]) < Math.abs(crowd.end[1])) {
