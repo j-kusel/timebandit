@@ -144,9 +144,10 @@ export default (p, Window) => {
         tickMode() {
             let measure = Window.selected.meas;
             Window.initialize_temp();
+            let divisor = measure.denom/4;
             this.grabbed = this.rollover.beat === measure.beats.length - 1 ?
                 60000.0/measure.beats.slice(-1)[0]
-                : 60000.0/(measure.ticks[(this.rollover.beat * Window.CONSTANTS.PPQ)]);
+                : 60000.0/(measure.ticks[(this.rollover.beat * Window.CONSTANTS.PPQ / divisor)]);
             Window.selected.dir = (measure.end > measure.start) ?
                 1 : ((measure.start > measure.end) ?
                     -1 : 0);

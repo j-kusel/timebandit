@@ -236,13 +236,14 @@ class App extends Component {
           }
       }
 
-      var updateMeasure = (inst, id, start, end, timesig, offset) => {
+      var updateMeasure = (inst, id, start, end, timesig, denom, offset) => {
           logger.log(`Updating measure ${id} in instrument ${inst}.`);  
           let oldMeas = this.state.instruments[inst].measures[id];
           
 
           offset = (typeof offset === 'number') ? offset : oldMeas.offset;
-          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+          var calc = MeasureCalc({ start, end, timesig, offset, denom}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+          console.log(calc);
 
           // preserve locks
           if ('locks' in oldMeas)
@@ -265,7 +266,6 @@ class App extends Component {
                   );
 
               instruments[inst].measures[id] = newMeas;
-              console.log(newMeas);
               return { instruments, ordered: ordered_cpy, selected: { inst, meas: newMeas } };
           });
       };
@@ -540,6 +540,7 @@ class App extends Component {
           start: parseInt(this.state.start, 10),
           end: parseInt(this.state.end, 10),
           timesig: parseInt(this.state.timesig, 10),
+          denom: parseInt(this.state.denom, 10),
           offset: this.state.offset ? parseFloat(this.state.offset) : selected.ms + selected.offset,
       };
 
@@ -555,8 +556,6 @@ class App extends Component {
           calc.beats.forEach((beat) =>
               newOrdered = ordered.tree.insert(beat + newMeasure.offset, instruments[inst].measures[id], newOrdered)
           );
-          console.log(oldState.ordered);
-          console.log(newOrdered);
           return {
               ordered: newOrdered,
               instruments,
@@ -611,7 +610,7 @@ class App extends Component {
           };
           Object.assign(newMeas, { [e.target.name]: intVal });
 
-          let insertMeas = (['start', 'end', 'timesig'].reduce((acc, i) => acc && newMeas[i], true)) ?
+          let insertMeas = (['start', 'end', 'timesig', 'denom'].reduce((acc, i) => acc && newMeas[i], true)) ?
               MeasureCalc(
                   newMeas, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
               ) :
@@ -1116,7 +1115,7 @@ class App extends Component {
     //var cursor = timeToChrono(this.state.cursor);
 
     
-    let measure_inputs = ['start', 'end', 'timesig'].map(name => (
+    let measure_inputs = ['start', 'end', 'timesig', 'denom'].map(name => (
         <FormInput
             type="text"
             key={name}

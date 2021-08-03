@@ -84,16 +84,18 @@ export default (p) => {
          * }
          */
 
-        completeCalc(start, slope, timesig) {
-            let tick_total = timesig * this.CONSTANTS.PPQ;
+        completeCalc(start, slope, timesig, denom) {
+            let divisor = denom/4;
+            let tick_total = timesig * this.CONSTANTS.PPQ / divisor;
             let inc = slope/tick_total;
             let last = 0;
             let ms = 0;
             var PPQ_mod = this.CONSTANTS.PPQ / this.CONSTANTS.PPQ_tempo;
+            let local_PPQ = this.CONSTANTS.PPQ / divisor;
             let beats = [];
             let ticks = [];
             for (let i=0; i<tick_total; i++) {
-                if (!(i%this.CONSTANTS.PPQ))
+                if (!(i%local_PPQ))
                     beats.push(ms);
                 ticks.push(ms);
                 if (i%PPQ_mod === 0) 
@@ -643,7 +645,8 @@ export default (p) => {
                 ticks: sel.ticks,
                 beats: sel.beats,
                 offset: sel.offset,
-                timesig: sel.timesig
+                timesig: sel.timesig,
+                denom: sel.denom
             };
 
             let cache = this.calculate_cache(sel);/*{
@@ -655,7 +658,7 @@ export default (p) => {
             */
 
             Object.assign(this.selected.meas, { cache });
-            Object.assign(this.selected.meas.cache, this.calculate_tempo_cache(sel, cache));
+            //Object.assign(this.selected.meas.cache, this.calculate_tempo_cache(sel, cache));
 
         }
 

@@ -59,21 +59,25 @@ var crowding = (gaps, position, ms, { center=false, strict=false, context=false,
 }
 
 var MeasureCalc = (features, options) => {
-    let start, end, timesig;
+    let start, end, timesig, denom;
     let PPQ, PPQ_tempo;
-    ({ start, end, timesig } = features);
+    ({ start, end, timesig, denom } = features);
+    if (!denom)
+        denom = 4;
     ({ PPQ, PPQ_tempo } = options);
     var ms;
     var beats = [];
     var ticks = [];
-    let tick_num = options.PPQ * timesig;
+    let divisor = denom/4;
+    let tick_num = options.PPQ * (timesig/divisor);
     let cumulative = 0.0;
     let inc = (end-start)/tick_num;
     let K = 60000.0 / PPQ;
     let PPQ_mod = PPQ / PPQ_tempo;
+    let local_PPQ = PPQ/divisor;
     let last = 0;
     for (var i=0; i < tick_num; i++) {
-        if (!(i%PPQ))
+        if (!(i%local_PPQ))
             beats.push(cumulative);
         ticks.push(cumulative);
         if (i%PPQ_mod === 0)
@@ -83,7 +87,7 @@ var MeasureCalc = (features, options) => {
     ms = cumulative;
     beats.push(ms);
 
-    return {start, end, timesig, beats, ms, ticks, offset: features.offset};
+    return {start, end, timesig, denom, beats, ms, ticks, offset: features.offset};
 }
 
 var order_by_key = (obj, key) => {

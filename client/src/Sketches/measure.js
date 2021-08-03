@@ -195,40 +195,43 @@ export default function measure(p) {
 
     // calculates only tempo change ticks.
     // returns beats/tempo ticks and requested individual ticks according to key
-    var quickCalc = (start, slope, timesig, extract) => {
+    var quickCalc = (start, slope, timesig, denom, extract) => {
         // tick_array is the total number of tempo updates for the measure
+        var divisor = denom/4;
         var tick_array = Array.from({
-            length: timesig * Window.CONSTANTS.PPQ_tempo
+            length: timesig * Window.CONSTANTS.PPQ_tempo / divisor
         }, (__, i) => i);
 
+        /* original 4/4 algorithm - DO NOT DELETE
+         * var K = 60000.0 * timesig / slope;
+         * var sigma = (n) => 1.0 / ((start * Window.CONSTANTS.PPQ_tempo  * K / 60000.0) + n);
+         */
+
+        // new algorithm essentially doubles, quadruples, etc. start and slope
+        slope *= divisor;
         var K = 60000.0 * timesig / slope;
         var sigma = (n) => 1.0 / ((start * Window.CONSTANTS.PPQ_tempo * K / 60000.0) + n);
+
+
         // convert extractions to ticks
         if (extract === undefined)
             extract = {};
         let extract_tick_locations = Object.keys(extract)
             .reduce((acc, key) => 
-                ({ ...acc, [extract[key] * Window.CONSTANTS.PPQ_tempo]: key })
+                ({ ...acc, [extract[key] * Window.CONSTANTS.PPQ_tempo / divisor]: key })
             , {});
 
         let returned = { beats: [], ticks: [] };
-        // why was there a length conditional here for an object?
+
         returned.ms = K * tick_array.reduce((sum, i) => {
             if (i in extract_tick_locations)
                 returned[extract_tick_locations[i]] = sum*K;
             return sum + sigma(i);
         }, 0);
         // catch last beat
-        // ... wait wtf does this even do
         if (tick_array.length in extract_tick_locations)
             returned[extract_tick_locations[tick_array.length]] = returned.ms;
 
-        // default snap target to end if nowhere else
-        // ####### this seems like it could be unpredictable behavior, not sure if i like it
-        // ####### commenting out for now!
-        /*if (!('snapped' in returned)) 
-            returned.snapped = returned.ms;
-            */
         return returned;
     };
 
@@ -490,7 +493,7 @@ export default function measure(p) {
                 };
 
                 // draw timesig
-                Window.drawTimesig(measure.timesig, '4', measure);
+                Window.drawTimesig(measure.timesig, measure.denom, measure);
 
                 // draw beats
                 beats.forEach((beat, index) => {
@@ -968,7 +971,7 @@ export default function measure(p) {
 
                 Window.exit_editor();
                 set_lock_persist(updated.inst, selected.id, Object.assign({}, { locks: selected.locks }));
-                API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.offset);
+                API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.denom, updated.offset);
                 return;
             }
         }
@@ -1413,7 +1416,7 @@ export default function measure(p) {
             let nudge = (gap, alpha, depth, even) => {
                 if (depth > 99 || Math.abs(gap) < c.NUDGE_THRESHOLD) {
                     // last full calculation
-                    let calc = Window.completeCalc(start, slope, measure.timesig);
+                    let calc = Window.completeCalc(start, slope, measure.timesig, measure.denom);
                     ms = calc.ms;
                     return { start, end, slope, offset, ms, beats: calc.beats, ticks: calc.ticks, snap };
                 }
@@ -1450,7 +1453,7 @@ export default function measure(p) {
                         end -= adjust;
                     }
                 }
-                let calc = quickCalc(start, slope, measure.timesig, calc_extracts);
+                let calc = quickCalc(start, slope, measure.timesig, measure.denom, calc_extracts);
                 let { locked, snapped } = calc;
 
                 if (typeof(locked) === 'number') {// && beat_lock.type === 'loc')
@@ -1469,6 +1472,7 @@ export default function measure(p) {
                 ms = calc.ms;
                 
                 let new_gap = snapped + offset - target;
+                console.log(gap, new_gap, snapped + offset, target);
                 alpha = monitor(gap, new_gap, alpha);
                 return nudge(new_gap, alpha, depth + 1, even);
             }
@@ -1564,7 +1568,7 @@ export default function measure(p) {
                 if (update.start < 10 || update.end < 10) 
                     return;
 
-                let calc = Window.completeCalc(update.start, update.end-update.start, measure.timesig);
+                let calc = Window.completeCalc(update.start, update.end-update.start, measure.timesig, measure.denom);
                 Object.assign(update, calc);
             // this should work for type === 'both' - DRY this up later
             } else if (beat_lock.type) {
@@ -1594,7 +1598,7 @@ export default function measure(p) {
                 if (update.start < 10 || update.end < 10) 
                     return;
                 
-                let calc = Window.completeCalc(update.start, update.end - update.start, measure.timesig);
+                let calc = Window.completeCalc(update.start, update.end - update.start, measure.timesig, measure.denom);
                 Object.assign(update, calc);
             }
 
@@ -1638,6 +1642,7 @@ export default function measure(p) {
                 Mouse.grabbed/Math.abs(slope);
 
             let amp_lock = beatscale/perc;
+            console.log(Mouse.grabbed, slope);
 
             if (beat_lock.type === 'tempo' || beat_lock.type === 'both') {
                 /* tick dragging with a tempo lock presents a problem -
@@ -1669,6 +1674,7 @@ export default function measure(p) {
                 update.start += amp_lock/2;
                 update.end += amp_lock/2;
             }
+            console.log(update.start, update.end);
 
             const SNAP_THRESH = 2.0;
             // if DIRECTION is locked
@@ -1687,7 +1693,7 @@ export default function measure(p) {
             };
 
 
-            let calc = Window.completeCalc(update.start, update.end-update.start, measure.timesig);
+            let calc = Window.completeCalc(update.start, update.end-update.start, measure.timesig, measure.denom);
             Object.assign(update, calc);
 
 
@@ -1799,7 +1805,7 @@ export default function measure(p) {
             set_lock_persist(selected.inst, selected.id, Object.assign({}, { locks:  selected.locks }));
 
         if (Mouse.drag.mode === 'tempo') {
-            API.updateMeasure(selected.inst, selected.id, selected.temp.start, selected.temp.end, selected.beats.length - 1, selected.temp.offset);
+            API.updateMeasure(selected.inst, selected.id, selected.temp.start, selected.temp.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             /*if (selected)
                 delete Window.selected.meas.temp;*/
             Mouse.resetDrag();
@@ -1808,7 +1814,7 @@ export default function measure(p) {
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
             else {
                 console.log(Window.selected.meas.id);
-                API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.start, selected.end, selected.beats.length - 1, selected.temp.offset);
+                API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.start, selected.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             }
             Mouse.resetDrag();
             return;
@@ -1818,7 +1824,7 @@ export default function measure(p) {
             Mouse.resetDrag();
             if (end < 10)
                 return;
-            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.temp.start, end, selected.beats.length - 1, selected.temp.offset);
+            //API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
         };
 
         return;
