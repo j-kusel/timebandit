@@ -1642,7 +1642,6 @@ export default function measure(p) {
                 Mouse.grabbed/Math.abs(slope);
 
             let amp_lock = beatscale/perc;
-            console.log(Mouse.grabbed, slope);
 
             if (beat_lock.type === 'tempo' || beat_lock.type === 'both') {
                 /* tick dragging with a tempo lock presents a problem -
@@ -1674,7 +1673,6 @@ export default function measure(p) {
                 update.start += amp_lock/2;
                 update.end += amp_lock/2;
             }
-            console.log(update.start, update.end);
 
             const SNAP_THRESH = 2.0;
             // if DIRECTION is locked
@@ -1757,7 +1755,6 @@ export default function measure(p) {
 
     p.mouseReleased = function(event) {
 
-        console.log(Window.selected.meas === Mouse.rollover.meas);
         p.mouseDown = false;
         if (Mouse.cancel) {
             Mouse.cancel = false;
@@ -1813,7 +1810,6 @@ export default function measure(p) {
             if (Window.editor.type)
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
             else {
-                console.log(Window.selected.meas.id);
                 API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.start, selected.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             }
             Mouse.resetDrag();
@@ -1824,7 +1820,7 @@ export default function measure(p) {
             Mouse.resetDrag();
             if (end < 10)
                 return;
-            //API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
+            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
         };
 
         return;
