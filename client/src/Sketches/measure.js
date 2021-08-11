@@ -1910,6 +1910,10 @@ export default function measure(p) {
                             (frameXmeas < beat + c.ROLLOVER_TOLERANCE)
                         ) {
                             Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind });
+                            if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
+                                let beat_tempo = (meas.end - meas.start)/meas.timesig * ind + meas.start;
+                                Window.editor_hover(beat_tempo.toString());
+                            }
                             return true;
                         } else if (ind < meas.cache.beats.length-1) { // last beat has no "graph"
                             // translating to tempo graph segment
