@@ -533,8 +533,8 @@ export default function measure(p) {
                     if ('meas' in Window.editor && Window.editor.meas.id === measure.id) {
                         let next = Window.editor.next[mark];
                         text[0] = next; 
-                        if (Window.editor.hover_next)
-                            text[0] = Window.editor.hover_next;
+                        if (Window.editor.hover_next_number)
+                            text[0] = Window.editor.hover_next_number.toString();
                         if (Window.editor.type === mark) {
                             p.textSize(c.TEMPO_PT + 2);
 
@@ -584,6 +584,7 @@ export default function measure(p) {
                 }
 
             });
+
 
             // draw all conflict boxes
             conflicts.forEach(func => func());
@@ -645,6 +646,29 @@ export default function measure(p) {
                 let yloc = inst * c.INST_HEIGHT - Window.scroll;
                 p.line(xloc, yloc, xloc, yloc + c.INST_HEIGHT);
             });
+
+        // draw editor hover information
+        if (Window.editor.type && Window.editor.hover_next_string) {
+            if ('type' in Mouse.rollover) {
+                p.push();
+                let rollover_color = p.color(colors.primary);
+                rollover_color.setAlpha(100);
+                p.stroke(rollover_color);
+                p.fill(rollover_color);
+
+                // these are identical for now, but text should adapt
+                // to avoid collisions with tempo line in the future
+                if (Mouse.rollover.type === 'tempo') {
+                    p.textAlign(p.LEFT, p.BOTTOM);
+                    p.text(Window.editor.hover_next_string, p.mouseX, p.mouseY);
+                } else if (Mouse.rollover.type === 'beat') {
+                    p.textAlign(p.LEFT, p.BOTTOM);
+                    p.text(Window.editor.hover_next_string, p.mouseX, p.mouseY);
+                }
+                p.pop();
+            }
+        }
+
 
 
         // draw editor frame
@@ -972,6 +996,7 @@ export default function measure(p) {
                 updated.inst = Window.editor.inst;
 
                 Window.exit_editor();
+                console.log(updated);
                 set_lock_persist(updated.inst, selected.id, Object.assign({}, { locks: selected.locks }));
                 API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.denom, updated.offset);
                 return;
@@ -1119,7 +1144,7 @@ export default function measure(p) {
 
         // all editor mode functions should be grouped together here.
         // confirming hover?
-        if (Window.editor.type && Window.editor.hover_next) {
+        if (Window.editor.type && Window.editor.hover_next_number) {
             Window.editor_confirm_hover();
             return;
         }
@@ -1912,7 +1937,7 @@ export default function measure(p) {
                             Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind });
                             if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                 let beat_tempo = (meas.end - meas.start)/meas.timesig * ind + meas.start;
-                                Window.editor_hover(beat_tempo.toString());
+                                Window.editor_hover(beat_tempo);
                             }
                             return true;
                         } else if (ind < meas.cache.beats.length-1) { // last beat has no "graph"
@@ -1930,7 +1955,7 @@ export default function measure(p) {
                                         let target_tick = Math.round(perc * Window.CONSTANTS.PPQ) + ind*Window.CONSTANTS.PPQ;
                                         // should the user be able to select the tempo graph of the edited measure?
                                         let hover_tempo = (target_tick * (meas.end - meas.start) / meas.ticks.length) + meas.start;
-                                        Window.editor_hover(hover_tempo.toString());
+                                        Window.editor_hover(hover_tempo);
                                     }
                                     return true;
                                 }

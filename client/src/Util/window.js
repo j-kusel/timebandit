@@ -138,28 +138,36 @@ export default (p) => {
             let types = ['start', 'end', 'timesig'];
             if (types.indexOf(type) > -1) {
                 let next = {};
-                let hover_next = null;
+                let hover_next_number = null;
+                let hover_next_string = null;
                 let pointers = {};
                 types.forEach(t => {
                     let str = meas[t].toString();
                     next[t] = str;
                     pointers[t] = str.length;
                 });
-                this.editor = { type, inst, meas, next, hover_next, pointers, timer: null, temp_offset: meas.offset };
+                this.editor = { type, inst, meas, next, hover_next_number, hover_next_string, pointers, timer: null, temp_offset: meas.offset };
                 return true;
             }
             return false;
         }
 
         editor_hover(tempo) {
-            this.editor.hover_next = tempo;
-            if (tempo && (this.editor.pointers[this.editor.type] > tempo.length - 1))
-                this.editor.pointers[this.editor.type] = tempo.length - 1;
+            if (typeof tempo !== 'number') {
+                this.editor.hover_next_number = null;
+                this.editor.hover_next_string = null;
+                return;
+            }
+            this.editor.hover_next_number = tempo;
+            this.editor.hover_next_string = tempo.toFixed(2).toString();
+            let str_len = tempo.toString().length - 1;
+            if (this.editor.pointers[this.editor.type] > str_len)
+                this.editor.pointers[this.editor.type] = str_len;
         }
 
         editor_confirm_hover() {
-            if (this.editor.hover_next) {
-                this.editor.next[this.editor.type] = this.editor.hover_next;
+            if (this.editor.hover_next_number) {
+                this.editor.next[this.editor.type] = this.editor.hover_next_number.toString();
                 this.start_editor_timer();
             }
         }
