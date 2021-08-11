@@ -138,21 +138,33 @@ export default (p) => {
             let types = ['start', 'end', 'timesig'];
             if (types.indexOf(type) > -1) {
                 let next = {};
+                let hover_next = null;
                 let pointers = {};
                 types.forEach(t => {
                     let str = meas[t].toString();
                     next[t] = str;
                     pointers[t] = str.length;
                 });
-                this.editor = { type, inst, meas, next, pointers, timer: null, temp_offset: meas.offset };
+                this.editor = { type, inst, meas, next, hover_next, pointers, timer: null, temp_offset: meas.offset };
                 return true;
             }
             return false;
         }
 
-        change_instName(input) {
+        editor_hover(tempo) {
+            this.editor.hover_next = tempo;
+            if (tempo && (this.editor.pointers[this.editor.type] > tempo.length - 1))
+                this.editor.pointers[this.editor.type] = tempo.length - 1;
+        }
 
-            console.log(input, DEL, BACK);
+        editor_confirm_hover() {
+            if (this.editor.hover_next) {
+                this.editor.next[this.editor.type] = this.editor.hover_next;
+                this.start_editor_timer();
+            }
+        }
+
+        change_instName(input) {
             let num = NUM.indexOf(p.keyCode);
             let letter = LETTERS[p.keyCode];
 
@@ -215,9 +227,13 @@ export default (p) => {
                 this.editor.pointers[type] = Math.max(0, pointer - 1)
             else if (input === RIGHT)
                 this.editor.pointers[type] = Math.min(pointer + 1, next.length);
-            this.editor.timer = this.editor.next[type] ?
-                p.frameCount + (2 * 10) : null;
+            this.editor.next[type] ? this.start_editor_timer() : this.start_editor_timer(true);
         }
+
+        start_editor_timer(clear) {
+            this.editor.timer = clear ? null : p.frameCount + (2 * 10);
+        }
+
 
         recalc_editor() {
             let locks = this.editor.meas.locks;
@@ -257,7 +273,7 @@ export default (p) => {
                 console.log(this.editor.next);
                 console.log(next);
                 let slope = next.end - next.start;
-                let calc = this.completeCalc(next.start, slope, next.timesig);
+                let calc = this.completeCalc(next.start, slope, next.timesig, this.editor.meas.denom);
                 Object.assign(calc, next); 
 
                 // check for 'loc' locking and adjust offset

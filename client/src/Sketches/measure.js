@@ -533,6 +533,8 @@ export default function measure(p) {
                     if ('meas' in Window.editor && Window.editor.meas.id === measure.id) {
                         let next = Window.editor.next[mark];
                         text[0] = next; 
+                        if (Window.editor.hover_next)
+                            text[0] = Window.editor.hover_next;
                         if (Window.editor.type === mark) {
                             p.textSize(c.TEMPO_PT + 2);
 
@@ -541,11 +543,11 @@ export default function measure(p) {
                             if (blink > 500) {
                                 p.push();
                                 p.stroke(0);
-                                let w = p.textWidth(next.slice(0, Window.editor.pointer))
+                                let w = p.textWidth(text[0].slice(0, Window.editor.pointer))
                                     + m.text[1];
                                 // correct for 'end' textAlign
                                 if (ind)
-                                    w -= p.textWidth(next);
+                                    w -= p.textWidth(text[0]);
                                 let bound = cache.bounding[ind];
                                 p.line(w, bound[1] - 2, w, bound[3] - 2);
                                 p.pop();
@@ -1116,6 +1118,12 @@ export default function measure(p) {
             return;
 
         // all editor mode functions should be grouped together here.
+        // confirming hover?
+        if (Window.editor.type && Window.editor.hover_next) {
+            Window.editor_confirm_hover();
+            return;
+        }
+
         // quitting editor?
         if (Window.editor.type && (
             !('meas' in Mouse.rollover) || !(Mouse.rollover.meas.id === Window.editor.meas.id)
@@ -1123,6 +1131,9 @@ export default function measure(p) {
             Window.exit_editor(true, gatherRanges);
             return;
         }
+
+        
+
 
         // handle editor markings
         if (Mouse.rollover.type.indexOf('marking') > -1) {
@@ -1842,6 +1853,10 @@ export default function measure(p) {
             return false;
         }
 
+        // if editor is open, reset any hover selection
+        if (Window.editor.type)
+            Window.editor_hover(null);
+
 
         // checking for rollover.
         // which instrument?
@@ -1905,6 +1920,14 @@ export default function measure(p) {
                                     frameY < y + c.ROLLOVER_TOLERANCE
                                 ) {
                                     Mouse.setRollover({ type: 'tempo', inst: inst_row, meas, beat: ind });
+                                    if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
+                                        let spread = meas.cache.beats[ind + 1] - beat;
+                                        let perc = (frameXmeas - beat)/spread;
+                                        let target_tick = Math.round(perc * Window.CONSTANTS.PPQ) + ind*Window.CONSTANTS.PPQ;
+                                        // should the user be able to select the tempo graph of the edited measure?
+                                        let hover_tempo = (target_tick * (meas.end - meas.start) / meas.ticks.length) + meas.start;
+                                        Window.editor_hover(hover_tempo.toString());
+                                    }
                                     return true;
                                 }
                             }
