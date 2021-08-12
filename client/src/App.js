@@ -95,6 +95,8 @@ class App extends Component {
           offset: '',
           instName: '',
           temp_offset: '',
+          temp_start: '',
+          temp_end: '',
           scale: 1,
           viewport: 0,
           time: 0,
@@ -391,6 +393,9 @@ class App extends Component {
                       newState[x] = '';
                       newState['edit_'.concat(x)] = '';
                   });
+
+                  newState.temp_start = false;
+                  newState.temp_end = false;
                   newState.temp_offset = false;
                   newState.editMeas = {};
               //}
@@ -398,8 +403,11 @@ class App extends Component {
           };
       };
 
-      var pollSelecting = () => (!!this.state.temp_offset);
-      var confirmSelecting = (inst, offset) => {
+      var pollSelecting = (type) => {
+          return (!!this.state.['temp_' + type]);
+      };
+
+      var confirmSelecting = (type, inst, offset) => {
           console.log('confirmed ', inst);
           this.setState(
               (oldState) => {
@@ -551,6 +559,8 @@ class App extends Component {
           let id = uuidv4();
           instruments[inst].measures[id] = { ...calc, id, inst };
           let [start, end, timesig, offset] = ['', '', '', ''];
+          let temp_start = false;
+          let temp_end = false;
           let temp_offset = false;
           let newOrdered = Object.assign(oldState.ordered, {});
           calc.beats.forEach((beat) =>
@@ -561,7 +571,8 @@ class App extends Component {
               instruments,
               insertMeas: {},
               mode: 0,
-              start, end, timesig, offset, temp_offset
+              start, end, timesig, offset,
+              temp_start, temp_end, temp_offset
           };
       });
   };
@@ -698,12 +709,22 @@ class App extends Component {
   };
 
 
+  handleStart(focus, e) {
+      if (this.state.mouseBlocker())
+          return;
+    this.setState({ temp_start: focus });
+  }
+  handleEnd(focus, e) {
+      if (this.state.mouseBlocker())
+          return;
+    this.setState({ temp_end: focus });
+  }
   handleOffset(focus, e) {
       if (this.state.mouseBlocker())
           return;
-
     this.setState({ temp_offset: focus });
   }
+
 
   selectTempoPPQ(eventKey) {
       document.activeElement.blur();
@@ -1114,8 +1135,23 @@ class App extends Component {
   render() {
     //var cursor = timeToChrono(this.state.cursor);
 
+    let measure_inputs_1 = ['start', 'end'].map(name => {
+        let cap_name = name.charAt(0).toUpperCase() + name.slice(1);
+        return (<FormInput
+            type="text"
+            key={name}
+            value={this.state[name]}
+            ref={this['insertFocus' + cap_name]}
+            id={name + 'Insert'}
+            placeholder={this.state[name] || (this.state.['temp_' + name] && this.state.cursor) || name}
+            name={name}
+            onFocus={(e) => this['handle' + cap_name](true, e)}
+            onBlur={(e) => this['handle' + cap_name](false, e)}
+            onChange={this.handleNumInput}
+        />)
+    });
     
-    let measure_inputs = ['start', 'end', 'timesig', 'denom'].map(name => (
+    let measure_inputs_2 = ['timesig', 'denom'].map(name => (
         <FormInput
             type="text"
             key={name}
@@ -1127,6 +1163,8 @@ class App extends Component {
             onChange={this.handleNumInput}
         />
     ));
+
+
 
     /*let edit_inputs = ['start', 'end', 'timesig'].map((name) => 
         <FormInput
@@ -1270,7 +1308,8 @@ class App extends Component {
                 <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }>
                     <form onSubmit={this.handleMeasure} className="measure-form" autoComplete="off">
                       <StyledInputGroup>
-                        {measure_inputs}
+                        {measure_inputs_1}
+                        {measure_inputs_2}
                         <FormInput
                             type="text"
                             key="offset"

@@ -66,6 +66,8 @@ export default (p) => {
             this.printTemp = {};
 
             this.updateViewCallback = () => null;
+            this.POLL_FLAG = null;
+            this.modulation = null;
 
             this.editor = {};
             this.instName = {};
@@ -170,6 +172,10 @@ export default (p) => {
                 this.editor.next[this.editor.type] = this.editor.hover_next_number.toString();
                 this.start_editor_timer();
             }
+        }
+
+        set_polling_flag(type) {
+            this.POLL_FLAG = type || null;
         }
 
         change_instName(input) {
@@ -1003,6 +1009,58 @@ export default (p) => {
                 p.fill(colors.selected_inst);
             p.rect(0, 0, p.width-1, c.INST_HEIGHT-1);
             p.pop();
+        }
+
+        drawModWheel(rollover) {
+            let ro = this.modulation || rollover;
+            p.push();
+            let tempo = (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
+            p.translate(ro.meas.cache.beats[ro.beat] + ro.meas.cache.offset, (ro.inst + 0.5)*c.INST_HEIGHT);
+            p.fill(primary);
+            p.stroke(primary);
+            if (this.modulation)
+                p.fill(secondary);
+            p.rect(-10, -10, 20, 20);
+            p.fill(secondary);
+            p.stroke(secondary);
+            if (this.modulation) {
+                p.fill(primary);
+                p.stroke(primary);
+            }
+
+            p.textAlign(p.CENTER, p.CENTER);
+            p.text(Math.round(tempo), 0, 0);
+            if (this.modulation) { 
+                p.push();
+                    p.strokeCap(p.SQUARE);
+                    p.strokeWeight(20);
+                    p.stroke(primary);
+                    p.noFill();
+                    p.arc(-20, 0, 80, 80, p.HALF_PI, -p.HALF_PI);
+                    p.arc(20, 0, 80, 80, -p.HALF_PI, p.HALF_PI);
+                    p.strokeWeight(18);
+                    p.stroke(secondary);
+                    let EDGE_BUFFER = p.PI * 0.01;
+                    let FIFTH_PI = p.PI * 0.2;
+
+                    for (let segment=0; segment<5; segment++) {
+                        let start = p.HALF_PI + segment * FIFTH_PI;
+                        p.arc(-20, 0, 80, 80, start + EDGE_BUFFER, start + FIFTH_PI - EDGE_BUFFER);
+                    }
+                p.pop();
+            }
+            p.pop();
+        }
+
+        set_modulation(meta) {
+
+            this.modulation = meta ?
+                Object.assign(meta, { origin: 
+                    { 
+                        x: meta.meas.cache.beats[meta.beat] + meta.meas.cache.offset + c.PANES_WIDTH,
+                        y: (meta.inst + 0.5)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
+                    }
+                }) : null;
         }
 
         _scaleY(input, height, range) {

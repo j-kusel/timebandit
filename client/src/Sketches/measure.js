@@ -583,9 +583,10 @@ export default function measure(p) {
                         });
                 }
 
+
             });
 
-
+            
             // draw all conflict boxes
             conflicts.forEach(func => func());
 
@@ -636,6 +637,10 @@ export default function measure(p) {
             p.pop();
             p.pop();
         });
+
+        if (Window.modulation || (Window.POLL_FLAG && Mouse.rollover.type === 'beat'))
+            Window.drawModWheel(Mouse.rollover);
+
 
         // draw snaps
         p.stroke(100, 255, 100);
@@ -996,7 +1001,6 @@ export default function measure(p) {
                 updated.inst = Window.editor.inst;
 
                 Window.exit_editor();
-                console.log(updated);
                 set_lock_persist(updated.inst, selected.id, Object.assign({}, { locks: selected.locks }));
                 API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.denom, updated.offset);
                 return;
@@ -1121,7 +1125,7 @@ export default function measure(p) {
                 )
             })
         }
-        if (API.pollSelecting())
+        if (API.pollSelecting('offset'))
             insertMeasSelecting();
     };
 
@@ -1155,6 +1159,18 @@ export default function measure(p) {
         )) {
             Window.exit_editor(true, gatherRanges);
             return;
+        }
+
+        // polling mode functions
+        if (Window.POLL_FLAG && Mouse.rollover.type === 'beat') {
+            // check bounding box
+            let frameY = p.mouseY - c.PLAYBACK_HEIGHT - Mouse.rollover.inst*c.INST_HEIGHT;
+            let half_height = c.INST_HEIGHT * 0.5;
+            if (frameY > half_height - 15 && frameY < half_height + 15)
+                Mouse.pollMode();
+            e.preventDefault();
+            return;
+
         }
 
         
@@ -1210,10 +1226,10 @@ export default function measure(p) {
             return;
         }
 
-        if (API.pollSelecting() /*&& !Mouse.select('inst')*/) {
+        if (API.pollSelecting('offset') /*&& !Mouse.select('inst')*/) {
             console.log('confirming');
             //Window.insertMeas.inst = inst;
-            API.confirmSelecting(Window.insertMeas.inst, Window.insertMeas.temp_offset);
+            API.confirmSelecting('offset', Window.insertMeas.inst, Window.insertMeas.temp_offset);
             e.preventDefault();
             return;
         }
@@ -1245,6 +1261,42 @@ export default function measure(p) {
         Mouse.drag.x = p.mouseX - p.mouseDown.x;
         Mouse.drag.y = p.mouseY - p.mouseDown.y;
 
+        // for metric modulation menu
+        if (Window.modulation) {
+            let meas = Window.modulation.meas;
+            let source = Window.modulation.origin.x;
+            if (Math.abs(p.mouseX - source) < 20)
+                return;
+
+            // offset from center
+            let target;
+            if (p.mouseX < source) {
+                source -= 20;
+                target = 'indexLeft';
+            } else {
+                source += 20;
+                target = 'indexRight';
+            }
+                let dist = p.dist(source, Window.modulation.origin.y, p.mouseX, p.mouseY)
+                if (dist > 30 && dist < 50) {
+                    let theta = p.atan((p.mouseY - Window.modulation.origin.y)/(p.mouseX - source));
+                    console.log(theta);
+                    if (theta <= 1.5 && theta >= -1.5) {
+                        let clamp_ratio = 5/3;
+                        let index = Math.floor((theta+1.5) * clamp_ratio)
+                        // invert option indices, depending on side
+                        Window.modulation[target] = (target === 'indexLeft') ? 4-index : index;
+                        //console.log(Window.modulation);
+                    }
+                    return;
+                }
+            /*} else {
+                source +=20;
+
+            }*/
+        }
+
+
         // printer drag
         if (Mouse.drag.mode === 'printer') {
             Window.printAdjust({ end: x_to_ms(p.mouseX) });
@@ -1275,6 +1327,7 @@ export default function measure(p) {
         // can't drag if nothing selected
         if (!(Window.selected.meas))
             return;
+
 
 
 
@@ -1871,12 +1924,13 @@ export default function measure(p) {
 
         Window.updateCursorLoc();
 
-        if (API.pollSelecting()) {
+        if (API.pollSelecting('offset')) {
             insertMeasSelecting();
             API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale, { insertMeas: Window.insertMeas.temp_offset });
             // return without changing rollover??
             return false;
         }
+
 
         // if editor is open, reset any hover selection
         if (Window.editor.type)
@@ -1938,6 +1992,11 @@ export default function measure(p) {
                             if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                 let beat_tempo = (meas.end - meas.start)/meas.timesig * ind + meas.start;
                                 Window.editor_hover(beat_tempo);
+                            } else {
+                                // this is a bad place to set the polling flag, but let's go with it for now
+                                let POLL_FLAG = (API.pollSelecting('start') && 'start')
+                                    || (API.pollSelecting('end') && 'end');
+                                Window.set_polling_flag(POLL_FLAG);
                             }
                             return true;
                         } else if (ind < meas.cache.beats.length-1) { // last beat has no "graph"

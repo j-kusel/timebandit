@@ -1,6 +1,7 @@
 //import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { bit_toggle, parse_bits } from './index.js';
+import _ from 'lodash';
 
 /*var drag_cursors = {
     'tempo': 'ns-resize',
@@ -163,6 +164,10 @@ export default (p, Window) => {
             if (!(Window.editor.type && ('temp' in Window.editor.meas)))
                 Window.initialize_temp();
             this.drag.mode = 'measure';
+        }
+
+        pollMode() {
+            Window.set_modulation(Object.assign({}, _.pick(this.rollover, ['beat', 'inst', 'meas'])));
         }
 
         beatLock() {
