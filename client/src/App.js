@@ -407,6 +407,12 @@ class App extends Component {
           return (!!this.state.['temp_' + type]);
       };
 
+      var confirmPoll = (type, result) => {
+          console.log(type, result);
+          // ADD TEMP BACK HERE TO CHANGE PLACEHOLDER BEFORE MOUSE RELEASE
+          this.setState({ [/*'temp_' + */type]: result });
+      };
+
       var confirmSelecting = (type, inst, offset) => {
           console.log('confirmed ', inst);
           this.setState(
@@ -460,7 +466,7 @@ class App extends Component {
           return measure;
       };
 
-      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**

@@ -1263,8 +1263,8 @@ export default function measure(p) {
 
         // for metric modulation menu
         if (Window.modulation) {
-            let meas = Window.modulation.meas;
             let source = Window.modulation.origin.x;
+            // skip if wheel not within reach
             if (Math.abs(p.mouseX - source) < 20)
                 return;
 
@@ -1280,20 +1280,17 @@ export default function measure(p) {
                 let dist = p.dist(source, Window.modulation.origin.y, p.mouseX, p.mouseY)
                 if (dist > 30 && dist < 50) {
                     let theta = p.atan((p.mouseY - Window.modulation.origin.y)/(p.mouseX - source));
-                    console.log(theta);
                     if (theta <= 1.5 && theta >= -1.5) {
                         let clamp_ratio = 5/3;
-                        let index = Math.floor((theta+1.5) * clamp_ratio)
+                        let index = Math.floor((theta+1.5) * clamp_ratio);
+                        let old_index = Window.modulation[target];
                         // invert option indices, depending on side
                         Window.modulation[target] = (target === 'indexLeft') ? 4-index : index;
-                        //console.log(Window.modulation);
+                        if ((!old_index) || (old_index !== Window.modulation[target]))
+                            Window.calc_metric_modulation();
                     }
                     return;
                 }
-            /*} else {
-                source +=20;
-
-            }*/
         }
 
 
@@ -1863,6 +1860,16 @@ export default function measure(p) {
         if (Mouse.drag.mode === 'lock') {
             Window.lockConfirm(Window.selected.meas, Mouse.lock_type);
             Mouse.resetDrag();
+            return;
+        }
+
+        if (Mouse.drag.mode === 'modulation') {
+            let next = Window.modulation.next || Window.modulation.base;
+            Window.set_modulation();
+            if (API.pollSelecting('start')) 
+                API.confirmPoll('start', next)
+            else if (API.pollSelecting('end'))
+                API.confirmPoll('end', next);
             return;
         }
 

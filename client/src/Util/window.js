@@ -108,6 +108,19 @@ export default (p) => {
             return { beats, ticks, ms }
         }
 
+        calc_metric_modulation() {
+            if (this.modulation && 'indexLeft' in this.modulation && 'indexRight' in this.modulation) {
+                let base = this.modulation.base;
+                console.log(this.modulation);
+                this.modulation.next = base / Math.pow(2, this.modulation.indexLeft) * Math.pow(2, this.modulation.indexRight);
+                console.log(this.modulation.next);
+                return;
+            }
+            if ('next' in this.modulation)
+                delete this.modulation.next;
+            return null;
+        }
+
         enter_instName(inst, oldName) {
             /*var input = p.createInput(oldName);
             input.style(`
@@ -1014,13 +1027,16 @@ export default (p) => {
         drawModWheel(rollover) {
             let ro = this.modulation || rollover;
             p.push();
-            let tempo = (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
+            let tempo = this.modulation ? (this.modulation.next || this.modulation.base) : (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
             p.translate(ro.meas.cache.beats[ro.beat] + ro.meas.cache.offset, (ro.inst + 0.5)*c.INST_HEIGHT);
+
+            // base tempo button
             p.fill(primary);
             p.stroke(primary);
             if (this.modulation)
-                p.fill(secondary);
-            p.rect(-10, -10, 20, 20);
+                p.fill(colors.accent);
+            let tempo_width = p.textWidth(tempo) + 4;
+            p.rect(-tempo_width*0.5, -10, tempo_width, 20);
             p.fill(secondary);
             p.stroke(secondary);
             if (this.modulation) {
@@ -1030,6 +1046,8 @@ export default (p) => {
 
             p.textAlign(p.CENTER, p.CENTER);
             p.text(Math.round(tempo), 0, 0);
+
+            // wheels
             if (this.modulation) { 
                 p.push();
                     p.strokeCap(p.SQUARE);
@@ -1044,9 +1062,37 @@ export default (p) => {
                     let FIFTH_PI = p.PI * 0.2;
 
                     for (let segment=0; segment<5; segment++) {
-                        let start = p.HALF_PI + segment * FIFTH_PI;
-                        p.arc(-20, 0, 80, 80, start + EDGE_BUFFER, start + FIFTH_PI - EDGE_BUFFER);
+                        let left_start = p.HALF_PI + segment * FIFTH_PI;
+                        let right_start = segment * FIFTH_PI - p.HALF_PI;
+                        p.push();
+                        if (this.modulation.indexLeft === 4-segment) {
+                            p.strokeWeight(28);
+                            p.stroke(colors.accent);
+                        }
+                        p.arc(-20, 0, 80, 80, left_start + EDGE_BUFFER, left_start + FIFTH_PI - EDGE_BUFFER);
+                        p.pop();
+                        p.push();
+                        if (this.modulation.indexRight === segment) {
+                            p.strokeWeight(24);
+                            p.stroke(colors.accent);
+                        }
+                        p.arc(20, 0, 80, 80, right_start + EDGE_BUFFER, right_start + FIFTH_PI - EDGE_BUFFER);
+                        p.pop();
                     }
+                    for (let segment=0; segment<5; segment++) {
+                        let text = Math.pow(2, 5-segment).toString();
+                        p.push();
+                        p.strokeWeight(1);
+                        p.stroke(primary);
+                        p.fill(primary);
+                        p.translate(-20, 0);
+                        let angle_x = 40 * p.cos(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
+                        let angle_y = 40 * p.sin(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
+                        p.text(text, angle_x, angle_y);
+                        p.text(text, -1 * angle_x + 40, angle_y);
+                        p.pop();
+                    }
+
                 p.pop();
             }
             p.pop();
