@@ -1263,23 +1263,23 @@ export default function measure(p) {
 
         // for metric modulation menu
         if (Window.modulation) {
-            let source = Window.modulation.origin.x;
+            let [x, y] = [Window.modulation.origin.x(), Window.modulation.origin.y()];
             // skip if wheel not within reach
-            if (Math.abs(p.mouseX - source) < 20)
+            if (Math.abs(p.mouseX - x) < 20)
                 return;
 
             // offset from center
             let target;
-            if (p.mouseX < source) {
-                source -= 20;
+            if (p.mouseX < x) {
+                x -= 20;
                 target = 'indexLeft';
             } else {
-                source += 20;
+                x += 20;
                 target = 'indexRight';
             }
-                let dist = p.dist(source, Window.modulation.origin.y, p.mouseX, p.mouseY)
+                let dist = p.dist(x, y, p.mouseX, p.mouseY)
                 if (dist > 30 && dist < 50) {
-                    let theta = p.atan((p.mouseY - Window.modulation.origin.y)/(p.mouseX - source));
+                    let theta = p.atan((p.mouseY - y)/(p.mouseX - x));
                     if (theta <= 1.5 && theta >= -1.5) {
                         let clamp_ratio = 5/3;
                         let index = Math.floor((theta+1.5) * clamp_ratio);

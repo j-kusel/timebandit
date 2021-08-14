@@ -1028,7 +1028,7 @@ export default (p) => {
             let ro = this.modulation || rollover;
             p.push();
             let tempo = this.modulation ? (this.modulation.next || this.modulation.base) : (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
-            p.translate(ro.meas.cache.beats[ro.beat] + ro.meas.cache.offset, (ro.inst + 0.5)*c.INST_HEIGHT);
+            p.translate(ro.meas.cache.beats[ro.beat] + ro.meas.cache.offset + this.viewport, (ro.inst + 0.5)*c.INST_HEIGHT);
 
             // base tempo button
             p.fill(primary);
@@ -1103,8 +1103,8 @@ export default (p) => {
             this.modulation = meta ?
                 Object.assign(meta, { origin: 
                     { 
-                        x: meta.meas.cache.beats[meta.beat] + meta.meas.cache.offset + c.PANES_WIDTH,
-                        y: (meta.inst + 0.5)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT
+                        x: () => meta.meas.cache.beats[meta.beat] + meta.meas.cache.offset + this.viewport + c.PANES_WIDTH,
+                        y: () => (meta.inst + 0.5)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT - this.scroll
                     }
                 }) : null;
         }
