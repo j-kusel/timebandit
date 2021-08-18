@@ -3,6 +3,7 @@ import { primary, secondary, secondary_light, secondary_light2 } from '../config
 import { colors } from 'bandit-lib';
 import { crowding } from '../Util/index.js';
 import { NUM, LETTERS, LEFT, RIGHT, DEL, BACK, PERIOD } from './keycodes';
+import _ from 'lodash';
 
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     //console.log(oldMeas);
@@ -111,9 +112,11 @@ export default (p) => {
         calc_metric_modulation() {
             if (this.modulation && 'indexLeft' in this.modulation && 'indexRight' in this.modulation) {
                 let base = this.modulation.base;
-                console.log(this.modulation);
                 this.modulation.next = base / Math.pow(2, this.modulation.indexLeft) * Math.pow(2, this.modulation.indexRight);
-                console.log(this.modulation.next);
+                if (this.editor.type) {
+                    this.editor.hover_next_number = this.modulation.next;
+                    this.editor.hover_next_string = this.modulation.next.toString();
+                }
                 return;
             }
             if ('next' in this.modulation)
@@ -162,6 +165,8 @@ export default (p) => {
                     pointers[t] = str.length;
                 });
                 this.editor = { type, inst, meas, next, hover_next_number, hover_next_string, pointers, timer: null, temp_offset: meas.offset };
+                // this could be a problem here?
+                this.initialize_temp(this.editor.meas);
                 return true;
             }
             return false;
@@ -180,11 +185,18 @@ export default (p) => {
                 this.editor.pointers[this.editor.type] = str_len;
         }
 
-        editor_confirm_hover() {
+        editor_pending_hover() {
             if (this.editor.hover_next_number) {
-                this.editor.next[this.editor.type] = this.editor.hover_next_number.toString();
-                this.start_editor_timer();
+                let number = this.editor.hover_next_number;
+                this.editor.next[this.editor.type] = number.toString();
+                this.editor.pending = number;
             }
+        }
+
+
+        editor_confirm_hover() {
+            this.editor.next[this.editor.type] = this.editor.hover_next_string;
+            this.start_editor_timer();
         }
 
         set_polling_flag(type) {
@@ -263,6 +275,7 @@ export default (p) => {
 
 
         recalc_editor() {
+            console.log(Object.assign({}, this.editor));
             let locks = this.editor.meas.locks;
             let selected = this.editor.meas.temp || this.editor.meas;
             let updated = Object.keys(this.editor.next).reduce(
@@ -681,28 +694,13 @@ export default (p) => {
         initialize_temp(meas) {
             console.log('INITIALIZED');
             let sel = meas || this.selected.meas;
-            this.selected.meas.temp = {
-                start: sel.start,
-                end: sel.end,
-                ms: sel.ms,
-                ticks: sel.ticks,
-                beats: sel.beats,
-                offset: sel.offset,
-                timesig: sel.timesig,
-                denom: sel.denom
-            };
+            
+            sel.temp = _.pick(sel, [
+                'start', 'end', 'ms', 'ticks', 'beats',
+                'offset', 'timesig', 'denom'
+            ]);
 
-            let cache = this.calculate_cache(sel);/*{
-                offset: sel.offset*this.scale,
-                beats: sel.beats.map(b => b*this.scale),
-                ticks: sel.ticks.map(t => t*this.scale),
-                ms: sel.ms*this.scale
-            };
-            */
-
-            Object.assign(this.selected.meas, { cache });
-            //Object.assign(this.selected.meas.cache, this.calculate_tempo_cache(sel, cache));
-
+            sel.cache = this.calculate_cache(sel);
         }
 
         setUpdateViewCallback(cb) {
@@ -1024,11 +1022,13 @@ export default (p) => {
             p.pop();
         }
 
-        drawModWheel(rollover) {
-            let ro = this.modulation || rollover;
+        drawTempoPicker(ro) {
+            let tempo = (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
+            let x = ('tick' in ro ? 
+                    ro.meas.cache.ticks[ro.tick] :
+                    ro.meas.cache.beats[ro.beat]) + ro.meas.cache.offset + this.viewport;
             p.push();
-            let tempo = this.modulation ? (this.modulation.next || this.modulation.base) : (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
-            p.translate(ro.meas.cache.beats[ro.beat] + ro.meas.cache.offset + this.viewport, (ro.inst + 0.5)*c.INST_HEIGHT);
+            p.translate(x, (ro.inst + 0.5)*c.INST_HEIGHT);
 
             // base tempo button
             p.fill(primary);
@@ -1046,67 +1046,91 @@ export default (p) => {
 
             p.textAlign(p.CENTER, p.CENTER);
             p.text(Math.round(tempo), 0, 0);
+            p.pop();
 
-            // wheels
-            if (this.modulation) { 
+        }
+
+        drawModWheel() {
+            let mod = this.modulation;
+            p.push();
+            let tempo = mod.next || mod.base;
+            let x = ('tick' in mod ? 
+                    mod.meas.cache.ticks[mod.tick] :
+                    mod.meas.cache.beats[mod.beat])
+                + mod.meas.cache.offset + this.viewport;
+
+            p.translate(mod.origin.x(), mod.origin.y()/*(mod.inst + 0.5)*c.INST_HEIGHT*/);
+
+            p.strokeCap(p.SQUARE);
+            p.strokeWeight(20);
+            p.stroke(primary);
+            p.noFill();
+            p.arc(-20, 0, 80, 80, p.HALF_PI, -p.HALF_PI);
+            p.arc(20, 0, 80, 80, -p.HALF_PI, p.HALF_PI);
+            p.strokeWeight(18);
+            p.stroke(secondary);
+            let EDGE_BUFFER = p.PI * 0.01;
+            let FIFTH_PI = p.PI * 0.2;
+
+            for (let segment=0; segment<5; segment++) {
+                let left_start = p.HALF_PI + segment * FIFTH_PI;
+                let right_start = segment * FIFTH_PI - p.HALF_PI;
                 p.push();
-                    p.strokeCap(p.SQUARE);
-                    p.strokeWeight(20);
-                    p.stroke(primary);
-                    p.noFill();
-                    p.arc(-20, 0, 80, 80, p.HALF_PI, -p.HALF_PI);
-                    p.arc(20, 0, 80, 80, -p.HALF_PI, p.HALF_PI);
-                    p.strokeWeight(18);
-                    p.stroke(secondary);
-                    let EDGE_BUFFER = p.PI * 0.01;
-                    let FIFTH_PI = p.PI * 0.2;
-
-                    for (let segment=0; segment<5; segment++) {
-                        let left_start = p.HALF_PI + segment * FIFTH_PI;
-                        let right_start = segment * FIFTH_PI - p.HALF_PI;
-                        p.push();
-                        if (this.modulation.indexLeft === 4-segment) {
-                            p.strokeWeight(28);
-                            p.stroke(colors.accent);
-                        }
-                        p.arc(-20, 0, 80, 80, left_start + EDGE_BUFFER, left_start + FIFTH_PI - EDGE_BUFFER);
-                        p.pop();
-                        p.push();
-                        if (this.modulation.indexRight === segment) {
-                            p.strokeWeight(24);
-                            p.stroke(colors.accent);
-                        }
-                        p.arc(20, 0, 80, 80, right_start + EDGE_BUFFER, right_start + FIFTH_PI - EDGE_BUFFER);
-                        p.pop();
-                    }
-                    for (let segment=0; segment<5; segment++) {
-                        let text = Math.pow(2, 5-segment).toString();
-                        p.push();
-                        p.strokeWeight(1);
-                        p.stroke(primary);
-                        p.fill(primary);
-                        p.translate(-20, 0);
-                        let angle_x = 40 * p.cos(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
-                        let angle_y = 40 * p.sin(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
-                        p.text(text, angle_x, angle_y);
-                        p.text(text, -1 * angle_x + 40, angle_y);
-                        p.pop();
-                    }
-
+                if (mod.indexLeft === 4-segment) {
+                    p.strokeWeight(28);
+                    p.stroke(colors.accent);
+                }
+                p.arc(-20, 0, 80, 80, left_start + EDGE_BUFFER, left_start + FIFTH_PI - EDGE_BUFFER);
+                p.pop();
+                p.push();
+                if (mod.indexRight === segment) {
+                    p.strokeWeight(24);
+                    p.stroke(colors.accent);
+                }
+                p.arc(20, 0, 80, 80, right_start + EDGE_BUFFER, right_start + FIFTH_PI - EDGE_BUFFER);
+                p.pop();
+            }
+            for (let segment=0; segment<5; segment++) {
+                let text = Math.pow(2, 5-segment).toString();
+                p.push();
+                p.strokeWeight(1);
+                p.stroke(primary);
+                p.fill(primary);
+                p.translate(-20, 0);
+                let angle_x = 40 * p.cos(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
+                let angle_y = 40 * p.sin(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
+                p.text(text, angle_x, angle_y);
+                p.text(text, -1 * angle_x + 40, angle_y);
                 p.pop();
             }
             p.pop();
         }
 
-        set_modulation(meta) {
+        set_modulation(rollover) {
+            if (!rollover)
+                return this.modulation = null;
 
-            this.modulation = meta ?
-                Object.assign(meta, { origin: 
-                    { 
-                        x: () => meta.meas.cache.beats[meta.beat] + meta.meas.cache.offset + this.viewport + c.PANES_WIDTH,
-                        y: () => (meta.inst + 0.5)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT - this.scroll
-                    }
-                }) : null;
+            let new_mod = _.pick(rollover, ['beat', 'inst', 'meas']);
+            let meas = new_mod.meas;
+            if (rollover.type === 'tempo') {
+                new_mod.tick = rollover.tick;
+                new_mod.base = rollover.tempo;
+            } else if (rollover.type === 'beat') {
+                new_mod.base = (meas.end - meas.start)/meas.timesig * new_mod.beat + meas.start;
+            }
+
+            new_mod.origin = { 
+                x: () => 
+                    (new_mod.tick ? 
+                        meas.cache.ticks[new_mod.tick] : 
+                        meas.cache.beats[new_mod.beat]
+                    ) + meas.cache.offset
+                    + this.viewport
+                    /*+ c.PANES_WIDTH*/,
+                y: () => (new_mod.inst + 0.5)*c.INST_HEIGHT /*+ c.PLAYBACK_HEIGHT*/ - this.scroll
+            };
+
+            this.modulation = new_mod;
         }
 
         _scaleY(input, height, range) {

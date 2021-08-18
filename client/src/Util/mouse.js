@@ -167,10 +167,6 @@ export default (p, Window) => {
         }
 
         pollMode() {
-            let new_mod = _.pick(this.rollover, ['beat', 'inst', 'meas']);
-            let meas = new_mod.meas;
-            new_mod.base = (meas.end - meas.start)/meas.timesig * new_mod.beat + meas.start;
-            Window.set_modulation(Object.assign({}, new_mod));
             this.drag.mode = 'modulation';
         }
 

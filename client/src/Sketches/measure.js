@@ -533,7 +533,7 @@ export default function measure(p) {
                     if ('meas' in Window.editor && Window.editor.meas.id === measure.id) {
                         let next = Window.editor.next[mark];
                         text[0] = next; 
-                        if (Window.editor.hover_next_number)
+                        if (mark === Window.editor.type && Window.editor.hover_next_number)
                             text[0] = Window.editor.hover_next_number.toString();
                         if (Window.editor.type === mark) {
                             p.textSize(c.TEMPO_PT + 2);
@@ -639,7 +639,10 @@ export default function measure(p) {
         });
 
         if (Window.modulation || (Window.POLL_FLAG && Mouse.rollover.type === 'beat'))
-            Window.drawModWheel(Mouse.rollover);
+            Window.drawTempoPicker(Mouse.rollover);
+
+        if (/*Window.editor.type && */Window.modulation)
+            Window.drawModWheel()
 
 
         // draw snaps
@@ -872,6 +875,7 @@ export default function measure(p) {
             p.arc(0, 0, 12, 12, 0, p.TWO_PI * ((Window.editor.timer - p.frameCount) / 120));
 
             if (Window.editor.timer < p.frameCount) {
+                console.log(Window.editor);
                 Window.recalc_editor();
                 Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
                 Window.editor.timer = null;
@@ -994,6 +998,8 @@ export default function measure(p) {
                     return;
                 let updated = Object.keys(Window.editor.next).reduce(
                     (acc, key) => Object.assign(acc, { [key]: parseFloat(Window.editor.next[key]) }), {});
+                // make denom an editor option later!
+                updated.denom = selected.denom;
                 updated.offset = Window.editor.temp_offset;
                 // check if anything's changed
                 if (!['start', 'end', 'timesig', 'offset'].some(p => (updated[p] !== selected[p])))
@@ -1149,7 +1155,9 @@ export default function measure(p) {
         // all editor mode functions should be grouped together here.
         // confirming hover?
         if (Window.editor.type && Window.editor.hover_next_number) {
-            Window.editor_confirm_hover();
+            //Window.editor_pending_hover();
+            Mouse.pollMode();
+            Window.set_modulation(Mouse.rollover);
             return;
         }
 
@@ -1166,8 +1174,10 @@ export default function measure(p) {
             // check bounding box
             let frameY = p.mouseY - c.PLAYBACK_HEIGHT - Mouse.rollover.inst*c.INST_HEIGHT;
             let half_height = c.INST_HEIGHT * 0.5;
-            if (frameY > half_height - 15 && frameY < half_height + 15)
+            if (frameY > half_height - 15 && frameY < half_height + 15) {
                 Mouse.pollMode();
+                Window.set_modulation(Mouse.rollover);
+            }
             e.preventDefault();
             return;
 
@@ -1263,23 +1273,24 @@ export default function measure(p) {
 
         // for metric modulation menu
         if (Window.modulation) {
+            let [frameX, frameY] = [p.mouseX - c.PANES_WIDTH, p.mouseY - c.PLAYBACK_HEIGHT];
             let [x, y] = [Window.modulation.origin.x(), Window.modulation.origin.y()];
             // skip if wheel not within reach
-            if (Math.abs(p.mouseX - x) < 20)
+            if (Math.abs(frameX - x) < 20)
                 return;
 
             // offset from center
             let target;
-            if (p.mouseX < x) {
+            if (frameX < x) {
                 x -= 20;
                 target = 'indexLeft';
             } else {
                 x += 20;
                 target = 'indexRight';
             }
-                let dist = p.dist(x, y, p.mouseX, p.mouseY)
+                let dist = p.dist(x, y, frameX, frameY)
                 if (dist > 30 && dist < 50) {
-                    let theta = p.atan((p.mouseY - y)/(p.mouseX - x));
+                    let theta = p.atan((frameY - y)/(frameX - x));
                     if (theta <= 1.5 && theta >= -1.5) {
                         let clamp_ratio = 5/3;
                         let index = Math.floor((theta+1.5) * clamp_ratio);
@@ -1865,7 +1876,14 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'modulation') {
             let next = Window.modulation.next || Window.modulation.base;
+
             Window.set_modulation();
+            if (Window.editor.type) {
+                Window.editor.hover_next_number = next;
+                Window.editor.hover_next_string = next.toString();
+                Window.editor_confirm_hover();
+                return;
+            }
             if (API.pollSelecting('start')) 
                 API.confirmPoll('start', next)
             else if (API.pollSelecting('end'))
@@ -2014,15 +2032,18 @@ export default function measure(p) {
                                 if (frameY > y - c.ROLLOVER_TOLERANCE &&
                                     frameY < y + c.ROLLOVER_TOLERANCE
                                 ) {
-                                    Mouse.setRollover({ type: 'tempo', inst: inst_row, meas, beat: ind });
+                                    let rollover = { type: 'tempo', inst: inst_row, meas, beat: ind };
                                     if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                         let spread = meas.cache.beats[ind + 1] - beat;
                                         let perc = (frameXmeas - beat)/spread;
-                                        let target_tick = Math.round(perc * Window.CONSTANTS.PPQ) + ind*Window.CONSTANTS.PPQ;
+                                        let PPQ_adjust = Window.CONSTANTS.PPQ / (meas.denom / 4);
+                                        let tick = Math.round(perc * PPQ_adjust) + ind*PPQ_adjust;
                                         // should the user be able to select the tempo graph of the edited measure?
-                                        let hover_tempo = (target_tick * (meas.end - meas.start) / meas.ticks.length) + meas.start;
-                                        Window.editor_hover(hover_tempo);
+                                        let tempo = (tick * (meas.end - meas.start) / meas.ticks.length) + meas.start;
+                                        Window.editor_hover(tempo);
+                                        Object.assign(rollover, { tick, tempo });
                                     }
+                                    Mouse.setRollover(rollover);
                                     return true;
                                 }
                             }
