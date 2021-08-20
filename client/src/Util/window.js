@@ -164,7 +164,13 @@ export default (p) => {
                     next[t] = str;
                     pointers[t] = str.length;
                 });
-                this.editor = { type, inst, meas, next, hover_next_number, hover_next_string, pointers, timer: null, temp_offset: meas.offset };
+                this.editor = { 
+                    type, inst, meas, next,
+                    hover_next_number, hover_next_string,
+                    pointers, timer: null, 
+                    old_range: this.range,
+                    temp_offset: meas.offset
+                };
                 // this could be a problem here?
                 this.initialize_temp(this.editor.meas);
                 return true;
@@ -196,6 +202,7 @@ export default (p) => {
 
         editor_confirm_hover() {
             this.editor.next[this.editor.type] = this.editor.hover_next_string;
+            this.editor_hover(null);
             this.start_editor_timer();
         }
 
@@ -1023,7 +1030,14 @@ export default (p) => {
         }
 
         drawTempoPicker(ro) {
-            let tempo = (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
+            // i think tempo should always be passed in rollover,
+            // but let's keep a backup calculation here for now.
+            let tempo;
+            if (this.modulation && 'next' in this.modulation)
+                tempo = this.modulation.next
+            else
+                tempo = ro.tempo || (ro.meas.end - ro.meas.start) / ro.meas.timesig * ro.beat + ro.meas.start;
+            tempo = Math.round(tempo);
             let x = ('tick' in ro ? 
                     ro.meas.cache.ticks[ro.tick] :
                     ro.meas.cache.beats[ro.beat]) + ro.meas.cache.offset + this.viewport;
@@ -1036,7 +1050,7 @@ export default (p) => {
             if (this.modulation)
                 p.fill(colors.accent);
             let tempo_width = p.textWidth(tempo) + 4;
-            p.rect(-tempo_width*0.5, -10, tempo_width, 20);
+            p.rect(-tempo_width*0.5 - 4, -10, tempo_width + 8, 20);
             p.fill(secondary);
             p.stroke(secondary);
             if (this.modulation) {
@@ -1045,7 +1059,7 @@ export default (p) => {
             }
 
             p.textAlign(p.CENTER, p.CENTER);
-            p.text(Math.round(tempo), 0, 0);
+            p.text(tempo, 0, 0);
             p.pop();
 
         }
@@ -1090,6 +1104,7 @@ export default (p) => {
                 p.arc(20, 0, 80, 80, right_start + EDGE_BUFFER, right_start + FIFTH_PI - EDGE_BUFFER);
                 p.pop();
             }
+            p.textAlign(p.CENTER, p.CENTER);
             for (let segment=0; segment<5; segment++) {
                 let text = Math.pow(2, 5-segment).toString();
                 p.push();

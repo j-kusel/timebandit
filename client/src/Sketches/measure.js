@@ -383,7 +383,9 @@ export default function measure(p) {
             let div = Window.CONSTANTS.PPQ / (n_ind + 1);
             instruments.forEach((inst, i_ind) =>
                 inst.ordered.forEach((measure) => {
-                    for (let i=0; i < measure.ticks.length; i += div) {
+                    let divisor = measure.denom / 4;
+                    let div_mod = div / divisor;
+                    for (let i=0; i < measure.ticks.length; i += div_mod) {
                         let tick = Math.round(i);
                         let target = (tick >= measure.ticks.length) ?
                             measure.ms : measure.ticks[tick];
@@ -533,11 +535,25 @@ export default function measure(p) {
                     if ('meas' in Window.editor && Window.editor.meas.id === measure.id) {
                         let next = Window.editor.next[mark];
                         text[0] = next; 
-                        if (mark === Window.editor.type && Window.editor.hover_next_number)
-                            text[0] = Window.editor.hover_next_number.toString();
+                        
                         if (Window.editor.type === mark) {
                             p.textSize(c.TEMPO_PT + 2);
-
+                            // draw hover indicator rectangles
+                            if (Window.editor.hover_next_number) {
+                                text[0] = Window.editor.hover_next_number.toString();
+                                p.push();
+                                let c_color = p.color(colors.contrast);
+                                c_color.setAlpha(100);
+                                p.stroke(c_color);
+                                p.fill(c_color);
+                                let width = p.textWidth(text[0]);
+                                let align_x = m.textAlign[0] === p.LEFT ?
+                                    0 : -width;
+                                let align_y = m.textAlign[1] === p.TOP ?
+                                    -8 : -16;
+                                p.rect(text[1] + align_x, text[2] + align_y, width, 18);
+                                p.pop();
+                            }
                             // handle blinking cursor
                             let blink = p.millis() % 1000;
                             if (blink > 500) {
@@ -656,7 +672,7 @@ export default function measure(p) {
             });
 
         // draw editor hover information
-        if (Window.editor.type && Window.editor.hover_next_string) {
+        if (Window.editor.type && Window.editor.hover_next_string && !Window.modulation) {
             if ('type' in Mouse.rollover) {
                 p.push();
                 let rollover_color = p.color(colors.primary);
@@ -933,6 +949,13 @@ export default function measure(p) {
             }
             if ('inst' in Window.instName) {
                 Window.exit_instName();
+                return;
+            }
+            if (Window.modulation) {
+                Window.set_modulation();
+                if (Window.editor.type)
+                    Window.editor_reject_hover();
+                Mouse.drag.mode = '';
                 return;
             }
             if (Window.editor.type) {
@@ -1821,7 +1844,9 @@ export default function measure(p) {
                 return finalize();
             }
 
-            let snap_to = closest(loc, Window.selected.inst, snaps.div_index).target;
+            let close_calc = closest(loc, Window.selected.inst, snaps.div_index);
+            let snap_to = close_calc.target;
+            console.log(close_calc);
             
             let gap = loc - snap_to;
 
@@ -1878,6 +1903,8 @@ export default function measure(p) {
             let next = Window.modulation.next || Window.modulation.base;
 
             Window.set_modulation();
+            Mouse.resetDrag();
+
             if (Window.editor.type) {
                 Window.editor.hover_next_number = next;
                 Window.editor.hover_next_string = next.toString();
@@ -1889,6 +1916,7 @@ export default function measure(p) {
             else if (API.pollSelecting('end'))
                 API.confirmPoll('end', next);
             return;
+
         }
 
         if (Mouse.lock_type)
@@ -2013,10 +2041,10 @@ export default function measure(p) {
                         if ((frameXmeas > beat - c.ROLLOVER_TOLERANCE) &&
                             (frameXmeas < beat + c.ROLLOVER_TOLERANCE)
                         ) {
-                            Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind });
+                            let tempo = (meas.end - meas.start)/meas.timesig * ind + meas.start;
+                            Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind, tempo });
                             if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
-                                let beat_tempo = (meas.end - meas.start)/meas.timesig * ind + meas.start;
-                                Window.editor_hover(beat_tempo);
+                                Window.editor_hover(tempo);
                             } else {
                                 // this is a bad place to set the polling flag, but let's go with it for now
                                 let POLL_FLAG = (API.pollSelecting('start') && 'start')
