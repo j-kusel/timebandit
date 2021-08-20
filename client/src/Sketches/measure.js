@@ -416,8 +416,6 @@ export default function measure(p) {
         if (SLOW)
             p.frameRate(10);
 
-        // CHECK Window.editor.timer SOMEWHERE HERE
-
         Window.drawFrame();
 
         // push below playback bar
@@ -959,7 +957,11 @@ export default function measure(p) {
                 return;
             }
             if (Window.editor.type) {
-                Window.exit_editor(true, gatherRanges);
+                Window.exit_editor(true, 
+                    () => {
+                        let r = gatherRanges();
+                        Window.updateRange({ tempo: [r.min, r.max] });
+                    });
                 return;
             }
             if (Window.mode === 0)

@@ -191,6 +191,7 @@ export default (p) => {
                 this.editor.pointers[this.editor.type] = str_len;
         }
 
+        // this is never used
         editor_pending_hover() {
             if (this.editor.hover_next_number) {
                 let number = this.editor.hover_next_number;
@@ -199,6 +200,10 @@ export default (p) => {
             }
         }
 
+        editor_reject_hover() {
+            this.editor.hover_next_number = null;
+            this.editor.hover_next_string = null;
+        }
 
         editor_confirm_hover() {
             this.editor.next[this.editor.type] = this.editor.hover_next_string;
@@ -567,6 +572,8 @@ export default (p) => {
         }
 
         updateRange(new_range) {
+            if ('temprange' in this.range)
+                delete this.range.temprange;
             Object.assign(this.range, new_range);
             this.rangeRefresh();
         }
@@ -924,15 +931,6 @@ export default (p) => {
                 p.pop();
             }
 
-            // showing bound with blink
-            /*if (blink) {
-                p.push();
-                p.stroke(0);
-                let bound = this.editor.meas.cache.bounding[2];
-                p.line(bound[0], bound[1], bound[2], bound[1]);
-                p.line(bound[0], bound[3], bound[2], bound[3]);
-                p.pop();
-            }*/
         }
 
         select(newSelected) {
@@ -949,7 +947,6 @@ export default (p) => {
                 delete this.selected.meas.temp;
             }
             Object.assign(this.selected, newSelected);
-            //this.selected = newSelected;
             return true;
         }
      
@@ -1073,7 +1070,7 @@ export default (p) => {
                     mod.meas.cache.beats[mod.beat])
                 + mod.meas.cache.offset + this.viewport;
 
-            p.translate(mod.origin.x(), mod.origin.y()/*(mod.inst + 0.5)*c.INST_HEIGHT*/);
+            p.translate(mod.origin.x(), mod.origin.y());
 
             p.strokeCap(p.SQUARE);
             p.strokeWeight(20);
@@ -1140,9 +1137,8 @@ export default (p) => {
                         meas.cache.ticks[new_mod.tick] : 
                         meas.cache.beats[new_mod.beat]
                     ) + meas.cache.offset
-                    + this.viewport
-                    /*+ c.PANES_WIDTH*/,
-                y: () => (new_mod.inst + 0.5)*c.INST_HEIGHT /*+ c.PLAYBACK_HEIGHT*/ - this.scroll
+                    + this.viewport,
+                y: () => (new_mod.inst + 0.5)*c.INST_HEIGHT - this.scroll
             };
 
             this.modulation = new_mod;
@@ -1197,12 +1193,6 @@ export default (p) => {
                     p.push();
                     p.translate(0, c.PREVIEW_HEIGHT + c.INSERT_PADDING);
                     p.textAlign(p.LEFT, p.TOP);
-                    /*let lines = [
-                        `${this.insertMeas.start} - ${this.insertMeas.end} / ${this.insertMeas.timesig}`,
-                        `${this.insertMeas.ms.toFixed(2)}ms`
-                    ];
-                    blockText(lines, { x: 0, y: 0 }, 6); 
-                    */
                     p.pop();
                     p.pop();
                 }
