@@ -62,6 +62,7 @@ var MeasureCalc = (features, options) => {
     let start, end, timesig, denom;
     let PPQ, PPQ_tempo;
     ({ start, end, timesig, denom } = features);
+    console.log(denom);
     if (!denom)
         denom = 4;
     ({ PPQ, PPQ_tempo } = options);

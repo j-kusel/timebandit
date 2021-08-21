@@ -153,7 +153,7 @@ export default (p) => {
         }
 
         enter_editor(type, inst, meas) {
-            let types = ['start', 'end', 'timesig'];
+            let types = ['start', 'end', 'timesig', 'denom'];
             if (types.indexOf(type) > -1) {
                 let next = {};
                 let hover_next_number = null;
@@ -293,7 +293,7 @@ export default (p) => {
             let updated = Object.keys(this.editor.next).reduce(
                 (acc, key) => Object.assign(acc, { [key]: parseFloat(this.editor.next[key]) }), {});
             // check if anything's changed
-            if (['start', 'end', 'timesig'].some(p => {
+            if (['start', 'end', 'timesig', 'denom'].some(p => {
                 return (
                 (updated[p] !== selected[p]) &&
                 updated[p]
@@ -325,7 +325,7 @@ export default (p) => {
                 console.log(this.editor.next);
                 console.log(next);
                 let slope = next.end - next.start;
-                let calc = this.completeCalc(next.start, slope, next.timesig, this.editor.meas.denom);
+                let calc = this.completeCalc(next.start, slope, next.timesig, next.denom);
                 Object.assign(calc, next); 
 
                 // check for 'loc' locking and adjust offset
@@ -902,35 +902,37 @@ export default (p) => {
                     text = [numerator, 0, 0];
             }
             if ('meas' in this.editor && this.editor.meas.id === meas.id) {
-                next = this.editor.next.timesig;
+                let next = [this.editor.next.timesig, this.editor.next.denom];
+                
                 text[0] = (this.scale > 0.03) ?
-                    [next, denom].join('\n') :
-                    ((this.scale > 0.02) ? [next, denom].join('/') :
-                        next);
+                    next.join('\n') :
+                    ((this.scale > 0.02) ? next.join('/') :
+                        next[0]);
 
-                blink = (this.editor.type === 'timesig') && ((p.millis() % 1000) > 500);
+                // handle blinking
+                let type = this.editor.type;
+                if ((type === 'timesig' || type === 'denom') && ((p.millis() % 1000) > 500)) {
+                    p.push();
+                    p.stroke(0);
+                    let textSize = this.scale > 0.03 ? c.INST_HEIGHT*0.25 : c.INST_HEIGHT * 0.1;
+                    p.textSize(textSize);
+                    let w = p.textWidth(next[type === 'timesig' ? 0 : 1].slice(0, this.editor.pointers[type]));
+                    let bound = this.editor.meas.cache.bounding[2];
+                    if (this.scale > 0.03) {
+                        p.translate(c.TIMESIG_PADDING, 0);
+                        w -= p.textWidth(next) * 0.5;
+                        if (type === 'denom')
+                            p.translate(0, textSize);
+                        p.line(w, bound[1], w, bound[1] + textSize);
+                    } else {
+                        p.translate(c.TIMESIG_PADDING/2, 0);
+                        p.line(w, bound[1], w, bound[3]);
+                    }
+                    p.pop();
+                }
             }
             p.text(...text);
-
             p.pop();
-            if (blink) {
-                p.push();
-                p.stroke(0);
-                let textSize = this.scale > 0.03 ? c.INST_HEIGHT*0.25 : c.INST_HEIGHT * 0.1;
-                p.textSize(textSize);
-                let w = p.textWidth(next.slice(0, this.editor.pointers.timesig));
-                let bound = this.editor.meas.cache.bounding[2];
-                if (this.scale > 0.03) {
-                    p.translate(c.TIMESIG_PADDING, 0);
-                    w -= p.textWidth(next) * 0.5;
-                    p.line(w, bound[1], w, bound[1] + textSize);
-                } else {
-                    p.translate(c.TIMESIG_PADDING/2, 0);
-                    p.line(w, bound[1], w, bound[3]);
-                }
-                p.pop();
-            }
-
         }
 
         select(newSelected) {

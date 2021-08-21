@@ -64,7 +64,7 @@ class UI extends Component {
             flag = flag || (Object.keys(inst.measures).length !== Object.keys(oldInst.measures).length);
             flag = flag || Object.keys(inst.measures).some((key) => {
                 flag = flag || (!(key in this.props.instruments[index].measures));
-                flag = flag || ['start', 'end', 'offset', 'timesig'].some((attr) =>
+                flag = flag || ['start', 'end', 'offset', 'timesig', 'denom'].some((attr) =>
                     inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr]
                 );
                 return flag;

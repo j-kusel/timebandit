@@ -367,6 +367,7 @@ export default function measure(p) {
         // calculate beat visual locations for all measures
         instruments.forEach(inst => {
             inst.ordered.forEach(meas => {
+                console.log(inst.measures[meas.id]);
                 console.log(meas === inst.measures[meas.id]);
                 meas.cache = Window.calculate_cache(meas);
             });
@@ -988,8 +989,8 @@ export default function measure(p) {
 
         if (p.keyCode === keycodes.TAB && Window.editor.type) {
             e.preventDefault();
-            let types = ['start', 'end', 'timesig'];
-            Window.editor.type = types[(types.indexOf(Window.editor.type) + 1) % 3];
+            let types = ['start', 'end', 'timesig', 'denom'];
+            Window.editor.type = types[(types.indexOf(Window.editor.type) + 1) % 4];
             return;
         }
 
@@ -1024,10 +1025,10 @@ export default function measure(p) {
                 let updated = Object.keys(Window.editor.next).reduce(
                     (acc, key) => Object.assign(acc, { [key]: parseFloat(Window.editor.next[key]) }), {});
                 // make denom an editor option later!
-                updated.denom = selected.denom;
+                //updated.denom = selected.denom;
                 updated.offset = Window.editor.temp_offset;
                 // check if anything's changed
-                if (!['start', 'end', 'timesig', 'offset'].some(p => (updated[p] !== selected[p])))
+                if (!['start', 'end', 'timesig', 'denom', 'offset'].some(p => (updated[p] !== selected[p])))
                     return Window.exit_editor(true, gatherRanges);
                 updated.inst = Window.editor.inst;
 
