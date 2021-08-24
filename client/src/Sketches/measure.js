@@ -292,8 +292,7 @@ export default function measure(p) {
         // THIS SHOULD BE MOVED INTO APP.JS WITH DEPENDENCIES
         // PASSED IN THE OTHER DIRECTION!
         API.registerTuts(tuts);
-
-        
+        API.registerPollingFlag((type) => Window.set_polling_flag(type));
 
         Window.CONSTANTS = props.CONSTANTS;
         Window.CONSTANTS.K = 60000.0 / Window.CONSTANTS.PPQ;
@@ -2057,11 +2056,6 @@ export default function measure(p) {
                             Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind, tempo });
                             if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                 Window.editor_hover(tempo);
-                            } else {
-                                // this is a bad place to set the polling flag, but let's go with it for now
-                                let POLL_FLAG = (API.pollSelecting('start') && 'start')
-                                    || (API.pollSelecting('end') && 'end');
-                                Window.set_polling_flag(POLL_FLAG);
                             }
                             return true;
                         } else if (ind < meas.cache.beats.length-1) { // last beat has no "graph"

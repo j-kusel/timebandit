@@ -143,6 +143,14 @@ export default (p) => {
                         Math.pow(2, this.modulation.indexRight-1) * 
                         (tuplet_mods[1])
                     );
+
+                    /*(base * 
+                        Math.pow(2, this.modulation.indexLeft-1) * 
+                        (tuplet_mods[0])
+                    ) / (
+                        Math.pow(2, this.modulation.indexRight-1) * 
+                        (tuplet_mods[1])
+                    );*/
                 if (this.editor.type) {
                     this.editor.hover_next_number = this.modulation.next;
                     this.editor.hover_next_string = this.modulation.next.toString();
@@ -245,11 +253,12 @@ export default (p) => {
             this.POLL_FLAG = type || null;
         }
 
+
         change_instName(input) {
             let num = NUM.indexOf(p.keyCode);
             let letter = LETTERS[p.keyCode];
 
-            let entry = ''
+            let entry = '';
             if (num > -1)
                 entry = num
             else if (letter)

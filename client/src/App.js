@@ -110,6 +110,7 @@ class App extends Component {
           mode: 0,
           PPQ: CONFIG.PPQ_default,
           tutorials: {},
+          pollingCb: () => null,
           scrollY: 0,
           mouseBlocker: () => false
       };
@@ -225,6 +226,10 @@ class App extends Component {
                   tutorials[tut] = obj[tut] : null
           );
           this.setState({ mouseBlocker: obj._mouseBlocker, tutorials });
+      }
+
+      var registerPollingFlag = (func) => {
+          this.setState({ pollingCb: func });
       }
       
       var updateInst = (inst, { name } = {}) => {
@@ -466,7 +471,7 @@ class App extends Component {
           return measure;
       };
 
-      return { printoutSet, printoutCheck, registerTuts, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -716,11 +721,16 @@ class App extends Component {
 
 
   handleStart(focus, e) {
+      let func = () => this.state.pollingCb(focus && 'start');
+      /*focus ? setTimeout(func, 20) :*/ func();
       if (this.state.mouseBlocker())
           return;
     this.setState({ temp_start: focus });
   }
   handleEnd(focus, e) {
+      let func = () => this.state.pollingCb(focus && 'end');
+      /*focus ? setTimeout(func, 20) :*/ func();
+
       if (this.state.mouseBlocker())
           return;
     this.setState({ temp_end: focus });
