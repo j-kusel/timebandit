@@ -94,9 +94,9 @@ class App extends Component {
           edit_timesig: '',
           offset: '',
           instName: '',
-          temp_offset: '',
-          temp_start: '',
-          temp_end: '',
+          temp_offset: false, /*'',*/
+          temp_start: false, /*'',*/
+          temp_end: false, /*'',*/
           scale: 1,
           viewport: 0,
           time: 0,
@@ -564,7 +564,7 @@ class App extends Component {
           let instruments = oldState.instruments;
           let id = uuidv4();
           instruments[inst].measures[id] = { ...calc, id, inst };
-          let [start, end, timesig, offset] = ['', '', '', ''];
+          let [start, end, timesig, denom, offset] = ['', '', '', '', ''];
           let temp_start = false;
           let temp_end = false;
           let temp_offset = false;
@@ -577,7 +577,7 @@ class App extends Component {
               instruments,
               insertMeas: {},
               mode: 0,
-              start, end, timesig, offset,
+              start, end, timesig, denom, offset,
               temp_start, temp_end, temp_offset
           };
       });
@@ -1149,7 +1149,7 @@ class App extends Component {
             value={this.state[name]}
             ref={this['insertFocus' + cap_name]}
             id={name + 'Insert'}
-            placeholder={this.state[name] || (this.state.['temp_' + name] && this.state.cursor) || name}
+            placeholder={this.state[name] || /*(this.state.['temp_' + name] && this.state.cursor) ||*/ name}
             name={name}
             onFocus={(e) => this['handle' + cap_name](true, e)}
             onBlur={(e) => this['handle' + cap_name](false, e)}

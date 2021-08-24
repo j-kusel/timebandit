@@ -1198,6 +1198,7 @@ export default function measure(p) {
 
         // polling mode functions
         if (Window.POLL_FLAG && Mouse.rollover.type === 'beat') {
+            console.log(Mouse.rollover);
             // check bounding box
             let frameY = p.mouseY - c.PLAYBACK_HEIGHT - Mouse.rollover.inst*c.INST_HEIGHT;
             let half_height = c.INST_HEIGHT * 0.5;
