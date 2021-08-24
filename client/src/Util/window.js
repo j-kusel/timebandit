@@ -109,10 +109,40 @@ export default (p) => {
             return { beats, ticks, ms }
         }
 
+        change_modulation(keyCode, released) {
+            let target = 'div' + this.modulation.zone;
+            /*if (released) {
+                delete this.modulation[target];
+                return;
+            }*/
+            let index = 'tuplet_zone' in this.modulation ?
+                this.modulation.tuplet_zone : 0;
+            let num = NUM.indexOf(p.keyCode);
+            console.log(target);
+            if (!(target in this.modulation))
+                this.modulation[target] = [0, 0];
+            this.modulation[target][index] = num;
+            this.calc_metric_modulation();
+        }
+
         calc_metric_modulation() {
+            let mod = this.modulation;
             if (this.modulation && 'indexLeft' in this.modulation && 'indexRight' in this.modulation) {
                 let base = this.modulation.base;
-                this.modulation.next = base / Math.pow(2, this.modulation.indexLeft) * Math.pow(2, this.modulation.indexRight);
+                let tuplet_mods = [
+                    'menuLeft' in mod ? mod.divLeft[0] / mod.divLeft[1] : 1,
+                    'menuRight' in mod ? mod.divRight[0] / mod.divRight[1] : 1,
+                ];
+                console.log(mod.indexLeft, mod.indexRight);
+                console.log(Math.pow(2, this.modulation.indexLeft-1), Math.pow(2, this.modulation.indexRight-1));
+                this.modulation.next = 
+                    (base * 
+                        Math.pow(2, this.modulation.indexLeft-1) * 
+                        (tuplet_mods[0])
+                    ) / (
+                        Math.pow(2, this.modulation.indexRight-1) * 
+                        (tuplet_mods[1])
+                    );
                 if (this.editor.type) {
                     this.editor.hover_next_number = this.modulation.next;
                     this.editor.hover_next_string = this.modulation.next.toString();
@@ -1065,6 +1095,17 @@ export default (p) => {
 
         drawModWheel() {
             let mod = this.modulation;
+            
+            if (mod.timerLeft < p.frameCount) {
+                mod.menuLeft = 'Left';
+                mod.divLeft = [1,1];
+                delete mod.timerLeft;
+            }
+            if (mod.timerRight < p.frameCount) {
+                mod.menuRight = 'Right';
+                mod.divRight = [1,1];
+                delete mod.timerRight;
+            }
             p.push();
             let tempo = mod.next || mod.base;
             let x = ('tick' in mod ? 
@@ -1083,6 +1124,17 @@ export default (p) => {
             p.strokeWeight(18);
             p.stroke(secondary);
             let EDGE_BUFFER = p.PI * 0.01;
+
+            p.push();
+            p.strokeWeight(28);
+            p.stroke(colors.contrast);
+            /*if (mod.menuLeft) {
+                p.arc(-20, 0, 80, 80, p.HALF_PI, p.HALF_PI + p.PI);
+            } if (mod.menuRight) {
+                p.arc(20, 0, 80, 80, 0, p.HALF_PI);
+            }*/
+            p.pop();
+
             let FIFTH_PI = p.PI * 0.2;
 
             for (let segment=0; segment<5; segment++) {
@@ -1097,15 +1149,21 @@ export default (p) => {
                 p.pop();
                 p.push();
                 if (mod.indexRight === segment) {
-                    p.strokeWeight(24);
+                    p.strokeWeight(28);
                     p.stroke(colors.accent);
                 }
                 p.arc(20, 0, 80, 80, right_start + EDGE_BUFFER, right_start + FIFTH_PI - EDGE_BUFFER);
                 p.pop();
             }
             p.textAlign(p.CENTER, p.CENTER);
+            let pow2 = [32,16,8,4,2];
+            let [l, r] = [mod.divLeft, mod.divRight];
+            let text = [
+                /*(l && l>2) ? pow(l) :*/ pow2,
+                /*(r && r>2) ? pow(r) :*/ pow2
+            ];
             for (let segment=0; segment<5; segment++) {
-                let text = Math.pow(2, 5-segment).toString();
+                //let text = Math.pow(2, 5-segment).toString();
                 p.push();
                 p.strokeWeight(1);
                 p.stroke(primary);
@@ -1113,10 +1171,20 @@ export default (p) => {
                 p.translate(-20, 0);
                 let angle_x = 40 * p.cos(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
                 let angle_y = 40 * p.sin(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
-                p.text(text, angle_x, angle_y);
-                p.text(text, -1 * angle_x + 40, angle_y);
+                p.text(text[0][segment], angle_x, angle_y);
+                p.text(text[1][segment], -1 * angle_x + 40, angle_y);
                 p.pop();
             }
+            p.push();
+            p.strokeWeight(1);
+            p.stroke(primary);
+            p.fill(primary);
+            p.textStyle(p.ITALIC);
+            if (mod.menuLeft) 
+                p.text(mod.divLeft.join(':'), -26, 0);
+            if (mod.menuRight) 
+                p.text(mod.divRight.join(':'), 26, 0);
+            p.pop();
             p.pop();
         }
 
@@ -1140,7 +1208,8 @@ export default (p) => {
                         meas.cache.beats[new_mod.beat]
                     ) + meas.cache.offset
                     + this.viewport,
-                y: () => (new_mod.inst + 0.5)*c.INST_HEIGHT - this.scroll
+                y: () => (new_mod.inst + 0.5)*c.INST_HEIGHT - this.scroll,
+                zone: 'Left'
             };
 
             this.modulation = new_mod;

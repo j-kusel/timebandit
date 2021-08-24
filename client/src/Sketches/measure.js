@@ -365,13 +365,10 @@ export default function measure(p) {
         });
 
         // calculate beat visual locations for all measures
-        instruments.forEach(inst => {
-            inst.ordered.forEach(meas => {
-                console.log(inst.measures[meas.id]);
-                console.log(meas === inst.measures[meas.id]);
-                meas.cache = Window.calculate_cache(meas);
-            });
-        });
+        instruments.forEach(inst =>
+            inst.ordered.forEach(meas =>
+                meas.cache = Window.calculate_cache(meas))
+        );
 
         // calculate insertMeas visual locations
         if ('beats' in Window.insertMeas)
@@ -975,7 +972,11 @@ export default function measure(p) {
         };
 
         if ([...NUM, ...Object.keys(LETTERS).map(l => parseInt(l, 10)), DEL, BACK, LEFT, RIGHT, PERIOD].indexOf(p.keyCode) > -1) {
-            if (Window.editor.type) {
+            if (NUM.indexOf(p.keyCode) > -1 && Window.modulation) {
+                e.preventDefault();
+                Window.change_modulation(p.keyCode);
+                return;
+            } else if (Window.editor.type) {
                 e.preventDefault();
                 Window.change_editor(p.keyCode);
                 return;
@@ -1301,33 +1302,40 @@ export default function measure(p) {
         if (Window.modulation) {
             let [frameX, frameY] = [p.mouseX - c.PANES_WIDTH, p.mouseY - c.PLAYBACK_HEIGHT];
             let [x, y] = [Window.modulation.origin.x(), Window.modulation.origin.y()];
+            Window.modulation.zone = (frameX < x) ? 'Left' : 'Right';
             // skip if wheel not within reach
             if (Math.abs(frameX - x) < 20)
                 return;
 
+            let target = 'index' + Window.modulation.zone;
             // offset from center
-            let target;
-            if (frameX < x) {
-                x -= 20;
-                target = 'indexLeft';
-            } else {
-                x += 20;
-                target = 'indexRight';
-            }
-                let dist = p.dist(x, y, frameX, frameY)
-                if (dist > 30 && dist < 50) {
-                    let theta = p.atan((frameY - y)/(frameX - x));
-                    if (theta <= 1.5 && theta >= -1.5) {
-                        let clamp_ratio = 5/3;
-                        let index = Math.floor((theta+1.5) * clamp_ratio);
-                        let old_index = Window.modulation[target];
-                        // invert option indices, depending on side
-                        Window.modulation[target] = (target === 'indexLeft') ? 4-index : index;
-                        if ((!old_index) || (old_index !== Window.modulation[target]))
-                            Window.calc_metric_modulation();
-                    }
-                    return;
+            x += (frameX < x) ? -20 : 20;
+            if (Window.modulation.menuLeft || Window.modulation.menuRight) {
+                let diff = frameX - x - ((frameX < x) ? -6 : 6);
+                let half_width = p.textWidth('18:18') * 0.5;
+                if (diff < 0 && diff > -half_width) {
+                    return Window.modulation.tuplet_zone = 0
+                } else if (diff > 0 && diff < half_width) {
+                    return Window.modulation.tuplet_zone = 1;
                 }
+            }
+            delete Window.modulation.tuplet_zone;
+            let dist = p.dist(x, y, frameX, frameY)
+            if (dist > 30 && dist < 50) {
+                let theta = p.atan((frameY - y)/(frameX - x));
+                if (theta <= 1.5 && theta >= -1.5) {
+                    let clamp_ratio = 5/3;
+                    let index = Math.floor((theta+1.5) * clamp_ratio);
+                    let old_index = Window.modulation[target];
+                    // invert option indices, depending on side
+                    Window.modulation[target] = (target === 'indexLeft') ? 4-index : index;
+                    if ((!old_index) || (old_index !== Window.modulation[target])) {
+                        Window.modulation['timer' + Window.modulation.zone] = p.frameCount + 12;
+                        Window.calc_metric_modulation();
+                    }
+                }
+                return;
+            }
         }
 
 
