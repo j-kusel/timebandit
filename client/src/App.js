@@ -721,24 +721,21 @@ class App extends Component {
 
 
   handleStart(focus, e) {
-      let func = () => this.state.pollingCb(focus && 'start');
-      /*focus ? setTimeout(func, 20) :*/ func();
       if (this.state.mouseBlocker())
           return;
-    this.setState({ temp_start: focus });
+      this.state.pollingCb(focus && 'start');
+      this.setState({ temp_start: focus });
   }
   handleEnd(focus, e) {
-      let func = () => this.state.pollingCb(focus && 'end');
-      /*focus ? setTimeout(func, 20) :*/ func();
-
       if (this.state.mouseBlocker())
           return;
-    this.setState({ temp_end: focus });
+      this.state.pollingCb(focus && 'end');
+      this.setState({ temp_end: focus });
   }
   handleOffset(focus, e) {
       if (this.state.mouseBlocker())
           return;
-    this.setState({ temp_offset: focus });
+      this.setState({ temp_offset: focus });
   }
 
 
