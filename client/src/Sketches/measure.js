@@ -1275,7 +1275,9 @@ export default function measure(p) {
         if (inst >= instruments.length || inst < 0)
             return;
 
-        Mouse.select();
+        //Mouse.select();
+        console.log(Mouse.rollover);
+        Window.select(_.pick(Mouse.rollover, ['inst', 'meas']));
 
         if (Window.selected.meas) {
             if (Window.mods.shift) {
@@ -1375,6 +1377,7 @@ export default function measure(p) {
 
         // retrieve the target measure and calculate the measure's gaps, if not cached
         let measure = Window.selected.meas;
+        console.log(Window.selected);
         if (!('gaps' in measure))
             measure.gaps = calcGaps(instruments[Window.selected.inst].ordered, Window.selected.meas.id);
         if (!crowd_cache)
@@ -2085,7 +2088,7 @@ export default function measure(p) {
                         } else
                             return false;
                     }))
-                        Mouse.setRollover({ type: 'measure', meas });
+                        Mouse.setRollover({ type: 'measure', inst: inst_row, meas });
                     return true;
                 } else
                     return false;

@@ -253,7 +253,6 @@ export default (p) => {
             this.POLL_FLAG = type || null;
         }
 
-
         change_instName(input) {
             let num = NUM.indexOf(p.keyCode);
             let letter = LETTERS[p.keyCode];
@@ -988,6 +987,7 @@ export default (p) => {
                 delete this.selected.meas.temp;
             }
             Object.assign(this.selected, newSelected);
+            console.log(this.selected);
             return true;
         }
      
