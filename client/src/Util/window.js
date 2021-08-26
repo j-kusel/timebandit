@@ -5,12 +5,15 @@ import { crowding } from '../Util/index.js';
 import { NUM, LETTERS, LEFT, RIGHT, DEL, BACK, PERIOD } from './keycodes';
 import _ from 'lodash';
 
+let selected_obj = {
+    inst: -1, meas: false,
+};
+
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     //console.log(oldMeas);
     let old_slope = oldMeas.end - oldMeas.start;
     let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
     let lock_percent = beat_lock.beat / oldMeas.timesig;
-    console.log(old_slope, lock_tempo, lock_percent);
     if (type === 'start')
         newMeas.end = (lock_tempo - newMeas.start)/lock_percent + newMeas.start
     else if (type === 'end')
@@ -51,10 +54,7 @@ export default (p) => {
             // modes: ESC, INS, EDITOR
             this.mode = 0;
             this.panels = false;
-            this.selected = {
-                inst: -1,
-                meas: undefined
-            };
+            this.selected = Object.assign({}, selected_obj);
             this.insts = 0;
             this.mods = {};
 
@@ -344,8 +344,6 @@ export default (p) => {
 
                     // check if tempo locked somewhere
                     if (locks[lock] !== 'loc') {
-                        console.log(selected);
-                        console.log(updated);
                         // if start has changed
                         if (this.editor.type === 'start' && (updated.start !== selected.start))
                             this.editor.next.end = tempo_edit(selected, updated, beat_lock, 'start').end.toString()
@@ -370,7 +368,6 @@ export default (p) => {
                 //calc.offset = this.editor.temp_offset;
                 console.log(this.editor.temp_offset);
                 if (beat_lock.type === 'loc' || beat_lock.type === 'both')
-                    //calc.offset += selected.beats[beat_lock.beat] - calc.beats[beat_lock.beat];
                     this.editor.temp_offset += selected.beats[beat_lock.beat] - calc.beats[beat_lock.beat];
 
                 calc.offset = this.editor.temp_offset;
@@ -745,7 +742,7 @@ export default (p) => {
 
         initialize_temp(meas) {
             console.log('INITIALIZED');
-            let sel = meas || this.selected.meas;
+            let sel = meas || this.selected[meas.id];
             
             sel.temp = _.pick(sel, [
                 'start', 'end', 'ms', 'ticks', 'beats',
@@ -973,22 +970,52 @@ export default (p) => {
             p.pop();
         }
 
+        resetSelection() {
+            return Object.assign({}, selected_obj);
+        }
+
+        getSelection() {
+            return Object.keys(this.selected).reduce((acc, key) => {
+                return (['inst','meas','all','dir'].indexOf(key) > -1) ?
+                    acc : acc.concat(key)
+            }, []);
+        }
+
         select(newSelected) {
+            let add = this.mods.mod;
             if (newSelected === 'clear') {
                 if (this.selected.inst === -1)
                     return false;
-                Object.assign(this.selected, { inst: -1, meas: undefined });
+                this.selected = this.resetSelection();
                 return true;
             }
-            if (this.selected.meas) {
-                if (newSelected.meas && (this.selected.meas.id === newSelected.meas.id))
+            if ('meas' in newSelected) {
+                let id = newSelected.meas.id;
+                if (this.selected[id]) {
+                    if (add) {
+                        delete this.selected[id];
+                        if (!this.getSelection().length)
+                            this.selected.meas = false;
+                        return true;
+                    }
                     return false;
+                } else {
+                    add ?
+                        this.selected[id] = newSelected.meas :
+                        this.selected = Object.assign({ [id]: newSelected.meas }, this.resetSelection());
+                    this.selected.meas = true;
+                }
                 this.editMeas = {};
-                delete this.selected.meas.temp;
+                // HOW DO YOU DELETE TEMP HERE?
+                //delete this.selected.meas.temp;
+                console.log(this.selected);
+                return true;
+            } else {
+                this.selected = this.resetSelection();;
+                this.selected.inst = newSelected.inst;
             }
-            Object.assign(this.selected, newSelected);
-            console.log(this.selected);
-            return true;
+            //Object.assign(this.selected, newSelected);
+            return false;
         }
      
         drawFrame() {
@@ -1061,7 +1088,7 @@ export default (p) => {
             p.fill(secondary_light2);
 
             // handle color if inst selected
-            if (!this.selected.meas && this.selected.inst === index)
+            if (this.selected.inst === index)
                 p.fill(colors.selected_inst);
             p.rect(0, 0, p.width-1, c.INST_HEIGHT-1);
             p.pop();
@@ -1279,7 +1306,7 @@ export default (p) => {
                 p.pop();
             };
 
-            if (this.mode === 2) {
+            /*if (this.mode === 2) {
                 p.rect(0, 0, c.EDITOR_WIDTH, c.EDITOR_HEIGHT);
                 p.stroke(secondary);
                 p.line(0, c.EDITOR_HEIGHT, c.INSERT_WIDTH, c.EDITOR_HEIGHT); 
@@ -1301,6 +1328,7 @@ export default (p) => {
                     p.pop();
                 }
             }
+            */
             p.pop();
         }
 

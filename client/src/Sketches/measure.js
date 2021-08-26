@@ -99,9 +99,9 @@ export default function measure(p) {
     var lock_persist = () => null;
     var reset_lock_persist = () => lock_persist = (() => console.log('not set'));
     var set_lock_persist = (inst, id, locks) =>
-        lock_persist = () =>
+        lock_persist = () => 
             inst < instruments.length ?
-                Object.assign(instruments[inst].measures[id], locks) : null;
+                Object.assign(instruments[inst].measures[id], locks) : null; 
                             
 
     var gatherRanges = (except) =>
@@ -280,7 +280,6 @@ export default function measure(p) {
         lock_persist();
         reset_lock_persist();
         Window.insertMeas = props.insertMeas;
-        //console.log(Window.selected.meas === Mouse.rollover.meas);
         //Window.selected = props.selected || ({ inst: -1, meas: undefined });
         Window.editMeas = props.editMeas;
         Window.newInst = props.newInst;
@@ -327,23 +326,48 @@ export default function measure(p) {
         });
         */
 
+        // I have NO idea what beat lock does here... some kind of insurance against the main react app shifting a measure?
         var beat_lock = {};
-        if (Window.selected.meas && 'locks' in Window.selected.meas) {
+        /*if (Window.selected.meas && 'locks' in Window.selected.meas) {
             let lock_candidates = Object.keys(Window.selected.meas.locks);
             if (lock_candidates.length)
                 beat_lock = { beat: lock_candidates[0], type: Window.selected.meas.locks[lock_candidates[0]] };
         }
+        */
 
-        // reset select, begin logging on update
-        if (Window.selected.inst > -1 && Window.selected.meas)
-            Window.selected.meas = instruments[Window.selected.inst].measures[Window.selected.meas.id];
+        // redraw simply clears temp?
+        if (Window.selected.meas) {
+            Window.getSelection().forEach(id => {
+                console.log(id);
+                let meas = Window.selected[id];
+                console.log(meas);
+                // why is this necessary? why doesn't this reference persist?
+                let ref = instruments[meas.inst].measures[meas.id];
+                if (ref) {
+                    Window.selected[id] = ref;
+                    delete ref.temp;
+                }
+            });
 
-        if ('ms' in Window.editMeas) {
-            Window.selected.meas.temp = Window.editMeas;
-            if ('beat' in beat_lock)
-                Window.selected.meas.temp.offset = Window.selected.meas.temp.offset + Window.selected.meas.beats[beat_lock.beat] - Window.editMeas.beats[beat_lock.beat];
-        } else if (Window.selected.meas && 'temp' in Window.selected.meas)
-            delete Window.selected.meas.temp;
+        }
+
+        // REVISITING THIS ENTIRE BLOCK {
+            // reset select, begin logging on update
+            // NOW HANDLED ABOVE
+            /*if (Window.selected.inst > -1 && Window.selected.meas)
+                Window.selected.meas = instruments[Window.selected.inst].measures[Window.selected.meas.id];
+                */
+
+            // EDITMEAS OBSOLETE?
+            /*if ('ms' in Window.editMeas) {
+                Window.selected.meas.temp = Window.editMeas;
+                if ('beat' in beat_lock)
+                    Window.selected.meas.temp.offset = Window.selected.meas.temp.offset + Window.selected.meas.beats[beat_lock.beat] - Window.editMeas.beats[beat_lock.beat];
+            // TEMP DELETED ABOVE
+            } else if (Window.selected.meas && 'temp' in Window.selected.meas)
+                delete Window.selected.meas.temp;
+                */
+        // }
 
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
@@ -463,7 +487,7 @@ export default function measure(p) {
                 p.translate(origin, 0);
 
                 // handle selection
-                if (Window.selected.meas && key === Window.selected.meas.id) {
+                if (Window.selected.meas && (key in Window.selected)) {
                     let sel_color = p.color(colors.contrast);
                     sel_color.setGreen(150);
                     sel_color.setAlpha(50);
@@ -755,7 +779,7 @@ export default function measure(p) {
             Debug.push(`viewport: ${Window.viewport}`);
             Debug.push(`scale: ${Window.scale}`);
             Debug.push(`scroll: ${Window.scroll}`);
-            Debug.push(`selected: ${Window.selected.inst}, ${Window.selected.meas ? Window.selected.meas.id : ''}`);
+            Debug.push(`selected: ${Window.selected.inst}, ${Window.selected.meas ? Window.getSelection().join(', ') : ''}`);
             Debug.write({ x: 0, y: (instruments.length+1)*c.INST_HEIGHT + c.DEBUG_TEXT }, c.DEBUG_TEXT);
             Debug.frameRate();
             Debug.clear();
@@ -1116,8 +1140,9 @@ export default function measure(p) {
 
         if ((p.keyCode === DEL || p.keyCode === BACK)) {
             if (!API.checkFocus() && Window.selected.meas) {
-                let to_delete = Window.selected;
-                Window.selected = { inst: -1 };
+                console.log(Window.getSelection());
+                let to_delete = Window.getSelection().map(key => Window.selected[key]);
+                Window.selected = Window.resetSelection();
                 API.deleteMeasure(to_delete);
             }
             return;
@@ -1197,7 +1222,6 @@ export default function measure(p) {
 
         // polling mode functions
         if (Window.POLL_FLAG && Mouse.rollover.type === 'beat') {
-            console.log(Mouse.rollover);
             // check bounding box
             let frameY = p.mouseY - c.PLAYBACK_HEIGHT - Mouse.rollover.inst*c.INST_HEIGHT;
             let half_height = c.INST_HEIGHT * 0.5;
@@ -1276,22 +1300,30 @@ export default function measure(p) {
             return;
 
         //Mouse.select();
-        console.log(Mouse.rollover);
-        Window.select(_.pick(Mouse.rollover, ['inst', 'meas']));
-
-        if (Window.selected.meas) {
+        if ('meas' in Mouse.rollover && Mouse.rollover.meas.id in Window.selected/*Window.selected.meas*/) {
+            console.log('in HERE');
             if (Window.mods.shift) {
                 if (Window.mods.mod)
                     Mouse.tickMode()
                 else
                     Mouse.measureMode();
+                return;
             } else if (Window.mods.mod) {
-                if (Mouse.rollover.type === 'beat')
-                    Mouse.beatLock()
-                else if (Mouse.rollover.type === 'tempo')
+                if (Mouse.rollover.type === 'beat') {
+                    Mouse.beatLock();
+                    return;
+                } else if (Mouse.rollover.type === 'tempo') {
                     Mouse.checkTempo();
+                    return;
+                }
             }
         };
+
+        // on new selection, skip all other options
+        if (Window.select(_.pick(Mouse.rollover, ['inst', 'meas']))) {
+            console.log('new selection, returning');
+            return true;
+        }
 
         API.displaySelected(Window.selected);
     }
@@ -1365,7 +1397,7 @@ export default function measure(p) {
         // still can't drag the first beat, this needs to be changed
         if (Mouse.rollover.beat === 0
             //|| Mouse.cancel
-            || Window.selected.meas === -1)
+            || (!Window.selected.meas))
             return;
 
         // can't drag if nothing selected
@@ -1376,10 +1408,9 @@ export default function measure(p) {
 
 
         // retrieve the target measure and calculate the measure's gaps, if not cached
-        let measure = Window.selected.meas;
-        console.log(Window.selected);
+        let measure = Mouse.rollover.meas/*Window.selected.meas*/;
         if (!('gaps' in measure))
-            measure.gaps = calcGaps(instruments[Window.selected.inst].ordered, Window.selected.meas.id);
+            measure.gaps = calcGaps(instruments[measure.inst].ordered, measure.id);
         if (!crowd_cache)
             crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true, context: { position: measure.offset, ms: measure.ms } });
         var crowd = crowd_cache;
@@ -1402,7 +1433,7 @@ export default function measure(p) {
             candidates.reduce((acc, candidate, index) => {
                 let next = position + candidate;
                 let target, gap, inst;
-                ({ target, gap, inst } = closest(next, Window.selected.inst, snaps.div_index));
+                ({ target, gap, inst } = closest(next, measure.inst, snaps.div_index));
                 if (Math.abs(gap) < Math.abs(acc.gap)) {
                     if (exempt !== undefined && index === exempt) {
                         return acc;
@@ -1518,7 +1549,7 @@ export default function measure(p) {
             if (check_snap && close.index !== -1) {
                 let gap = close.target - (meas.beats[close.index] + position);
                 if (Math.abs(gap) < 50) {
-                    snaps.snapped_inst = { ...close, origin: Window.selected.inst };
+                    snaps.snapped_inst = { ...close, origin: measure.inst };
                     update.offset = position + gap;
                 } else
                     snaps.snapped_inst = {};
@@ -1530,10 +1561,10 @@ export default function measure(p) {
         // the following are necessary for 'tempo'/'tick' drags
 
         // retrieve locks
-        let lock_candidates = ('locks' in Window.selected.meas) ?
-            Object.keys(Window.selected.meas.locks) : [];
+        let lock_candidates = ('locks' in measure) ?
+            Object.keys(measure.locks) : [];
         var beat_lock = lock_candidates.length ?
-            ({ beat: parseInt(lock_candidates[0], 10), type: Window.selected.meas.locks[lock_candidates[0]] }) :
+            ({ beat: parseInt(lock_candidates[0], 10), type: measure.locks[lock_candidates[0]] }) :
             {};
 
         // LENGTH GRADIENT DESCENT
@@ -1772,6 +1803,7 @@ export default function measure(p) {
             let slope = measure.end - measure.start;
 
             let perc = Math.abs(slope) < c.FLAT_THRESHOLD ?
+                // where did dir here come from??
                 ((Window.selected.dir === 1) ? -c.FLAT_THRESHOLD : c.FLAT_THRESHOLD) :
                 Mouse.grabbed/Math.abs(slope);
 
@@ -1858,7 +1890,7 @@ export default function measure(p) {
                 return finalize();
             }
 
-            let close_calc = closest(loc, Window.selected.inst, snaps.div_index);
+            let close_calc = closest(loc, measure.inst, snaps.div_index);
             let snap_to = close_calc.target;
             console.log(close_calc);
             
@@ -1908,7 +1940,7 @@ export default function measure(p) {
         }
 
         if (Mouse.drag.mode === 'lock') {
-            Window.lockConfirm(Window.selected.meas, Mouse.lock_type);
+            Window.lockConfirm(Mouse.rollover.meas, Mouse.lock_type);
             Mouse.resetDrag();
             return;
         }
@@ -1939,7 +1971,7 @@ export default function measure(p) {
         nudge_cache = false;
         crowd_cache = false;
 
-        if (!(Window.selected.meas)
+        if (!(Mouse.rollover.meas)
             || p.mouseY < 0 || p.mouseY > p.height
         ) {
             Mouse.resetDrag();
@@ -1947,17 +1979,23 @@ export default function measure(p) {
         }
 
         // process drag results
-        let selected = Window.selected.meas;
+
+        if (!Mouse.drag.mode)
+            return;
         if (Window.range.temprange) {
             Window.updateRange({ tempo: Window.range.temprange });
             delete Window.range.temprange;
         }
 
+        let selected = Mouse.rollover.meas;
         // request that locks persist after API updateMeasure()
-        if ('locks' in selected)
-            set_lock_persist(selected.inst, selected.id, Object.assign({}, { locks:  selected.locks }));
+        let lock_persistence = () => {
+            if ('locks' in selected)
+                set_lock_persist(selected.inst, selected.id, Object.assign({}, { locks:  selected.locks }));
+        }
 
         if (Mouse.drag.mode === 'tempo') {
+            lock_persistence();
             API.updateMeasure(selected.inst, selected.id, selected.temp.start, selected.temp.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             /*if (selected)
                 delete Window.selected.meas.temp;*/
@@ -1966,7 +2004,8 @@ export default function measure(p) {
             if (Window.editor.type)
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
             else {
-                API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.start, selected.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
+                lock_persistence();
+                API.updateMeasure(selected.inst, selected.id, selected.start, selected.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             }
             Mouse.resetDrag();
             return;
@@ -1976,7 +2015,8 @@ export default function measure(p) {
             Mouse.resetDrag();
             if (end < 10)
                 return;
-            API.updateMeasure(Window.selected.inst, Window.selected.meas.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
+            lock_persistence();
+            API.updateMeasure(selected.inst, selected.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
         };
 
         return;
@@ -2097,7 +2137,7 @@ export default function measure(p) {
         }
 
         // set cursor based on Mouse.rollover
-        Mouse.eval_cursor(Window.mods, Window.selected.meas);
+        Mouse.eval_cursor(Window.mods, Window.selected);
 
         return false;
     };

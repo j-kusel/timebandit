@@ -125,7 +125,7 @@ export default (p, Window) => {
 
             let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
             // check for editor menus
-            if (Window.mode === 2 && Window.selected.meas) {
+            /*if (Window.mode === 2 && Window.selected.meas) {
                 let selStart = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
                 let menuStart = (inst+1)*c.INST_HEIGHT + c.PLAYBACK_HEIGHT;
 
@@ -137,14 +137,14 @@ export default (p, Window) => {
                     this.canceller(true, 'Mouse clicked over editor menu');
                     return true;
                 }
-            }
+            }*/
             this.canceller(false);
             return false;
         };
 
         tickMode() {
-            let measure = Window.selected.meas;
-            Window.initialize_temp();
+            let measure = this.rollover.meas;
+            Window.initialize_temp(measure);
             let divisor = measure.denom/4;
             this.grabbed = this.rollover.beat === measure.beats.length - 1 ?
                 60000.0/measure.beats.slice(-1)[0]
@@ -162,7 +162,7 @@ export default (p, Window) => {
 
         measureMode() {
             if (!(Window.editor.type && ('temp' in Window.editor.meas)))
-                Window.initialize_temp();
+                Window.initialize_temp(this.rollover.meas);
             this.drag.mode = 'measure';
         }
 
@@ -180,15 +180,16 @@ export default (p, Window) => {
             if (parse_bits(locked[Window.selected.meas.id].beats).length < 2 || parse_bits(locked[Window.selected.meas.id].beats).indexOf(this.rollover.beat) !== -1)
                 locked[Window.selected.meas.id].beats = bit_toggle(locked[Window.selected.meas.id].beats, this.rollover.beat);
                 */
-            if (Window.locking(Window.selected.meas, this.rollover.beat))
+            console.log('locking');
+            if (Window.locking(this.rollover.meas, this.rollover.beat))
                 this.drag.mode = 'lock';
         }
 
         checkTempo() {
-            if (!Window.selected.meas)
+            if (!this.rollover.meas)
                 return false;
             this.drag.mode = 'tempo';
-            Window.initialize_temp();
+            Window.initialize_temp(this.rollover.meas);
             this.drag.grab = this.rollover.beat;
             this.grabbed = this.rollover.beat;
         }
@@ -256,13 +257,11 @@ export default (p, Window) => {
 
         eval_cursor(mods, selected) {
             this.cursor = 'default';
-            if (selected) {
+            if (Window.selected.meas) {
                 // if selected measure is in rollover
-                if ('meas' in this.rollover && this.rollover.meas.id === selected.id) {
+                if ('meas' in this.rollover && Window.getSelection().indexOf(this.rollover.meas.id) > -1) {
                     if (Window.mods.mod && (this.rollover.type === 'beat')) {
-                        this.cursor = 'pointer';
-                        if (Window.mods.shift)
-                            this.cursor = 'text';
+                        this.cursor = (Window.mods.shift) ? 'text' : 'pointer';
                     } else if (Window.mods.shift && this.rollover.type === 'measure')
                         this.cursor = 'ew-resize';
                 }

@@ -281,36 +281,22 @@ class App extends Component {
       };
 
       var deleteMeasure = (selected) => self.setState(oldState => {
-          logger.log(`Deleting measure ${selected.meas.id} from instrument ${selected.inst}.`);
+          console.log(selected);
           let ordered_cpy = oldState.ordered;
           if (Object.keys(ordered_cpy)) {
-              let meas_to_delete = oldState.instruments[selected.inst].measures[selected.meas.id];
-              meas_to_delete
-                  .beats.forEach((beat, ind) => {
-                      // IN PROGRESS
-                      /*
-                      let find = (node, { _clear }) => {
-                          console.log(_clear);
-                          if (node === undefined)
-                              return;
-                          if (Math.abs(node.loc - _clear) < 5) {
-                              console.log('finding it here');
-                              //node.meas = node.meas.filter(meas => meas.inst !== selected.inst);
-                              node.meas.splice(node.meas.indexOf(selected.inst));
-                              
-                              // NEED TO REPLACE NODE
-                          }
-                          (_clear < node.loc) ?
-                              find(node.left, { _clear }) :
-                              find(node.right, { _clear });
-                      }
-                      */
-
-                      ordered.tree.edit(ordered_cpy, { _clear: beat + meas_to_delete.offset, inst: selected.inst });
-                  });
+              selected.forEach(meas => {
+                  let meas_to_delete = oldState.instruments[meas.inst].measures[meas.id];
+                  meas_to_delete
+                      .beats.forEach((beat, ind) => {
+                          ordered.tree.edit(ordered_cpy, { _clear: beat + meas_to_delete.offset, inst: selected.inst });
+                      });
+              });
           }
 
-          delete oldState.instruments[selected.inst].measures[selected.meas.id];
+          selected.forEach(meas => {
+              logger.log(`Deleting measure ${meas.id} from instrument ${meas.inst}.`);
+              delete oldState.instruments[meas.inst].measures[meas.id]
+          });
           return ({ instruments: oldState.instruments, selected: {}, ordered: ordered_cpy });
       });
 
