@@ -1,5 +1,21 @@
 import c from '../config/CONFIG.json';
 
+const FLOAT_MUL = Math.pow(10, 8);
+const MUL = (x) => Math.round(x*FLOAT_MUL)/FLOAT_MUL;
+
+var lt = (x, y) =>
+    (isFinite(x) ? MUL(x):x) //x.toFixed(FLOAT):x)
+        < (isFinite(y) ? MUL(y):y)//y.toFixed(FLOAT):y);
+var lte = (x, y) =>
+    (isFinite(x) ? MUL(x):x)
+        <= (isFinite(y) ? MUL(y):y);
+var gt = (x, y) =>
+    (isFinite(x) ? MUL(x):x)
+        > (isFinite(y) ? MUL(y):y);
+var gte = (x, y) =>
+    (isFinite(x) ? MUL(x):x)
+        >= (isFinite(y) ? MUL(y):y);
+
 // finds adjacent measures and returns their location and distance
 var crowding = (gaps, position, ms, { center=false, strict=false, context=false, impossible=false } = {}) => {
     let final = position + ms;
@@ -58,11 +74,100 @@ var crowding = (gaps, position, ms, { center=false, strict=false, context=false,
         }, { start: [0, Infinity], end: [0, Infinity], gap: -1 });
 }
 
+var initial_gap = (gaps, offset, ms, /*current*/) => {
+    // right now this starts by finding the first 
+    let current = -1;
+    gaps.some((gap, i) => {
+        if (offset >= gap[0] &&
+            offset + ms <= gap[1]
+        ) {
+            current = i;
+            return true;
+        }
+        return false;
+    });
+    let gap_left, gap_right;
+    var search_gap = (current, dir) => {
+        // left and right boundaries of current gap
+        let left = gaps[current][0];
+        let right = gaps[current][1];
+
+        // too big? keep searching
+        if (ms > right - left) {
+            if (dir > 0)
+                return search_gap(current+1, dir);
+            return search_gap(current-1, dir);
+        }
+        return gaps[current];
+    }
+
+    // left and right search
+    // later, allow previous caches to be passed in to reduce gap search calculations
+    if (current-1 > -1)
+        gap_left = search_gap(current-1, -1);
+    if (current+1 < gaps.length)
+        gap_right = search_gap(current+1, 1);
+
+    return { 
+        left: gap_left, right: gap_right,
+        wiggle: [
+            offset - gaps[current][0],
+            gaps[current][1] - (offset + ms)
+        ]
+    }
+    // something here about return false or recurse if negative
+
+}
+
+var anticipate_gap = (gaps, offset, ms, /*current*/) => {
+    let [left, current, right] = [null, null, null];
+    let end = offset+ms;
+    console.log(offset, ms, end);
+    console.log('checking gaps: ', gaps);
+    let valid = gaps.some((gap, i) => {
+        console.log(offset, end);
+        if (gte(offset, gap[0]) && lte(end, gap[1])) {
+            console.log('this fits');
+
+            current = gap;
+            if (i<gaps.length-1)
+                right = gaps[i+1];
+            return true;
+        } else console.log('this doesnt fit');
+        if (lte(ms, gap[1] - gap[0]))
+            left = gap;
+    });
+    console.log(gaps, gaps.length, offset);
+    if (!(valid || right))
+        right = [gaps[gaps.length-1][0]];
+
+
+
+    //console.log(left, right, current);
+
+    // if measure is valid, return its wiggle room,
+    // otherwise return the distance in either direction
+    // to the previous/next gap
+    let obj = {
+        valid,
+        resolution: [
+            left ? offset - (left[1]-ms) : Infinity, //null,
+            right ? right[0] - offset : Infinity //null
+        ]
+    };
+    if (valid)
+        obj.wiggle = [
+            offset - current[0],
+            current[1] - (offset + ms)
+        ];
+
+    return obj;
+}
+
 var MeasureCalc = (features, options) => {
     let start, end, timesig, denom;
     let PPQ, PPQ_tempo;
     ({ start, end, timesig, denom } = features);
-    console.log(denom);
     if (!denom)
         denom = 4;
     ({ PPQ, PPQ_tempo } = options);
@@ -137,6 +242,9 @@ var parse_bits = (n) => {
     return bits;
 };
 
-export { MeasureCalc, order_by_key, check_proximity_by_key, bit_toggle, parse_bits, crowding };
+export { MeasureCalc, order_by_key, check_proximity_by_key,
+    bit_toggle, parse_bits, crowding, anticipate_gap, initial_gap,
+    lt, lte, gt, gte
+};
 
 

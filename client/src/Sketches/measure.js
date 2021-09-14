@@ -3,7 +3,8 @@
  * @module sketch
  */
 
-import { order_by_key, check_proximity_by_key, parse_bits, crowding } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, parse_bits, crowding, initial_gap, anticipate_gap } from '../Util/index.js';
+import { lt, lte, gt, gte } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
@@ -28,6 +29,10 @@ const SLOW = process.env.NODE_ENV === 'development';
 var API = {};
 var input;
 
+var conflict = [Infinity, -Infinity];
+var obstacles = [Infinity, -Infinity];
+
+
 const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
 //const [SHIFT, ALT] = [16, 18];
 const [KeyC, KeyI, KeyV] = [67, 73, 86];
@@ -38,19 +43,28 @@ const [KeyC, KeyI, KeyV] = [67, 73, 86];
 // generates measure.gaps in 'measure' drag mode
 var calcGaps = (measures, id) => {
     var last = false;
+    if (!(typeof id === 'object'))
+        id = [id];
     // ASSUMES MEASURES ARE IN ORDER
-    return measures.reduce((acc, meas, i) => {
+    let obstacles = [];
+    let gaps = measures.reduce((acc, meas, i) => {
         // skip measure in question
-        if (id && (meas.id === id))
+        if (id.length && id.indexOf(meas.id) > -1)
             return acc;
         acc = [...acc, [
             (last) ? last.offset + last.ms : -Infinity,
             meas.offset
         ]];
+        obstacles.push(meas);
         last = meas;
         return acc;
     }, [])
         .concat([[ last.offset + last.ms, Infinity ]]);
+    return { gaps, obstacles };
+};
+
+var mergeGaps = (gaps) => {
+
 };
 
 // tweaks learning rate for nudge algorithms
@@ -384,7 +398,8 @@ export default function measure(p) {
             };
 
             // cache gaps
-            inst.gap_cache = calcGaps(inst.ordered, '');
+            inst.gap_cache = calcGaps(inst.ordered, '').gaps;
+            console.log(inst.gap_cache);
         });
 
         // calculate beat visual locations for all measures
@@ -450,6 +465,7 @@ export default function measure(p) {
 
         // this instrument loop is 200 lines, that's ridiculous.
         // now down to 115.
+
         instruments.forEach((inst, i_ind) => {
             // prototyping this new function
             Window.drawInst(inst, i_ind);
@@ -618,6 +634,26 @@ export default function measure(p) {
                         });
                 }
 
+                if (measure.temp && measure.temp.crowd) {
+                    p.push();
+                    let origin = measure.cache.offset + Window.viewport;
+                    p.translate(origin, 0);
+                    let box_color = p.color(colors.accent);
+                    box_color.setAlpha(100);
+                    p.stroke(box_color);
+                    p.fill(box_color);
+                    /*let crowd = measure.temp.crowd;
+                    if (crowd.start[1] < 0) {
+                        let start = Math.min(-(crowd.start[1] * Window.scale), measure.cache.ms);
+                        p.rect(0, 0, start, c.INST_HEIGHT);
+                    }
+                    if (crowd.end[1] < 0) {
+                        let end = Math.min(-(crowd.end[1] * Window.scale), measure.cache.ms);
+                        p.rect(measure.cache.ms-end, 0, end, c.INST_HEIGHT);
+                    }
+                    */
+                    p.pop();
+                }
 
             });
 
@@ -672,6 +708,18 @@ export default function measure(p) {
             p.pop();
             p.pop();
         });
+        if (conflict) {
+            p.push();
+            let cb = p.color(colors.accent);
+            cb.setAlpha(100);
+            p.fill(cb);
+            p.rect(Window.ms_to_x(conflict[0]), 0, (conflict[1]-conflict[0])*Window.scale, instruments.length*c.INST_HEIGHT); 
+            cb = p.color(colors.contrast);
+            cb.setAlpha(100);
+            p.fill(cb);
+            p.rect(Window.ms_to_x(obstacles[0]), 0, (obstacles[1]-obstacles[0])*Window.scale, instruments.length*c.INST_HEIGHT); 
+            p.pop();
+        };
 
         if (Window.modulation || (Window.POLL_FLAG && Mouse.rollover.type === 'beat'))
             Window.drawTempoPicker(Mouse.rollover);
@@ -912,7 +960,7 @@ export default function measure(p) {
             if (Window.editor.timer < p.frameCount) {
                 console.log(Window.editor);
                 Window.recalc_editor();
-                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
+                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id).gaps);
                 Window.editor.timer = null;
             }
             p.pop();
@@ -1041,7 +1089,7 @@ export default function measure(p) {
                 if (Window.editor.timer) {
                     Window.editor.timer = null;
                     Window.recalc_editor();
-                    Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
+                    Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id).gaps);
                 }
 
                 if ('start' in selected.temp.invalid || 'end' in selected.temp.invalid)
@@ -1244,7 +1292,7 @@ export default function measure(p) {
                 Window.enter_instName(Mouse.rollover.inst, instruments[Mouse.rollover.inst].name)
             else if (Window.editor.type && Window.editor.type !== type) {
                 Window.recalc_editor();
-                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id));
+                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id).gaps);
                 Window.editor.timer = null;
                 Window.editor.type = type
             } else
@@ -1305,8 +1353,176 @@ export default function measure(p) {
             if (Window.mods.shift) {
                 if (Window.mods.mod)
                     Mouse.tickMode()
-                else
-                    Mouse.measureMode();
+                else {
+                    // 'measure' mode
+                    let instMeas = [];
+                    let gapTraces = {};
+                    let count = 0;
+                    for (let i=0; i<instruments.length; i++) {
+                        instMeas.push([]);
+                        count += Object.keys(instruments[i].measures).length;
+                    }
+                    let selections = Window.getSelection().map(id => Window.selected[id]);
+                    if (selections.length === count)
+                        return Mouse.measureMode({ breaks: false });
+                    selections.forEach(meas => {
+                        instMeas[meas.inst].push(meas.id);
+                    });
+                    let instGaps = instMeas.map((ids, ind) =>
+                        calcGaps(instruments[ind].ordered, ids));
+                    console.log(instGaps);
+
+                    var fit_check = (select, bias, gap) => {
+                        let offset = select.offset + bias;
+                        console.log('fit check');
+                        console.log(`meas offset: ${select.offset}, check bias: ${bias}, total offset: ${offset}`);
+                        console.log(`is ${offset} >= ${gap[0]}? is ${offset+select.ms} <= ${gap[1]}?`);
+                        //return offset >= gap[0] && offset + select.ms <= gap[1];
+                        return gte(offset, gap[0]) && lte(offset + select.ms, gap[1]);
+                    };
+                    // find initial gap for each selection
+                    selections.forEach(select => {
+                        let meas = gapTraces[select.id] = {};
+                        meas.meas = select;
+                        meas.gaps = instGaps[select.inst].gaps;
+                        meas.gaps.some((gap, i) =>
+                            fit_check(select, 0, gap)
+                                && ((meas.pointer = i) || true)
+                        );
+                        meas.initial = meas.pointer;
+                    });
+                    console.log(gapTraces);
+
+                    // find first global obstacle on left
+                    let bias = 0;
+                    let searching = () => {
+                        console.log('starting loop. pointers: ', Object.keys(gapTraces).map(key => gapTraces[key].pointer));
+                        return Object.keys(gapTraces).some(key => gapTraces[key].pointer);
+                    };
+                    let left = [];
+                    let ddepth = 10;
+                    let valid = true;
+                    while (isFinite(bias)/* && searching() && (!ddepth--)*/) {
+                        valid = true;
+                        let result = Object.keys(gapTraces).reduce((acc, key) => {
+                            console.group();
+                            let select = gapTraces[key];
+                            let meas = select.meas;
+                            console.log(`checking measure ${meas.timesig}/${meas.denom} in inst `, meas.inst);
+                            // left
+                            let gap = select.gaps[select.pointer];
+                            let fit = fit_check(meas, -bias, gap);
+                            let first = select.pointer === 0;
+                            console.group();
+                            console.log(`checking bias ${bias} in gap ${select.pointer}: `, gap);
+                            if (first) {
+                                let candidate = meas.offset - (select.gaps[0][1]-meas.ms);
+                                if (gt(candidate, bias))
+                                    acc.nearest = Math.min(candidate, acc.nearest);
+                            } else {
+                                acc.nearest = Math.min(acc.nearest, meas.offset - (select.gaps[select.pointer-1][1]-meas.ms))
+                            }
+
+                            if (!fit) {
+                                console.log('measure doesnt fit.');
+                                if (!first)
+                                    select.pointer--;
+                                valid = false;
+                            } else {
+                                console.log('measure fits.');
+                            }
+                            if (valid) {
+                                let offset = meas.offset - bias;
+                                acc.wiggle = Math.min(acc.wiggle, meas.offset - gap[0]);
+                                console.log('everything fits so far. wiggle: ', acc.wiggle);
+                            }
+                            console.log('nearest: ', acc.nearest);
+                            console.groupEnd();
+                            console.groupEnd();
+                            return acc;    
+                        }, {
+                            nearest: Infinity,
+                            wiggle: Infinity,
+                            bias
+                        });
+                        if (valid) {
+                            if (left.length)
+                                left[left.length-1].next = result;
+                            left.push(result);
+                        }
+                        console.log('valid pass: ', valid);
+                        console.log(result);
+                        bias = result.nearest;
+                    }
+
+                    // reset pointers
+                    Object.keys(gapTraces).forEach(key => gapTraces[key].pointer = gapTraces[key].initial);
+                    // find first global obstacle on right
+                    bias = 0;
+                    let right = [];
+                    // the loop continues until gaps are exhausted
+                    while (isFinite(bias)) {
+                        valid = true;
+                        let result = Object.keys(gapTraces).reduce((acc, key) => {
+                            let select = gapTraces[key];
+                            let meas = select.meas;
+                            console.log(`checking inst${meas.inst} meas: ${meas.ms} at ${bias+meas.offset}`);
+                            // left
+                            //if ((select.pointer < select.gaps.length-1)) {
+                                let gap = select.gaps[select.pointer];
+                                console.log('checking gap ', select.pointer);
+
+                                // does the measure fit this gap?
+                                let fit = fit_check(meas, bias, gap);
+                                let last = select.pointer >= select.gaps.length-1;
+
+
+                                if (last) {
+                                    let candidate = select.gaps[select.gaps.length-1][0]-meas.offset;
+                                    if (candidate > bias)
+                                        acc.nearest = Math.min(candidate, acc.nearest);
+                                } else
+                                    acc.nearest = Math.min(select.gaps[select.pointer+1][0]-meas.offset, acc.nearest)
+
+                                if (!fit) {
+                                    console.log('measure doesnt fit.');
+                                    if (!last)
+                                        console.log('still more to check, incrementing pointer to ', select.pointer++);
+                                    valid = false;
+                                } else {
+                                    console.log('measure fits.');
+                                }
+                                if (valid) {
+                                    let offset = meas.offset + bias;
+                                    console.log('wiggle candidates: ', offset-gap[0], gap[1]-meas.ms-meas.offset);
+                                    // if everything still fits, hone down wiggle
+                                    acc.wiggle = Math.min(acc.wiggle, gap[1]-meas.ms-meas.offset);                                 
+                                    console.log('everything fits so far. wiggle: ', acc.wiggle);
+                                }
+                                console.log('nearest: ', acc.nearest);
+
+                            //}
+                            return acc;
+                        }, {
+                            nearest: Infinity,
+                            wiggle: Infinity,
+                            bias
+                        });
+                        if (valid) {
+                            result.half = (result.nearest+result.wiggle)*0.5;
+                            if (right.length)
+                                right[right.length-1].next = result;
+                            right.push(result)
+                        }
+                        console.log('valid pass: ', valid);
+                        console.log(result);
+                        bias = result.nearest;
+                    }
+
+                    console.log(left);
+                    console.log(right);
+                    Mouse.measureMode({ breaks: { left, right }});
+                }
                 return;
             } else if (Window.mods.mod) {
                 if (Mouse.rollover.type === 'beat') {
@@ -1410,7 +1626,7 @@ export default function measure(p) {
         // retrieve the target measure and calculate the measure's gaps, if not cached
         let measure = Mouse.rollover.meas/*Window.selected.meas*/;
         if (!('gaps' in measure))
-            measure.gaps = calcGaps(instruments[measure.inst].ordered, measure.id);
+            measure.gaps = calcGaps(instruments[measure.inst].ordered, measure.id).gaps;
         if (!crowd_cache)
             crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true, context: { position: measure.offset, ms: measure.ms } });
         var crowd = crowd_cache;
@@ -1462,11 +1678,15 @@ export default function measure(p) {
                 let temprange = [Math.min(min, ranges.min), Math.max(max, ranges.max)];
                 Window.updateRange({ temprange });
             }
-            Object.assign(measure.temp, update);
-        
-            measure.temp.invalid = {};
-            let cache = Window.calculate_cache(measure.temp);
-            Object.assign(measure, { cache });
+            if (typeof update.length === 'number') {
+                update.forEach(meas => {
+                    let measure = Window.selected[meas.id];
+                    Object.assign(measure.temp, meas);
+                    measure.temp.invalid = {};
+                    let cache = Window.calculate_cache(measure.temp);
+                    Object.assign(measure, { cache });
+                });
+            }
 
             //API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
             return;
@@ -1515,46 +1735,184 @@ export default function measure(p) {
 
                 return finalize(true);
             }
-            let meas = Window.editor.type ? measure.temp : measure;
-            let position = meas.offset + Mouse.drag.x/Window.scale;
-            let close = snap_eval(position, meas.beats);
 
-            // determine whether start or end are closer
-            // negative numbers signify conflicts
-            //
-            // i think context here was to solve an invalidation display
-            // problem when using the editor because the crowding algorithm
-            // is still broken
-            let crowd = crowding(measure.gaps, position, meas.ms, { center: true/*, context: { position: measure.offset, ms: measure.ms }*/});
-            Object.assign(update, {
-                ticks: meas.ticks.slice(0),
-                beats: meas.beats.slice(0),
-                offset: position
-            });
-            
-            // initialize flag to prevent snapping when there's no space anyways
-            let check_snap = true;
-            if (Math.abs(crowd.start[1]) < Math.abs(crowd.end[1])) {
-                if (crowd.start[1] - c.SNAP_THRESHOLD*2 < 0) {
-                    update.offset = crowd.start[0];
-                    check_snap = false;
-                }
-            } else {
-                if (crowd.end[1] - c.SNAP_THRESHOLD*2 < 0) {
-                    update.offset = crowd.end[0] - meas.ms;
-                    check_snap = false;
-                }
+            let dragged = Mouse.drag.x/Window.scale;
+            let selections = Window.getSelection().map(id => Window.selected[id]);;
+
+            if (Mouse.drag.free) {
+                update = selections.map(s => {
+                    var u = _.pick(s, ['beats', 'ticks', 'offset', 'start', 'end', 'id']);
+                    u.offset += dragged;
+                    return u;
+                });
+                return finalize(true);
+            } else if (Mouse.drag.filter_drag) {
+                let new_drag = Mouse.drag.filter_drag(dragged);
+                update = selections.map(select => {
+                    var meas_update = _.pick(select, ['beats', 'ticks', 'offset', 'start', 'end', 'id']);
+                    meas_update.offset += new_drag;
+                    return meas_update;
+                });
+                return finalize(true);
             }
 
-            if (check_snap && close.index !== -1) {
-                let gap = close.target - (meas.beats[close.index] + position);
-                if (Math.abs(gap) < 50) {
-                    snaps.snapped_inst = { ...close, origin: measure.inst };
-                    update.offset = position + gap;
-                } else
-                    snaps.snapped_inst = {};
-            };
+            // first compile gaps
+            let instMeas = [];
+            for (let i=0; i<instruments.length; i++)
+                instMeas.push([]);
+            let spread = [Infinity, -Infinity];
+            selections.forEach(meas => {
+                let i = meas.inst;
+                spread[0] = Math.min(meas.offset, spread[0]);
+                spread[1] = Math.max(meas.offset + meas.ms, spread[1]);
+                instMeas[i].push(meas.id);
+            });
+            let instGaps = instMeas.map((ids, ind) =>
+                calcGaps(instruments[ind].ordered, ids));
+            console.log(instGaps);
+
+
+            // "conflict boxes" attempt
+            // start with naive drag
             
+            conflict = [Infinity, -Infinity];
+            obstacles = [Infinity, -Infinity];
+            update = selections.map(select => {
+                
+                var meas_update = _.pick(select, ['beats', 'ticks', 'offset', 'start', 'end']);
+                meas_update.id = select.id;
+                // idealized position
+                let position = meas_update.offset + dragged;
+                meas_update.offset = position;
+                meas_update.crowd = crowding(instGaps[select.inst].gaps, position, select.ms, { center: true });
+                let crowd_flag = false;
+                if (meas_update.crowd.start[1] < 0 || meas_update.crowd.end[1] < 0) {
+                    conflict = [Math.min(conflict[0], position), Math.max(conflict[1], position + select.ms)];
+                    crowd_flag = true;
+                }
+                /*
+                if (meas_update.crowd.start[1] < 0) {
+                    conflict[0] = Math.min(conflict[0], position);
+                    crowd_flag = true;
+                }
+                if (meas_update.crowd.end[1] < 0) {
+                    conflict[1] = Math.max(conflict[1], position + select.ms);
+                    crowd_flag = true;
+                }
+                */
+
+                /*if (crowd_flag)
+                    instGaps[select.inst].obstacles.forEach((meas) => {
+                        let end = meas.offset + meas.ms;
+                        if ((meas.offset < conflict[0] && end > conflict[0]) ||
+                            (meas.offset < conflict[1] && end > conflict[1]))
+                            obstacles = [Math.min(obstacles[0], meas.offset), Math.max(obstacles[1], meas.offset + meas.ms)];
+                    });
+                    */
+                
+
+                return meas_update;
+            });
+
+            return finalize(true);
+            
+            // first attempt
+            /*update = [];
+            let jump_start = [];
+            let jump_end = [];
+            let jump = Infinity;
+            let clamp_dragged = dragged;
+            let crowd_flag = '';
+            let move = dragged;
+            instruments.forEach((__, ind) => {
+                instMeas[ind].forEach(id => {
+                    let selected = Window.selected[id];
+                    var meas_update = _.pick(selected, ['beats', 'ticks', 'offset', 'start', 'end']);
+                    meas_update.id = id;
+
+                    let position = selected.offset + dragged;
+                    let close = snap_eval(position, selected.beats);
+
+                    let crowd = crowding(instGaps[ind], position, selected.ms, { center: true });
+                    
+                    // initialize flag to prevent snapping when there's no space anyways
+                    let check_snap = true;
+                    console.log(crowd.start);
+                    if (Math.abs(crowd.start[1]) < Math.abs(crowd.end[1])) {
+                        if (crowd.start[1] - c.SNAP_THRESHOLD*2 < 0) {
+                            //update.offset = crowd.start[0];
+                            //console.log(compare, crowd.start[1]);
+                            
+                            //if (Math.abs(jump) > Math.abs(crowd.start[1]))
+                            //    jump = -crowd.start[1];
+                            //jump_start.push(crowd.start[1]);
+                            if (crowd.start[1] < jump) {
+                                jump = crowd.start[1];
+                                crowd_flag = 'start';
+                            }
+                            //jump = Math.min(crowd.start[1], jump);
+                            check_snap = false;
+                        }
+                    } else {
+                        if (crowd.end[1] - c.SNAP_THRESHOLD*2 < 0) {
+                            //update.offset = crowd.end[0] - measure.ms;
+                            let compare = crowd.end[0] - (position + selected.ms);
+                            //console.log(compare, crowd.end[1]);
+                            //console.log(crowd.end);
+                            //if (Math.abs(jump) > Math.abs(crowd.end[1]))
+                            //    jump = crowd.end[1];
+                            jump_end.push(crowd.end[1]);
+                            if (crowd.end[1] < jump) {
+                                jump = crowd.end[1];
+                                crowd_flag = 'end';
+                            }
+                            //jump = Math.min(crowd.end[1], jump);
+
+                                //clamp_dragged = dragged - crowd.end[1];
+                            check_snap = false;
+                        }
+                    }
+                    // else //?
+                    // disabling snaps for now...
+                    if (check_snap && close.index !== -1) {
+                        let gap = close.target - (measure.beats[close.index] + position);
+                        if (Math.abs(gap) < 50) {
+                            snaps.snapped_inst = { ...close, origin: measure.inst };
+                            update.offset = position + gap;
+                        } else
+                            snaps.snapped_inst = {};
+                    };
+                    update.push(meas_update);
+                });
+                
+            });
+            */
+            
+
+            /*if (isFinite(jump))
+                dragged += jump;
+                */
+            /*let jump = {};
+            if (jump_start.length)
+                jump.start = Math.min(...jump_start);
+            if (jump_end.length)
+                jump.end = Math.min(...jump_end);
+            if ('start' in jump) {
+                if ('end' in jump) {
+                    if (
+            }*/
+            /*if (crowd_flag) {
+                console.log(crowd_flag, jump);
+                dragged += (crowd_flag === 'start') ?
+                    -jump : jump;
+            }*/
+
+            
+
+                
+            update.forEach(meas => {
+                meas.offset += dragged;
+            });
             return finalize(true);
         };
 
@@ -2005,7 +2363,14 @@ export default function measure(p) {
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
             else {
                 lock_persistence();
-                API.updateMeasure(selected.inst, selected.id, selected.start, selected.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
+                selected = Window.getSelection().map(id => {
+                    let returned = Object.assign({}, _.pick(Window.selected[id], [
+                        'inst', 'id', 'start', 'end', 'timesig', 'denom'
+                    ]));
+                    return Object.assign(returned, _.pick(Window.selected[id].temp, ['offset']));
+                });
+                API.updateMeasure(selected);  
+                //API.updateMeasure(selected.inst, selected.id, selected.start, selected.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             }
             Mouse.resetDrag();
             return;

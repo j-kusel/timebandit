@@ -243,40 +243,59 @@ class App extends Component {
           }
       }
 
-      var updateMeasure = (inst, id, start, end, timesig, denom, offset) => {
-          logger.log(`Updating measure ${id} in instrument ${inst}.`);  
+      //var updateMeasure = (inst, id, start, end, timesig, denom, offset) => {
+      var updateMeasure = (selected) => {
           
-          let oldMeas = this.state.instruments[inst].measures[id];
+          console.log(selected);
+              /*let oldMeas = this.state.instruments[inst].measures[id];
+              
+              offset = (typeof offset === 'number') ? offset : oldMeas.offset;
+              var calc = MeasureCalc({ start, end, timesig, offset, denom}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+
+              // preserve locks
+              if ('locks' in oldMeas)
+                  calc.locks = Object.assign({}, oldMeas.locks);
+                  */
+
           
-
-          offset = (typeof offset === 'number') ? offset : oldMeas.offset;
-          var calc = MeasureCalc({ start, end, timesig, offset, denom}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
-          console.log(calc);
-          console.log(oldMeas.id);
-          console.log(this.state.instruments);
-
-          // preserve locks
-          if ('locks' in oldMeas)
-              calc.locks = Object.assign({}, oldMeas.locks);
 
           // re-order measures
           self.setState(oldState => {
-              let instruments = oldState.instruments;
-              let oldMeas = instruments[inst].measures[id];
+            let instruments = oldState.instruments;
+
+            let ordered_cpy = Object.assign(oldState.ordered, {});
+            selected.forEach((meas) => {
+              let inst, id;
+              ({ inst, id } = meas);
+
+              logger.log(`Updating measure ${id} in instrument ${inst}.`);  
+              let oldMeas = this.state.instruments[inst].measures[id];
+              // what exception requires this?
+              //let offset = (typeof offset === 'number') ? offset : oldMeas.offset;
+              var calc = MeasureCalc(
+                _.pick(meas, ['start','end','timesig','offset','denom']),
+                { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
+              );
+
+              // preserve locks
+              if ('locks' in oldMeas)
+                  calc.locks = Object.assign({}, oldMeas.locks);
+
               let newMeas = { ...calc, id, inst, beat_nodes: [], locks: {} };
-              let ordered_cpy = Object.assign(oldState.ordered, {});
               if (Object.keys(ordered_cpy))
                   calc.beats.forEach((beat, ind) =>
                       ordered.tree.edit(ordered_cpy, {
                           inst,
                           newMeas,
                           _clear: oldMeas.beats[ind] + oldMeas.offset,
-                          _target: beat + offset
+                          _target: beat + newMeas.offset
                       })
                   );
 
               instruments[inst].measures[id] = newMeas;
-              return { instruments, ordered: ordered_cpy, selected: { inst, meas: newMeas } };
+              //return { instruments, ordered: ordered_cpy, selected: { inst, meas: newMeas } };
+            });
+            return { instruments, ordered: ordered_cpy, /*selected: { inst, meas: newMeas }*/ };
           });
       };
 

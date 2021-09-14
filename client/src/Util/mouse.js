@@ -149,9 +149,11 @@ export default (p, Window) => {
             this.grabbed = this.rollover.beat === measure.beats.length - 1 ?
                 60000.0/measure.beats.slice(-1)[0]
                 : 60000.0/(measure.ticks[(this.rollover.beat * Window.CONSTANTS.PPQ / divisor)]);
-            Window.selected.dir = (measure.end > measure.start) ?
+            // DIR SHOULD BE OBSOLETE
+            /*Window.selected.dir = (measure.end > measure.start) ?
                 1 : ((measure.start > measure.end) ?
                     -1 : 0);
+                    */
             this.drag.mode = 'tick';
             this.drag.grab = this.rollover.beat;
         }
@@ -160,9 +162,37 @@ export default (p, Window) => {
             this.drag.mode = 'printer';
         }
 
-        measureMode() {
-            if (!(Window.editor.type && ('temp' in Window.editor.meas)))
-                Window.initialize_temp(this.rollover.meas);
+        measureMode({ breaks }) {
+            if (!(Window.editor.type && ('temp' in Window.editor.meas))) {
+                Window.getSelection().forEach(id =>
+                    Window.initialize_temp(Window.selected[id]));
+            }
+            if (breaks) {
+                // search takes mouse drag and breaks
+                let search = (drag, b) => {
+                    let last_bias = 0;
+                    //console.log('searching ', drag, 'in ', b);
+                    if (drag > b.bias && drag < b.wiggle)
+                        return drag;
+                    // if it's less than the next gap,
+                    // figure out which side it snaps to.
+                    if (b.next && drag < b.next.bias)
+                        return (drag > (b.next.bias+b.wiggle)*0.5) ?
+                            b.next.bias : b.wiggle;
+                    //if (!b.next)
+                    // otherwise keep searching
+                    return search(drag, b.next);
+                };
+
+                this.drag.filter_drag = (drag) => {
+                    let d = (drag < 0) ?
+                        (-search(-drag, breaks.left[0])) :
+                        search(drag, breaks.right[0]);
+                    return d;
+                };
+            } else
+                this.drag.free = true;
+            
             this.drag.mode = 'measure';
         }
 
