@@ -1645,7 +1645,6 @@ export default function measure(p) {
         if (Mouse.drag.mode === 'measure') {
 
             if (Window.editor.type) {
-
                 // initialize update
                 if ('temp' in measure)
                     Object.assign(update, _.pick(measure.temp, ['offset', 'start', 'end']));
@@ -1688,15 +1687,16 @@ export default function measure(p) {
             let dragged = Mouse.drag.x/Window.scale;
             let selections = Window.getSelection().map(id => Window.selected[id]);
 
-            let new_drag, retreat, advance;
-            [new_drag, retreat, advance] = Mouse.drag.filter_drag(dragged);
-            if (retreat || advance) {
+            // backwards/forwards store remaining wiggle room
+            let new_drag, bw, fw;
+            [new_drag, bw, fw] = Mouse.drag.filter_drag(dragged);
+            if (bw || fw) {
                 // adding a snap check for dragged measure here
                 let close = snap_eval(new_drag+measure.offset, measure.beats);
                 if (close.index !== -1 && Math.abs(close.gap) < 50) {
                     let s_new_drag = Math.abs(new_drag + close.gap);
-                    if ((s_new_drag > retreat)
-                        && (s_new_drag < advance)
+                    if ((s_new_drag > bw)
+                        && (s_new_drag < fw)
                     ) {
                         new_drag += close.gap;
                         snaps.snapped_inst = { ...close, origin: measure.inst };
@@ -2150,15 +2150,13 @@ export default function measure(p) {
                 set_lock_persist(selected.inst, selected.id, Object.assign({}, { locks:  selected.locks }));
         }
 
-        if (Mouse.drag.mode === 'tempo') {
+        /*if (Mouse.drag.mode === 'tempo') {
             lock_persistence();
             let update = _.pick(selected, ['inst', 'id', 'timesig', 'denom']);
             Object.assign(update, _.pick(selected.temp, ['offset', 'start', 'end']));
             API.updateMeasure(update);
-            /*if (selected)
-                delete Window.selected.meas.temp;*/
             Mouse.resetDrag();
-        } else if (Mouse.drag.mode === 'measure') {
+        } else*/ if (Mouse.drag.mode === 'measure') {
             if (Window.editor.type)
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
             else {
@@ -2170,18 +2168,21 @@ export default function measure(p) {
                     return Object.assign(returned, _.pick(Window.selected[id].temp, ['offset']));
                 });
                 API.updateMeasure(selected);  
-                //API.updateMeasure(selected.inst, selected.id, selected.start, selected.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             }
             Mouse.resetDrag();
             return;
-        } else if (Mouse.drag.mode === 'tick') {
-            let end = selected.temp.end;
+        } else if (Mouse.drag.mode === 'tick' || Mouse.drag.mode === 'tempo') {
+            lock_persistence();
+            /*let end = selected.temp.end;
             selected.temp.ticks = [];
-            Mouse.resetDrag();
             if (end < 10)
                 return;
-            lock_persistence();
-            API.updateMeasure(selected.inst, selected.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
+                */
+            let update = _.pick(selected, ['inst', 'id', 'timesig', 'denom']);
+            Object.assign(update, _.pick(selected.temp, ['offset', 'start', 'end']));
+            API.updateMeasure(update);  
+            //API.updateMeasure(selected.inst, selected.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
+            Mouse.resetDrag();
         };
 
         return;
