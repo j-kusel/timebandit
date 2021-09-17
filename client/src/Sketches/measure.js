@@ -1242,12 +1242,9 @@ export default function measure(p) {
             { name: '[buttons, core_buttons]' , func: () => [...buttons, ...core_buttons]
                 .some(click => click())
             },
-            //{ name: 'Mouse.checkTempo(Window.mode)', func: () => Mouse.checkTempo(Window.mode)},
-            //{ name: 'Window.insertMeas.confirmed', func: () => (Window.insertMeas.confirmed)},
         ];
         Mouse.pressInit(p, checks);
 
-        // ############################################## HOW DOES MOUSE.CANCEL EVEN WORK?
         if (Mouse.cancel)
             return;
 
@@ -1347,19 +1344,15 @@ export default function measure(p) {
         if (inst >= instruments.length || inst < 0)
             return;
 
-        //Mouse.select();
-        if ('meas' in Mouse.rollover && Mouse.rollover.meas.id in Window.selected/*Window.selected.meas*/) {
-            console.log('in HERE');
+        if ('meas' in Mouse.rollover && Mouse.rollover.meas.id in Window.selected) {
             if (Window.mods.shift) {
                 if (Window.mods.mod)
                     Mouse.tickMode()
                 else {
                     // 'measure' mode
+                    // i want this elsewhere but there are so many dependencies
                     let instMeas = [];
                     let count = [];
-                    // how does this data structure transform over time?
-                    // can it be simplified?
-                    //
                     // create an array instMeas of empty arrays
                     for (let i=0; i<instruments.length; i++) {
                         instMeas.push([]);
@@ -1382,6 +1375,7 @@ export default function measure(p) {
                         (c && (c !== Object.keys(instruments[i].measures).length))
                     ))
                         return Mouse.measureMode({ breaks: false });
+
                     // calculate global gaps for each instrument.
                     // this cannot be known before all measures are sorted,
                     // so must be a separate loop.
@@ -1390,10 +1384,6 @@ export default function measure(p) {
 
                     var fit_check = (select, bias, gap) => {
                         let offset = select.offset + bias;
-                        console.log('fit check');
-                        console.log(`meas offset: ${select.offset}, check bias: ${bias}, total offset: ${offset}`);
-                        console.log(`is ${offset} >= ${gap[0]}? is ${offset+select.ms} <= ${gap[1]}?`);
-                        //return offset >= gap[0] && offset + select.ms <= gap[1];
                         return gte(offset, gap[0]) && lte(offset + select.ms, gap[1]);
                     };
                     // find initial gap for each selection
@@ -1404,8 +1394,8 @@ export default function measure(p) {
                     let gapTraces = {};
                     selections.forEach(select => {
                         let meas = gapTraces[select.id] = {
-                            meas:  select,
-                            gaps:  instGaps[select.inst].gaps
+                            meas: select,
+                            gaps: instGaps[select.inst].gaps
                         };
                         // when current gap is found, initialize gap pointer
                         meas.gaps.some((gap, i) =>
@@ -1416,7 +1406,8 @@ export default function measure(p) {
                     });
 
 
-                    // find first global obstacle on left
+                    // find global obstacles on left/right
+                    // - dependent on gapTraces object, fit_check function
                     let break_check = (arr, dir, bias) => {
                         if (!isFinite(bias))
                             return arr;
@@ -1483,143 +1474,15 @@ export default function measure(p) {
                     // reset pointers
                     Object.keys(gapTraces).forEach(key => gapTraces[key].pointer = gapTraces[key].initial);
                     breaks.right = break_check([], 'right', 0);
-
-                    /*while (isFinite(bias)) {
-                        valid = true;
-                        let result = Object.keys(gapTraces).reduce((acc, key) => {
-                            console.group();
-                            let select = gapTraces[key];
-                            let meas = select.meas;
-                            console.log(`checking measure ${meas.timesig}/${meas.denom} in inst `, meas.inst);
-                            // left
-                            let gap = select.gaps[select.pointer];
-                            // if there are no gaps (meaning no obstacles), return generic acc
-                            if (!gap) {
-                                console.groupEnd();
-                                return acc;
-                            }
-                            let fit = fit_check(meas, -bias, gap);
-                            let first = select.pointer === 0;
-                            console.group();
-                            console.log(`checking bias ${bias} in gap ${select.pointer}: `, gap);
-                            if (first) {
-                                let candidate = meas.offset - (select.gaps[0][1]-meas.ms);
-                                if (gt(candidate, bias))
-                                    acc.nearest = Math.min(candidate, acc.nearest);
-                            } else
-                                acc.nearest = Math.min(acc.nearest, meas.offset - (select.gaps[select.pointer-1][1]-meas.ms))
-
-                            if (!fit) {
-                                console.log('measure doesnt fit.');
-                                if (!first) select.pointer--;
-                                valid = false;
-                            } else
-                                console.log('measure fits.');
-                            if (valid) {
-                                acc.wiggle = Math.min(acc.wiggle, meas.offset - gap[0]);
-                                console.log('everything fits so far. wiggle: ', acc.wiggle);
-                            }
-                            console.log('nearest: ', acc.nearest);
-                            console.groupEnd();
-                            console.groupEnd();
-                            return acc;    
-                        }, {
-                            nearest: Infinity,
-                            wiggle: Infinity,
-                            bias
-                        });
-                        if (valid) {
-                            // link previous result to current one
-                            result.half = (result.nearest+result.wiggle)*0.5;
-                            if (left.length) {
-                                let prev = left[left.length-1];
-                                prev.next = result;
-                                prev.break = (result.bias+prev.wiggle)*0.5;
-                            }
-                            left.push(result);
-
-                        }
-                        console.log('valid pass: ', valid);
-                        console.log(result);
-                        bias = result.nearest;
-                    }
-
-                    // reset pointers
-                    Object.keys(gapTraces).forEach(key => gapTraces[key].pointer = gapTraces[key].initial);
-                    // find first global obstacle on right
-                    bias = 0;
-                    let right = [];
-                    // the loop continues until gaps are exhausted
-                    while (isFinite(bias)) {
-                        valid = true;
-                        let result = Object.keys(gapTraces).reduce((acc, key) => {
-                            let select = gapTraces[key];
-                            let meas = select.meas;
-                            console.log(`checking inst${meas.inst} meas: ${meas.ms} at ${bias+meas.offset}`);
-                            let gap = select.gaps[select.pointer];
-                            if (!gap)
-                                return acc;
-                            console.log('checking gap ', select.pointer);
-
-                            // does the measure fit this gap?
-                            let fit = fit_check(meas, bias, gap);
-                            let last = select.pointer >= select.gaps.length-1;
-
-
-                            if (last) {
-                                let candidate = select.gaps[select.gaps.length-1][0]-meas.offset;
-                                if (candidate > bias)
-                                    acc.nearest = Math.min(candidate, acc.nearest);
-                            } else
-                                acc.nearest = Math.min(select.gaps[select.pointer+1][0]-meas.offset, acc.nearest)
-
-                            if (!fit) {
-                                console.log('measure doesnt fit.');
-                                if (!last) select.pointer++;
-                                valid = false;
-                            } else {
-                                console.log('measure fits.');
-                            }
-                            if (valid) {
-                                let offset = meas.offset + bias;
-                                acc.wiggle = Math.min(acc.wiggle, gap[1]-meas.ms-meas.offset); 
-                                console.log('everything fits so far. wiggle: ', acc.wiggle);
-                            }
-                            console.log('nearest: ', acc.nearest);
-                            return acc;
-                        }, {
-                            nearest: Infinity,
-                            wiggle: Infinity,
-                            bias
-                        });
-                        if (valid) {
-                            result.half = (result.nearest+result.wiggle)*0.5;
-                            if (right.length) {
-                                let prev = right[right.length-1];
-                                prev.next = result;
-                                prev.break = (result.bias+prev.wiggle)*0.5;
-                            }
-                            right.push(result)
-                        }
-                        console.log('valid pass: ', valid);
-                        console.log(result);
-                        bias = result.nearest;
-                    }
-                    */
-
-                    console.log(breaks);
                     Mouse.measureMode({ breaks });
                 }
-                return;
             } else if (Window.mods.mod) {
-                if (Mouse.rollover.type === 'beat') {
-                    Mouse.beatLock();
-                    return;
-                } else if (Mouse.rollover.type === 'tempo') {
-                    Mouse.checkTempo();
-                    return;
-                }
+                if (Mouse.rollover.type === 'beat')
+                    Mouse.beatLock()
+                else if (Mouse.rollover.type === 'tempo')
+                    Mouse.tempoMode();
             }
+            return;
         };
 
         // on new selection, skip all other options
@@ -1748,12 +1611,9 @@ export default function measure(p) {
 
 
         // initialize update
-        var update = {
-            beats: [], ticks: [],
-            offset: measure.offset,
-            start: measure.start,
-            end: measure.end
-        };
+        var update = _.pick(measure, ['offset', 'start', 'end', 'id']);
+        Object.assign(update, { beats: [], ticks: [] });
+        
 
         const finalize = (moved) => {
 
@@ -1765,15 +1625,17 @@ export default function measure(p) {
                 let temprange = [Math.min(min, ranges.min), Math.max(max, ranges.max)];
                 Window.updateRange({ temprange });
             }
-            if (typeof update.length === 'number') {
-                update.forEach(meas => {
-                    let measure = Window.selected[meas.id];
-                    Object.assign(measure.temp, meas);
-                    measure.temp.invalid = {};
-                    let cache = Window.calculate_cache(measure.temp);
-                    Object.assign(measure, { cache });
-                });
+            if (typeof update.length !== 'number') {
+                update = [update];
             }
+            update.forEach(meas => {
+                let measure = Window.selected[meas.id];
+                Object.assign(measure.temp, meas);
+                measure.temp.invalid = {};
+                let cache = Window.calculate_cache(measure.temp);
+                Object.assign(measure, { cache });
+            });
+            
 
             //API.updateEdit(measure.temp.start, measure.temp.end, measure.timesig, measure.temp.offset);
             return;
@@ -1824,181 +1686,30 @@ export default function measure(p) {
             }
 
             let dragged = Mouse.drag.x/Window.scale;
-            let selections = Window.getSelection().map(id => Window.selected[id]);;
+            let selections = Window.getSelection().map(id => Window.selected[id]);
 
-            if (Mouse.drag.free) {
-                update = selections.map(s => {
-                    var u = _.pick(s, ['beats', 'ticks', 'offset', 'start', 'end', 'id']);
-                    u.offset += dragged;
-                    return u;
-                });
-                return finalize(true);
-            } else if (Mouse.drag.filter_drag) {
-                let new_drag = Mouse.drag.filter_drag(dragged);
-                update = selections.map(select => {
-                    var meas_update = _.pick(select, ['beats', 'ticks', 'offset', 'start', 'end', 'id']);
-                    meas_update.offset += new_drag;
-                    return meas_update;
-                });
-                return finalize(true);
+            let new_drag, retreat, advance;
+            [new_drag, retreat, advance] = Mouse.drag.filter_drag(dragged);
+            if (retreat || advance) {
+                // adding a snap check for dragged measure here
+                let close = snap_eval(new_drag+measure.offset, measure.beats);
+                if (close.index !== -1 && Math.abs(close.gap) < 50) {
+                    let s_new_drag = Math.abs(new_drag + close.gap);
+                    if ((s_new_drag > retreat)
+                        && (s_new_drag < advance)
+                    ) {
+                        new_drag += close.gap;
+                        snaps.snapped_inst = { ...close, origin: measure.inst };
+                    } else
+                        snaps.snapped_inst = {};
+                };
             }
 
-            // first compile gaps
-            let instMeas = [];
-            for (let i=0; i<instruments.length; i++)
-                instMeas.push([]);
-            let spread = [Infinity, -Infinity];
-            selections.forEach(meas => {
-                let i = meas.inst;
-                spread[0] = Math.min(meas.offset, spread[0]);
-                spread[1] = Math.max(meas.offset + meas.ms, spread[1]);
-                instMeas[i].push(meas.id);
-            });
-            let instGaps = instMeas.map((ids, ind) =>
-                calcGaps(instruments[ind].ordered, ids));
-            console.log(instGaps);
 
-
-            // "conflict boxes" attempt
-            // start with naive drag
-            
-            conflict = [Infinity, -Infinity];
-            obstacles = [Infinity, -Infinity];
             update = selections.map(select => {
-                
-                var meas_update = _.pick(select, ['beats', 'ticks', 'offset', 'start', 'end']);
-                meas_update.id = select.id;
-                // idealized position
-                let position = meas_update.offset + dragged;
-                meas_update.offset = position;
-                meas_update.crowd = crowding(instGaps[select.inst].gaps, position, select.ms, { center: true });
-                let crowd_flag = false;
-                if (meas_update.crowd.start[1] < 0 || meas_update.crowd.end[1] < 0) {
-                    conflict = [Math.min(conflict[0], position), Math.max(conflict[1], position + select.ms)];
-                    crowd_flag = true;
-                }
-                /*
-                if (meas_update.crowd.start[1] < 0) {
-                    conflict[0] = Math.min(conflict[0], position);
-                    crowd_flag = true;
-                }
-                if (meas_update.crowd.end[1] < 0) {
-                    conflict[1] = Math.max(conflict[1], position + select.ms);
-                    crowd_flag = true;
-                }
-                */
-
-                /*if (crowd_flag)
-                    instGaps[select.inst].obstacles.forEach((meas) => {
-                        let end = meas.offset + meas.ms;
-                        if ((meas.offset < conflict[0] && end > conflict[0]) ||
-                            (meas.offset < conflict[1] && end > conflict[1]))
-                            obstacles = [Math.min(obstacles[0], meas.offset), Math.max(obstacles[1], meas.offset + meas.ms)];
-                    });
-                    */
-                
-
+                var meas_update = _.pick(select, ['beats', 'ticks', 'offset', 'start', 'end', 'id']);
+                meas_update.offset += new_drag;
                 return meas_update;
-            });
-
-            return finalize(true);
-            
-            // first attempt
-            /*update = [];
-            let jump_start = [];
-            let jump_end = [];
-            let jump = Infinity;
-            let clamp_dragged = dragged;
-            let crowd_flag = '';
-            let move = dragged;
-            instruments.forEach((__, ind) => {
-                instMeas[ind].forEach(id => {
-                    let selected = Window.selected[id];
-                    var meas_update = _.pick(selected, ['beats', 'ticks', 'offset', 'start', 'end']);
-                    meas_update.id = id;
-
-                    let position = selected.offset + dragged;
-                    let close = snap_eval(position, selected.beats);
-
-                    let crowd = crowding(instGaps[ind], position, selected.ms, { center: true });
-                    
-                    // initialize flag to prevent snapping when there's no space anyways
-                    let check_snap = true;
-                    console.log(crowd.start);
-                    if (Math.abs(crowd.start[1]) < Math.abs(crowd.end[1])) {
-                        if (crowd.start[1] - c.SNAP_THRESHOLD*2 < 0) {
-                            //update.offset = crowd.start[0];
-                            //console.log(compare, crowd.start[1]);
-                            
-                            //if (Math.abs(jump) > Math.abs(crowd.start[1]))
-                            //    jump = -crowd.start[1];
-                            //jump_start.push(crowd.start[1]);
-                            if (crowd.start[1] < jump) {
-                                jump = crowd.start[1];
-                                crowd_flag = 'start';
-                            }
-                            //jump = Math.min(crowd.start[1], jump);
-                            check_snap = false;
-                        }
-                    } else {
-                        if (crowd.end[1] - c.SNAP_THRESHOLD*2 < 0) {
-                            //update.offset = crowd.end[0] - measure.ms;
-                            let compare = crowd.end[0] - (position + selected.ms);
-                            //console.log(compare, crowd.end[1]);
-                            //console.log(crowd.end);
-                            //if (Math.abs(jump) > Math.abs(crowd.end[1]))
-                            //    jump = crowd.end[1];
-                            jump_end.push(crowd.end[1]);
-                            if (crowd.end[1] < jump) {
-                                jump = crowd.end[1];
-                                crowd_flag = 'end';
-                            }
-                            //jump = Math.min(crowd.end[1], jump);
-
-                                //clamp_dragged = dragged - crowd.end[1];
-                            check_snap = false;
-                        }
-                    }
-                    // else //?
-                    // disabling snaps for now...
-                    if (check_snap && close.index !== -1) {
-                        let gap = close.target - (measure.beats[close.index] + position);
-                        if (Math.abs(gap) < 50) {
-                            snaps.snapped_inst = { ...close, origin: measure.inst };
-                            update.offset = position + gap;
-                        } else
-                            snaps.snapped_inst = {};
-                    };
-                    update.push(meas_update);
-                });
-                
-            });
-            */
-            
-
-            /*if (isFinite(jump))
-                dragged += jump;
-                */
-            /*let jump = {};
-            if (jump_start.length)
-                jump.start = Math.min(...jump_start);
-            if (jump_end.length)
-                jump.end = Math.min(...jump_end);
-            if ('start' in jump) {
-                if ('end' in jump) {
-                    if (
-            }*/
-            /*if (crowd_flag) {
-                console.log(crowd_flag, jump);
-                dragged += (crowd_flag === 'start') ?
-                    -jump : jump;
-            }*/
-
-            
-
-                
-            update.forEach(meas => {
-                meas.offset += dragged;
             });
             return finalize(true);
         };
@@ -2441,7 +2152,9 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'tempo') {
             lock_persistence();
-            API.updateMeasure(selected.inst, selected.id, selected.temp.start, selected.temp.end, selected.beats.length - 1, selected.denom, selected.temp.offset);
+            let update = _.pick(selected, ['inst', 'id', 'timesig', 'denom']);
+            Object.assign(update, _.pick(selected.temp, ['offset', 'start', 'end']));
+            API.updateMeasure(update);
             /*if (selected)
                 delete Window.selected.meas.temp;*/
             Mouse.resetDrag();

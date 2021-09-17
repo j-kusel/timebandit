@@ -262,16 +262,15 @@ class App extends Component {
           // re-order measures
           self.setState(oldState => {
             let instruments = oldState.instruments;
-
             let ordered_cpy = Object.assign(oldState.ordered, {});
+            if (!Array.isArray(selected))
+              selected = [selected];
             selected.forEach((meas) => {
               let inst, id;
               ({ inst, id } = meas);
 
               logger.log(`Updating measure ${id} in instrument ${inst}.`);  
               let oldMeas = this.state.instruments[inst].measures[id];
-              // what exception requires this?
-              //let offset = (typeof offset === 'number') ? offset : oldMeas.offset;
               var calc = MeasureCalc(
                 _.pick(meas, ['start','end','timesig','offset','denom']),
                 { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
@@ -293,9 +292,8 @@ class App extends Component {
                   );
 
               instruments[inst].measures[id] = newMeas;
-              //return { instruments, ordered: ordered_cpy, selected: { inst, meas: newMeas } };
             });
-            return { instruments, ordered: ordered_cpy, /*selected: { inst, meas: newMeas }*/ };
+            return { instruments, ordered: ordered_cpy };
           });
       };
 

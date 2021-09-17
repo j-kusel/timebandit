@@ -80,7 +80,6 @@ export default (p, Window) => {
 
         resetDrag() {
             delete this.drag.filter_drag;
-            delete this.drag.free;
             Object.assign(this.drag, { x: 0, y: 0, mode: '' });
         }
 
@@ -168,28 +167,30 @@ export default (p, Window) => {
             if (!(Window.editor.type && ('temp' in Window.editor.meas)))
                 Window.getSelection().forEach(id =>
                     Window.initialize_temp(Window.selected[id]));
-            console.log(breaks);
             if (breaks) {
                 // search takes mouse drag and breaks
                 let search = (drag, b) => {
                     if (drag > b.bias && drag < b.wiggle)
-                        return drag;
+                        return [drag, b.bias, b.wiggle];
                     // which side does it snap to?
                     if (b.next && drag < b.next.bias)
-                        return (drag > (b.next.bias+b.wiggle)*0.5) ?
-                            b.next.bias : b.wiggle;
+                        return [(drag > (b.next.bias+b.wiggle)*0.5) ?
+                            b.next.bias : b.wiggle,
+                            null, null];
                     // otherwise keep searching
                     return search(drag, b.next);
                 };
 
                 this.drag.filter_drag = (drag) => {
-                    let d = (drag < 0) ?
-                        (-search(-drag, breaks.left[0])) :
-                        search(drag, breaks.right[0]);
-                    return d;
-                };
+                    if (drag < 0) {
+                        let left = search(-drag, breaks.left[0]);
+                        if (left[0]) left[0] *= -1;
+                        return left;
+                    }
+                    return search(drag, breaks.right[0]);
+                }
             } else
-                this.drag.free = true;
+                this.drag.filter_drag = (d) => d;
             
             this.drag.mode = 'measure';
         }
@@ -199,23 +200,15 @@ export default (p, Window) => {
         }
 
         beatLock() {
-            /*if (!(Window.selected.meas.id in locked))
-                locked[Window.selected.meas.id] = {
-                    beats: [],
-                    meta: {}
-                };
-            // IS THIS DUMB?
-            if (parse_bits(locked[Window.selected.meas.id].beats).length < 2 || parse_bits(locked[Window.selected.meas.id].beats).indexOf(this.rollover.beat) !== -1)
-                locked[Window.selected.meas.id].beats = bit_toggle(locked[Window.selected.meas.id].beats, this.rollover.beat);
-                */
             console.log('locking');
             if (Window.locking(this.rollover.meas, this.rollover.beat))
                 this.drag.mode = 'lock';
         }
 
-        checkTempo() {
-            if (!this.rollover.meas)
+        tempoMode() {
+            /*if (!this.rollover.meas)
                 return false;
+                */
             this.drag.mode = 'tempo';
             Window.initialize_temp(this.rollover.meas);
             this.drag.grab = this.rollover.beat;
