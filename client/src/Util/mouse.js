@@ -79,6 +79,8 @@ export default (p, Window) => {
         }
 
         resetDrag() {
+            delete this.drag.filter_drag;
+            delete this.drag.free;
             Object.assign(this.drag, { x: 0, y: 0, mode: '' });
         }
 
@@ -163,23 +165,19 @@ export default (p, Window) => {
         }
 
         measureMode({ breaks }) {
-            if (!(Window.editor.type && ('temp' in Window.editor.meas))) {
+            if (!(Window.editor.type && ('temp' in Window.editor.meas)))
                 Window.getSelection().forEach(id =>
                     Window.initialize_temp(Window.selected[id]));
-            }
+            console.log(breaks);
             if (breaks) {
                 // search takes mouse drag and breaks
                 let search = (drag, b) => {
-                    let last_bias = 0;
-                    //console.log('searching ', drag, 'in ', b);
                     if (drag > b.bias && drag < b.wiggle)
                         return drag;
-                    // if it's less than the next gap,
-                    // figure out which side it snaps to.
+                    // which side does it snap to?
                     if (b.next && drag < b.next.bias)
                         return (drag > (b.next.bias+b.wiggle)*0.5) ?
                             b.next.bias : b.wiggle;
-                    //if (!b.next)
                     // otherwise keep searching
                     return search(drag, b.next);
                 };

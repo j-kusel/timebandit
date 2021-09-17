@@ -1356,21 +1356,37 @@ export default function measure(p) {
                 else {
                     // 'measure' mode
                     let instMeas = [];
-                    let gapTraces = {};
-                    let count = 0;
+                    let count = [];
+                    // how does this data structure transform over time?
+                    // can it be simplified?
+                    //
+                    // create an array instMeas of empty arrays
                     for (let i=0; i<instruments.length; i++) {
                         instMeas.push([]);
-                        count += Object.keys(instruments[i].measures).length;
+                        count.push(0);
                     }
-                    let selections = Window.getSelection().map(id => Window.selected[id]);
-                    if (selections.length === count)
-                        return Mouse.measureMode({ breaks: false });
-                    selections.forEach(meas => {
-                        instMeas[meas.inst].push(meas.id);
+
+                    // map Window.selected hashmap to an array of measure objects,
+                    // push from array of measure objects into instMeas array by inst index,
+                    // and increment selection counts for each inst to shortcut gap search.
+                    let selections = Window.getSelection().map(id => {
+                        let sel = Window.selected[id];
+                        count[sel.inst]++;
+                        instMeas[sel.inst].push(id);
+                        return sel;
                     });
+
+                    // skip costly algo if selection is exclusively
+                    // entire instruments
+                    if (!count.some((c, i) => 
+                        (c && (c !== Object.keys(instruments[i].measures).length))
+                    ))
+                        return Mouse.measureMode({ breaks: false });
+                    // calculate global gaps for each instrument.
+                    // this cannot be known before all measures are sorted,
+                    // so must be a separate loop.
                     let instGaps = instMeas.map((ids, ind) =>
                         calcGaps(instruments[ind].ordered, ids));
-                    console.log(instGaps);
 
                     var fit_check = (select, bias, gap) => {
                         let offset = select.offset + bias;
@@ -1381,28 +1397,94 @@ export default function measure(p) {
                         return gte(offset, gap[0]) && lte(offset + select.ms, gap[1]);
                     };
                     // find initial gap for each selection
+                    // this can't be known until gaps are calculated, 
+                    // so must be a separate loop.
+                    //
+                    // is this even necessary, or is it handled in the loops below?
+                    let gapTraces = {};
                     selections.forEach(select => {
-                        let meas = gapTraces[select.id] = {};
-                        meas.meas = select;
-                        meas.gaps = instGaps[select.inst].gaps;
+                        let meas = gapTraces[select.id] = {
+                            meas:  select,
+                            gaps:  instGaps[select.inst].gaps
+                        };
+                        // when current gap is found, initialize gap pointer
                         meas.gaps.some((gap, i) =>
                             fit_check(select, 0, gap)
                                 && ((meas.pointer = i) || true)
                         );
                         meas.initial = meas.pointer;
                     });
-                    console.log(gapTraces);
+
 
                     // find first global obstacle on left
-                    let bias = 0;
-                    let searching = () => {
-                        console.log('starting loop. pointers: ', Object.keys(gapTraces).map(key => gapTraces[key].pointer));
-                        return Object.keys(gapTraces).some(key => gapTraces[key].pointer);
+                    let break_check = (arr, dir, bias) => {
+                        if (!isFinite(bias))
+                            return arr;
+                        let valid = true;
+                        let result = Object.keys(gapTraces).reduce((acc, key) => {
+                            console.group();
+                            let select = gapTraces[key];
+                            let meas = select.meas;
+                            console.log(`checking measure ${meas.timesig}/${meas.denom} in inst `, meas.inst);
+                            let gap = select.gaps[select.pointer];
+                            // if there are no gaps (meaning no obstacles), return generic acc
+                            if (!gap) {
+                                console.groupEnd();
+                                return acc;
+                            }
+                            let left = (dir==='left');
+                            let fit = left ?
+                                fit_check(meas, -bias, gap) :
+                                fit_check(meas, bias, gap);
+                            let final = left ?
+                                select.pointer === 0 :
+                                select.pointer >= select.gaps.length-1;
+                            if (final) {
+                                let candidate = left ?
+                                    meas.offset - (select.gaps[0][1]-meas.ms) :
+                                    select.gaps[select.gaps.length-1][0]-meas.offset;
+                                if (gt(candidate, bias))
+                                    acc.nearest = Math.min(candidate, acc.nearest);
+                            } else
+                                acc.nearest = Math.min(acc.nearest,
+                                    left ?
+                                        meas.offset - (select.gaps[select.pointer-1][1]-meas.ms) :
+                                        select.gaps[select.pointer+1][0]-meas.offset
+                                );
+                            if (!fit) {
+                                if (!final)
+                                    select.pointer += left ? -1 : 1;
+                                valid = false;
+                            }
+                            if (valid)
+                                acc.wiggle = Math.min(acc.wiggle,
+                                    left ?
+                                        meas.offset - gap[0]:
+                                        gap[1]-meas.ms-meas.offset
+                                );
+                            return acc;
+                        }, { nearest: Infinity, wiggle: Infinity, bias });
+                        if (valid) {
+                            // link previous result to current one
+                            result.half = (result.nearest+result.wiggle)*0.5;
+                            if (arr.length) {
+                                let prev = arr[arr.length-1];
+                                prev.next = result;
+                                prev.break = (result.bias+prev.wiggle)*0.5;
+                            }
+                            arr.push(result);
+                        }
+                        return break_check(arr, dir, result.nearest);
                     };
-                    let left = [];
-                    let ddepth = 10;
-                    let valid = true;
-                    while (isFinite(bias)/* && searching() && (!ddepth--)*/) {
+
+
+                    let breaks = {};
+                    breaks.left = break_check([], 'left', 0);
+                    // reset pointers
+                    Object.keys(gapTraces).forEach(key => gapTraces[key].pointer = gapTraces[key].initial);
+                    breaks.right = break_check([], 'right', 0);
+
+                    /*while (isFinite(bias)) {
                         valid = true;
                         let result = Object.keys(gapTraces).reduce((acc, key) => {
                             console.group();
@@ -1411,6 +1493,11 @@ export default function measure(p) {
                             console.log(`checking measure ${meas.timesig}/${meas.denom} in inst `, meas.inst);
                             // left
                             let gap = select.gaps[select.pointer];
+                            // if there are no gaps (meaning no obstacles), return generic acc
+                            if (!gap) {
+                                console.groupEnd();
+                                return acc;
+                            }
                             let fit = fit_check(meas, -bias, gap);
                             let first = select.pointer === 0;
                             console.group();
@@ -1419,20 +1506,16 @@ export default function measure(p) {
                                 let candidate = meas.offset - (select.gaps[0][1]-meas.ms);
                                 if (gt(candidate, bias))
                                     acc.nearest = Math.min(candidate, acc.nearest);
-                            } else {
+                            } else
                                 acc.nearest = Math.min(acc.nearest, meas.offset - (select.gaps[select.pointer-1][1]-meas.ms))
-                            }
 
                             if (!fit) {
                                 console.log('measure doesnt fit.');
-                                if (!first)
-                                    select.pointer--;
+                                if (!first) select.pointer--;
                                 valid = false;
-                            } else {
+                            } else
                                 console.log('measure fits.');
-                            }
                             if (valid) {
-                                let offset = meas.offset - bias;
                                 acc.wiggle = Math.min(acc.wiggle, meas.offset - gap[0]);
                                 console.log('everything fits so far. wiggle: ', acc.wiggle);
                             }
@@ -1446,9 +1529,15 @@ export default function measure(p) {
                             bias
                         });
                         if (valid) {
-                            if (left.length)
-                                left[left.length-1].next = result;
+                            // link previous result to current one
+                            result.half = (result.nearest+result.wiggle)*0.5;
+                            if (left.length) {
+                                let prev = left[left.length-1];
+                                prev.next = result;
+                                prev.break = (result.bias+prev.wiggle)*0.5;
+                            }
                             left.push(result);
+
                         }
                         console.log('valid pass: ', valid);
                         console.log(result);
@@ -1467,41 +1556,36 @@ export default function measure(p) {
                             let select = gapTraces[key];
                             let meas = select.meas;
                             console.log(`checking inst${meas.inst} meas: ${meas.ms} at ${bias+meas.offset}`);
-                            // left
-                            //if ((select.pointer < select.gaps.length-1)) {
-                                let gap = select.gaps[select.pointer];
-                                console.log('checking gap ', select.pointer);
+                            let gap = select.gaps[select.pointer];
+                            if (!gap)
+                                return acc;
+                            console.log('checking gap ', select.pointer);
 
-                                // does the measure fit this gap?
-                                let fit = fit_check(meas, bias, gap);
-                                let last = select.pointer >= select.gaps.length-1;
+                            // does the measure fit this gap?
+                            let fit = fit_check(meas, bias, gap);
+                            let last = select.pointer >= select.gaps.length-1;
 
 
-                                if (last) {
-                                    let candidate = select.gaps[select.gaps.length-1][0]-meas.offset;
-                                    if (candidate > bias)
-                                        acc.nearest = Math.min(candidate, acc.nearest);
-                                } else
-                                    acc.nearest = Math.min(select.gaps[select.pointer+1][0]-meas.offset, acc.nearest)
+                            if (last) {
+                                let candidate = select.gaps[select.gaps.length-1][0]-meas.offset;
+                                if (candidate > bias)
+                                    acc.nearest = Math.min(candidate, acc.nearest);
+                            } else
+                                acc.nearest = Math.min(select.gaps[select.pointer+1][0]-meas.offset, acc.nearest)
 
-                                if (!fit) {
-                                    console.log('measure doesnt fit.');
-                                    if (!last)
-                                        console.log('still more to check, incrementing pointer to ', select.pointer++);
-                                    valid = false;
-                                } else {
-                                    console.log('measure fits.');
-                                }
-                                if (valid) {
-                                    let offset = meas.offset + bias;
-                                    console.log('wiggle candidates: ', offset-gap[0], gap[1]-meas.ms-meas.offset);
-                                    // if everything still fits, hone down wiggle
-                                    acc.wiggle = Math.min(acc.wiggle, gap[1]-meas.ms-meas.offset);                                 
-                                    console.log('everything fits so far. wiggle: ', acc.wiggle);
-                                }
-                                console.log('nearest: ', acc.nearest);
-
-                            //}
+                            if (!fit) {
+                                console.log('measure doesnt fit.');
+                                if (!last) select.pointer++;
+                                valid = false;
+                            } else {
+                                console.log('measure fits.');
+                            }
+                            if (valid) {
+                                let offset = meas.offset + bias;
+                                acc.wiggle = Math.min(acc.wiggle, gap[1]-meas.ms-meas.offset); 
+                                console.log('everything fits so far. wiggle: ', acc.wiggle);
+                            }
+                            console.log('nearest: ', acc.nearest);
                             return acc;
                         }, {
                             nearest: Infinity,
@@ -1510,18 +1594,21 @@ export default function measure(p) {
                         });
                         if (valid) {
                             result.half = (result.nearest+result.wiggle)*0.5;
-                            if (right.length)
-                                right[right.length-1].next = result;
+                            if (right.length) {
+                                let prev = right[right.length-1];
+                                prev.next = result;
+                                prev.break = (result.bias+prev.wiggle)*0.5;
+                            }
                             right.push(result)
                         }
                         console.log('valid pass: ', valid);
                         console.log(result);
                         bias = result.nearest;
                     }
+                    */
 
-                    console.log(left);
-                    console.log(right);
-                    Mouse.measureMode({ breaks: { left, right }});
+                    console.log(breaks);
+                    Mouse.measureMode({ breaks });
                 }
                 return;
             } else if (Window.mods.mod) {

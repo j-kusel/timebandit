@@ -996,8 +996,10 @@ export default (p) => {
                         delete this.selected[id];
                         if (!this.getSelection().length)
                             this.selected.meas = false;
+                        console.log(this.selected);
                         return true;
                     }
+                    console.log(this.selected);
                     return false;
                 } else {
                     add ?
@@ -1011,9 +1013,10 @@ export default (p) => {
                 console.log(this.selected);
                 return true;
             } else {
-                this.selected = this.resetSelection();;
+                this.selected = this.resetSelection();
                 this.selected.inst = newSelected.inst;
             }
+            console.log(this.selected);
             //Object.assign(this.selected, newSelected);
             return false;
         }
