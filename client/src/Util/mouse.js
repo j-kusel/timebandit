@@ -29,6 +29,10 @@ export default (p, Window) => {
                 x: 0, y: 0,
                 mode: '',
             };
+            this.move = {
+                x: 0, y: 0,
+                mode: ''
+            };
             this.cancel = true;
             this.rollover = { type: '' };
             this._rollover = {};
@@ -81,6 +85,10 @@ export default (p, Window) => {
         resetDrag() {
             delete this.drag.filter_drag;
             Object.assign(this.drag, { x: 0, y: 0, mode: '' });
+        }
+
+        resetMove() {
+            
         }
 
         select(type) {
@@ -142,6 +150,37 @@ export default (p, Window) => {
             this.canceller(false);
             return false;
         };
+
+        pasteMode(breaks) {
+            this.move.type = 'paste';
+            let mouse_start = Window.x_to_ms(p.mouseX - c.PANES_WIDTH);
+            // search takes mouse drag and breaks
+            let search = (drag, b) => {
+                if (!b)
+                    return [drag];
+                if (drag > b.bias && drag < b.wiggle)
+                    return [drag, b.bias, b.wiggle];
+                // which side does it snap to?
+                if (b.next && drag < b.next.bias)
+                    return [(drag > (b.next.bias+b.wiggle)*0.5) ?
+                        b.next.bias : b.wiggle,
+                        null, null];
+                // otherwise keep searching
+                return search(drag, b.next);
+            };
+
+            this.move.filter_move = () => {
+                let move = Window.x_to_ms(p.mouseX - c.PANES_WIDTH) - mouse_start;
+                console.log(p.mouseX, move, mouse_start);
+                if (move < 0) {
+                    let left = search(-move, breaks.left[0]);
+                    if (left[0]) left[0] *= -1;
+                    return left;
+                }
+                return search(move, breaks.right[0]);
+            }
+
+        }
 
         tickMode() {
             let measure = this.rollover.meas;

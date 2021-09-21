@@ -3,7 +3,7 @@
  * @module sketch
  */
 
-import { order_by_key, check_proximity_by_key, parse_bits, crowding, initial_gap, anticipate_gap } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, parse_bits, crowding, initial_gap, anticipate_gap, calc_gaps, global_gaps } from '../Util/index.js';
 import { lt, lte, gt, gte } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
@@ -40,28 +40,6 @@ const [KeyC, KeyI, KeyV] = [67, 73, 86];
 //const [KeyZ] = [90];
 //const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
 
-// generates measure.gaps in 'measure' drag mode
-var calcGaps = (measures, id) => {
-    var last = false;
-    if (!(typeof id === 'object'))
-        id = [id];
-    // ASSUMES MEASURES ARE IN ORDER
-    let obstacles = [];
-    let gaps = measures.reduce((acc, meas, i) => {
-        // skip measure in question
-        if (id.length && id.indexOf(meas.id) > -1)
-            return acc;
-        acc = [...acc, [
-            (last) ? last.offset + last.ms : -Infinity,
-            meas.offset
-        ]];
-        obstacles.push(meas);
-        last = meas;
-        return acc;
-    }, [])
-        .concat([[ last.offset + last.ms, Infinity ]]);
-    return { gaps, obstacles };
-};
 
 var mergeGaps = (gaps) => {
 
@@ -398,7 +376,7 @@ export default function measure(p) {
             };
 
             // cache gaps
-            inst.gap_cache = calcGaps(inst.ordered, '').gaps;
+            inst.gap_cache = calc_gaps(inst.ordered, '').gaps;
             console.log(inst.gap_cache);
         });
 
@@ -960,7 +938,7 @@ export default function measure(p) {
             if (Window.editor.timer < p.frameCount) {
                 console.log(Window.editor);
                 Window.recalc_editor();
-                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id).gaps);
+                Window.validate_editor((inst, id) => calc_gaps(instruments[inst].ordered, id).gaps);
                 Window.editor.timer = null;
             }
             p.pop();
@@ -1089,7 +1067,7 @@ export default function measure(p) {
                 if (Window.editor.timer) {
                     Window.editor.timer = null;
                     Window.recalc_editor();
-                    Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id).gaps);
+                    Window.validate_editor((inst, id) => calc_gaps(instruments[inst].ordered, id).gaps);
                 }
 
                 if ('start' in selected.temp.invalid || 'end' in selected.temp.invalid)
@@ -1120,14 +1098,27 @@ export default function measure(p) {
 
         // CTRL/MOD functions
         if (p.keyIsDown(MOD)) {
-            if (p.keyCode === KeyC
-                && Window.selected.meas
-            ) {
-                logger.log(`Copying measure ${Window.selected.meas.id}.`);
-                copied = Window.selected.meas; //instruments[Window.selected.inst].measures[Window.selected.meas];
+            if (p.keyCode === KeyC && Window.selected.meas) {
+                copied = Window.getSelection().map(key => Window.selected[key]);
+                logger.log(`Copying measures ${copied.join(', ')}.`);
+                //copied = Window.selected.meas; //instruments[Window.selected.inst].measures[Window.selected.meas];
                 return;
             } else if (p.keyCode === KeyV && copied) {
-                API.paste(Window.selected.inst, copied, (p.mouseX-Window.viewport-c.PANES_WIDTH)/Window.scale);
+                // new multiple-selection pasting code
+                let copied_meas = copied.map((copy, id) => 
+                    Object.assign(_.pick(copy, [
+                        'inst', 'start', 'end', 'timesig', 'denom', 'offset', 'ms'
+                    ]), { id })
+                );
+                
+                let breaks = global_gaps(
+                    instruments.map(i => i.ordered),
+                    copied_meas,
+                    true
+                );
+                console.log(breaks);
+                Mouse.pasteMode(breaks);
+                //API.paste(Window.selected.inst, copied, (p.mouseX-Window.viewport-c.PANES_WIDTH)/Window.scale);
                 return;
             }
             /* ADD UNDO HISTORY HERE
@@ -1188,7 +1179,6 @@ export default function measure(p) {
 
         if ((p.keyCode === DEL || p.keyCode === BACK)) {
             if (!API.checkFocus() && Window.selected.meas) {
-                console.log(Window.getSelection());
                 let to_delete = Window.getSelection().map(key => Window.selected[key]);
                 Window.selected = Window.resetSelection();
                 API.deleteMeasure(to_delete);
@@ -1289,7 +1279,7 @@ export default function measure(p) {
                 Window.enter_instName(Mouse.rollover.inst, instruments[Mouse.rollover.inst].name)
             else if (Window.editor.type && Window.editor.type !== type) {
                 Window.recalc_editor();
-                Window.validate_editor((inst, id) => calcGaps(instruments[inst].ordered, id).gaps);
+                Window.validate_editor((inst, id) => calc_gaps(instruments[inst].ordered, id).gaps);
                 Window.editor.timer = null;
                 Window.editor.type = type
             } else
@@ -1349,131 +1339,13 @@ export default function measure(p) {
                 if (Window.mods.mod)
                     Mouse.tickMode()
                 else {
-                    // 'measure' mode
-                    // i want this elsewhere but there are so many dependencies
-                    let instMeas = [];
-                    let count = [];
-                    // create an array instMeas of empty arrays
-                    for (let i=0; i<instruments.length; i++) {
-                        instMeas.push([]);
-                        count.push(0);
-                    }
-
                     // map Window.selected hashmap to an array of measure objects,
-                    // push from array of measure objects into instMeas array by inst index,
-                    // and increment selection counts for each inst to shortcut gap search.
-                    let selections = Window.getSelection().map(id => {
-                        let sel = Window.selected[id];
-                        count[sel.inst]++;
-                        instMeas[sel.inst].push(id);
-                        return sel;
-                    });
+                    let breaks = global_gaps(
+                        instruments.map(i => i.ordered),
+                        Window.getSelection()
+                            .map(id => Window.selected[id])
+                    );
 
-                    // skip costly algo if selection is exclusively
-                    // entire instruments
-                    if (!count.some((c, i) => 
-                        (c && (c !== Object.keys(instruments[i].measures).length))
-                    ))
-                        return Mouse.measureMode({ breaks: false });
-
-                    // calculate global gaps for each instrument.
-                    // this cannot be known before all measures are sorted,
-                    // so must be a separate loop.
-                    let instGaps = instMeas.map((ids, ind) =>
-                        calcGaps(instruments[ind].ordered, ids));
-
-                    var fit_check = (select, bias, gap) => {
-                        let offset = select.offset + bias;
-                        return gte(offset, gap[0]) && lte(offset + select.ms, gap[1]);
-                    };
-                    // find initial gap for each selection
-                    // this can't be known until gaps are calculated, 
-                    // so must be a separate loop.
-                    //
-                    // is this even necessary, or is it handled in the loops below?
-                    let gapTraces = {};
-                    selections.forEach(select => {
-                        let meas = gapTraces[select.id] = {
-                            meas: select,
-                            gaps: instGaps[select.inst].gaps
-                        };
-                        // when current gap is found, initialize gap pointer
-                        meas.gaps.some((gap, i) =>
-                            fit_check(select, 0, gap)
-                                && ((meas.pointer = i) || true)
-                        );
-                        meas.initial = meas.pointer;
-                    });
-
-
-                    // find global obstacles on left/right
-                    // - dependent on gapTraces object, fit_check function
-                    let break_check = (arr, dir, bias) => {
-                        if (!isFinite(bias))
-                            return arr;
-                        let valid = true;
-                        let result = Object.keys(gapTraces).reduce((acc, key) => {
-                            console.group();
-                            let select = gapTraces[key];
-                            let meas = select.meas;
-                            console.log(`checking measure ${meas.timesig}/${meas.denom} in inst `, meas.inst);
-                            let gap = select.gaps[select.pointer];
-                            // if there are no gaps (meaning no obstacles), return generic acc
-                            if (!gap) {
-                                console.groupEnd();
-                                return acc;
-                            }
-                            let left = (dir==='left');
-                            let fit = left ?
-                                fit_check(meas, -bias, gap) :
-                                fit_check(meas, bias, gap);
-                            let final = left ?
-                                select.pointer === 0 :
-                                select.pointer >= select.gaps.length-1;
-                            if (final) {
-                                let candidate = left ?
-                                    meas.offset - (select.gaps[0][1]-meas.ms) :
-                                    select.gaps[select.gaps.length-1][0]-meas.offset;
-                                if (gt(candidate, bias))
-                                    acc.nearest = Math.min(candidate, acc.nearest);
-                            } else
-                                acc.nearest = Math.min(acc.nearest,
-                                    left ?
-                                        meas.offset - (select.gaps[select.pointer-1][1]-meas.ms) :
-                                        select.gaps[select.pointer+1][0]-meas.offset
-                                );
-                            if (!fit) {
-                                if (!final)
-                                    select.pointer += left ? -1 : 1;
-                                valid = false;
-                            }
-                            if (valid)
-                                acc.wiggle = Math.min(acc.wiggle,
-                                    left ?
-                                        meas.offset - gap[0]:
-                                        gap[1]-meas.ms-meas.offset
-                                );
-                            return acc;
-                        }, { nearest: Infinity, wiggle: Infinity, bias });
-                        if (valid) {
-                            // link previous result to current one
-                            result.half = (result.nearest+result.wiggle)*0.5;
-                            if (arr.length) {
-                                let prev = arr[arr.length-1];
-                                prev.next = result;
-                                prev.break = (result.bias+prev.wiggle)*0.5;
-                            }
-                            arr.push(result);
-                        }
-                        return break_check(arr, dir, result.nearest);
-                    };
-
-
-                    let breaks = {};
-                    breaks.left = break_check([], 'left', 0);
-                    // reset pointers
-                    Object.keys(gapTraces).forEach(key => gapTraces[key].pointer = gapTraces[key].initial);
-                    breaks.right = break_check([], 'right', 0);
                     Mouse.measureMode({ breaks });
                 }
             } else if (Window.mods.mod) {
@@ -1576,7 +1448,7 @@ export default function measure(p) {
         // retrieve the target measure and calculate the measure's gaps, if not cached
         let measure = Mouse.rollover.meas/*Window.selected.meas*/;
         if (!('gaps' in measure))
-            measure.gaps = calcGaps(instruments[measure.inst].ordered, measure.id).gaps;
+            measure.gaps = calc_gaps(instruments[measure.inst].ordered, measure.id).gaps;
         if (!crowd_cache)
             crowd_cache = crowding(measure.gaps, measure.offset, measure.ms, { strict: true, context: { position: measure.offset, ms: measure.ms } });
         var crowd = crowd_cache;
@@ -2150,13 +2022,7 @@ export default function measure(p) {
                 set_lock_persist(selected.inst, selected.id, Object.assign({}, { locks:  selected.locks }));
         }
 
-        /*if (Mouse.drag.mode === 'tempo') {
-            lock_persistence();
-            let update = _.pick(selected, ['inst', 'id', 'timesig', 'denom']);
-            Object.assign(update, _.pick(selected.temp, ['offset', 'start', 'end']));
-            API.updateMeasure(update);
-            Mouse.resetDrag();
-        } else*/ if (Mouse.drag.mode === 'measure') {
+        if (Mouse.drag.mode === 'measure') {
             if (Window.editor.type)
                 Window.editor.temp_offset = Window.editor.meas.temp.offset
             else {
@@ -2173,15 +2039,9 @@ export default function measure(p) {
             return;
         } else if (Mouse.drag.mode === 'tick' || Mouse.drag.mode === 'tempo') {
             lock_persistence();
-            /*let end = selected.temp.end;
-            selected.temp.ticks = [];
-            if (end < 10)
-                return;
-                */
             let update = _.pick(selected, ['inst', 'id', 'timesig', 'denom']);
             Object.assign(update, _.pick(selected.temp, ['offset', 'start', 'end']));
             API.updateMeasure(update);  
-            //API.updateMeasure(selected.inst, selected.id, selected.temp.start, end, selected.beats.length - 1, selected.denom, selected.temp.offset);
             Mouse.resetDrag();
         };
 
@@ -2196,6 +2056,12 @@ export default function measure(p) {
         }
 
         Window.updateCursorLoc();
+
+        if (Mouse.move.type === 'paste') {
+            console.log(Window.x_to_ms(p.mouseX), Mouse.move.filter_move());
+            return;
+
+        }
 
         if (API.pollSelecting('offset')) {
             insertMeasSelecting();

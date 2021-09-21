@@ -629,6 +629,10 @@ export default (p) => {
             return (ms*this.scale + this.viewport);
         }
 
+        x_to_ms(x) {
+            return (x - this.viewport) / this.scale;
+        }
+
         printAdjust({ start, end }) {
             if (start)
                 this.printTemp.start = start;

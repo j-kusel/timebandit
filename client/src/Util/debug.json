@@ -22,6 +22,13 @@
               "timesig": 5,
               "denom": 4,
               "offset": 4722
+          },
+          { 
+              "start": 60,
+              "end": 120,
+              "timesig": 6,
+              "denom": 8,
+              "offset": 15900
           }
       ]
     },
@@ -41,6 +48,13 @@
               "timesig": 5,
               "denom": 8,
               "offset": 300 
+            },
+            {
+              "start": 60,
+              "end": 120,
+              "timesig": 5,
+              "denom": 8,
+              "offset": 15600 
             }
         ]
     }
