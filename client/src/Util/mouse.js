@@ -323,7 +323,7 @@ export default (p, Window) => {
                 this.cursor = 'text';
         }
 
-        eval_cursor(mods, selected) {
+        eval_cursor() {
             this.cursor = 'default';
             if (Window.selected.meas) {
                 // if selected measure is in rollover

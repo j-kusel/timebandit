@@ -258,7 +258,6 @@ export default function measure(p) {
         lock_persist();
         reset_lock_persist();
         Window.insertMeas = props.insertMeas;
-        //Window.selected = props.selected || ({ inst: -1, meas: undefined });
         Window.editMeas = props.editMeas;
         Window.newInst = props.newInst;
         Window.mode = props.mode;
@@ -316,9 +315,7 @@ export default function measure(p) {
         // redraw simply clears temp?
         if (Window.selected.meas) {
             Window.getSelection().forEach(id => {
-                console.log(id);
                 let meas = Window.selected[id];
-                console.log(meas);
                 // why is this necessary? why doesn't this reference persist?
                 let ref = instruments[meas.inst].measures[meas.id];
                 if (ref) {
@@ -328,24 +325,6 @@ export default function measure(p) {
             });
 
         }
-
-        // REVISITING THIS ENTIRE BLOCK {
-            // reset select, begin logging on update
-            // NOW HANDLED ABOVE
-            /*if (Window.selected.inst > -1 && Window.selected.meas)
-                Window.selected.meas = instruments[Window.selected.inst].measures[Window.selected.meas.id];
-                */
-
-            // EDITMEAS OBSOLETE?
-            /*if ('ms' in Window.editMeas) {
-                Window.selected.meas.temp = Window.editMeas;
-                if ('beat' in beat_lock)
-                    Window.selected.meas.temp.offset = Window.selected.meas.temp.offset + Window.selected.meas.beats[beat_lock.beat] - Window.editMeas.beats[beat_lock.beat];
-            // TEMP DELETED ABOVE
-            } else if (Window.selected.meas && 'temp' in Window.selected.meas)
-                delete Window.selected.meas.temp;
-                */
-        // }
 
         if ('locks' in props)
             locks = props.locks.reduce((acc, lock) => (acc |= (1 << lock)), 0); 
@@ -976,8 +955,6 @@ export default function measure(p) {
     }
 
     p.keyPressed = function(e) {
-        console.log(e.code);
-        console.log(p.keyCode, KeyC);
         if (API.modalCheck())
             return;
 
@@ -993,7 +970,7 @@ export default function measure(p) {
         // this updates the mouse cursor when turning mod keys on and off
         // (otherwise the cursor would only refresh on movement!)
         if (mod_change_flag)
-            Mouse.eval_cursor(Window.mods, Window.selected.meas);
+            Mouse.eval_cursor(Window.mods);
 
         snaps.div_index = (Keyboard.num_counter) ?
             Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
@@ -1068,15 +1045,11 @@ export default function measure(p) {
                 Window.exit_instName((instName) => {
                     if (Window.instName.next)
                         API.updateInst(Window.instName.inst, { name: Window.instName.next });
-                        //instruments[Window.instName.inst].name = Window.instName.next;
                 });
                 return;
             }
             if (Window.editor.type) {
                 e.preventDefault();
-                
-                let selected = Window.editor.meas;
-
                 // force calculation/validation if timer still running
                 if (Window.editor.timer) {
                     Window.editor.timer = null;
@@ -1084,21 +1057,24 @@ export default function measure(p) {
                     Window.validate_editor((inst, id) => calc_gaps(instruments[inst].ordered, id).gaps);
                 }
 
-                if ('start' in selected.temp.invalid || 'end' in selected.temp.invalid)
+                let selected = Window.editor.meas;
+                if (selected.temp.invalid && ('start' in selected.temp.invalid || 'end' in selected.temp.invalid))
                     return;
-                let updated = Object.keys(Window.editor.next).reduce(
-                    (acc, key) => Object.assign(acc, { [key]: parseFloat(Window.editor.next[key]) }), {});
-                // make denom an editor option later!
-                //updated.denom = selected.denom;
-                updated.offset = Window.editor.temp_offset;
-                // check if anything's changed
-                if (!['start', 'end', 'timesig', 'denom', 'offset'].some(p => (updated[p] !== selected[p])))
+                let updated = _.pick(selected, 
+                    ['start', 'end', 'timesig', 'denom', 'offset', 'inst', 'id']
+                );
+                // overwrite, check for changes 
+                let diff = false;
+                ['start', 'end', 'timesig', 'denom'].forEach(key => {
+                    updated[key] = parseFloat(Window.editor.next[key]);
+                    diff = diff || (updated[key] === selected[key]);
+                });
+                if (!diff)
                     return Window.exit_editor(true, gatherRanges);
-                updated.inst = Window.editor.inst;
-
+                updated.offset = Window.editor.temp_offset;
                 Window.exit_editor();
                 set_lock_persist(updated.inst, selected.id, Object.assign({}, { locks: selected.locks }));
-                API.updateMeasure(updated.inst, selected.id, updated.start, updated.end, updated.timesig, updated.denom, updated.offset);
+                API.updateMeasure(updated);
                 return;
             }
         }
@@ -1115,11 +1091,8 @@ export default function measure(p) {
             return false;
             //logger.log(`Copying measures ${copied.join(', ')}.`);
         } else if (p.keyCode === KeyP && Window.copied.length) {
-            console.log(Window.copied);
             // new multiple-selection pasting code
             Window.enter_paste_mode();
-            
-            //console.log(Window.pasteMeas);
             let breaks = global_gaps(
                 instruments.map(i => i.ordered),
                 Window.pasteMeas,
@@ -1200,14 +1173,6 @@ export default function measure(p) {
             return;
         };
 
-        /*if (p.keyCode === KeyV) {
-            Window.mode = 2;
-            //API.displaySelected(Window.selected);
-            API.updateMode(Window.mode);
-            return;
-        };*/
-
-
         if ((p.keyCode === DEL || p.keyCode === BACK)) {
             if (!API.checkFocus() && Window.selected.meas) {
                 let to_delete = Window.getSelection().map(key => Window.selected[key]);
@@ -1263,7 +1228,7 @@ export default function measure(p) {
         let checks = [
             { name: 'API.modalCheck', func: API.modalCheck, },
             { name: 'tuts._mouseBlocker', func: tuts._mouseBlocker, },
-            {name: 'Mouse.checkOrigin(p)', func: () => Mouse.checkOrigin(p)},
+            { name: 'Mouse.checkOrigin(p)', func: () => Mouse.checkOrigin(p)},
             { name: '[buttons, core_buttons]' , func: () => [...buttons, ...core_buttons]
                 .some(click => click())
             },
@@ -1364,8 +1329,6 @@ export default function measure(p) {
         }
 
         if (API.pollSelecting('offset') /*&& !Mouse.select('inst')*/) {
-            console.log('confirming');
-            //Window.insertMeas.inst = inst;
             API.confirmSelecting('offset', Window.insertMeas.inst, Window.insertMeas.temp_offset);
             e.preventDefault();
             return;
@@ -1399,10 +1362,8 @@ export default function measure(p) {
         };
 
         // on new selection, skip all other options
-        if (Window.select(_.pick(Mouse.rollover, ['inst', 'meas']))) {
-            console.log('new selection, returning');
+        if (Window.select(_.pick(Mouse.rollover, ['inst', 'meas'])))
             return true;
-        }
 
         API.displaySelected(Window.selected);
     }
@@ -1786,14 +1747,8 @@ export default function measure(p) {
             let spread = Window.range.tempo[1] - Window.range.tempo[0];
             let change = Mouse.drag.y / c.INST_HEIGHT * spread;
 
-            // can't drag a grabbed beat.
-            // ...wait, why not?
-            /*if (beat_lock.beat === Mouse.grabbed)
-                return;*/
-
             // we need to first conditionally check the new length!
             // if nothing is tempo-locked
-            //update = { beats: [], ticks: [], offset: measure.offset };
             if (!('beat' in beat_lock) || beat_lock.type === 'loc') {
                 update.start = measure.start - (!(locks & (1 << 1)) ? change : 0);
                 update.end = measure.end - (!(locks & (1 << 2)) ? change : 0);
@@ -1821,12 +1776,6 @@ export default function measure(p) {
                     update.start = measure.start + (pivot - new_pivot);
                     update.end = new_slope * measure.timesig + update.start;
                 }
-                /*
-                let new_slope = slope*Mouse.grabbed - change;
-                let fresh_slope = (new_slope - pivot) / (Mouse.grabbed - beat_lock.beat);
-                update.start = (new_slope + measure.start) - fresh_slope*Mouse.grabbed;
-                update.end = (fresh_slope*measure.timesig) + update.start;
-                */
 
                 // no ridiculous values... yet
                 if (update.start < 10 || update.end < 10) 
@@ -2098,11 +2047,8 @@ export default function measure(p) {
 
         Window.updateCursorLoc();
 
-        if (Mouse.move.type === 'paste') {
-            Mouse.move.filter_move();
-            return;
-
-        }
+        if (Mouse.move.type === 'paste')
+            return Mouse.move.filter_move();
 
         if (API.pollSelecting('offset')) {
             insertMeasSelecting();
@@ -2148,8 +2094,6 @@ export default function measure(p) {
                     let frameXmeas = frameX - meas.cache.offset;
 
                     // check markings
-                    // CACHE THE BOUNDING BOX #############
-
                     let bounds = meas.cache.bounding;
                     if (['start_tempo_marking', 'end_tempo_marking', 'timesig_marking'].some((type, ind) => {
                         let bounds = meas.cache.bounding[ind];
@@ -2210,7 +2154,7 @@ export default function measure(p) {
         }
 
         // set cursor based on Mouse.rollover
-        Mouse.eval_cursor(Window.mods, Window.selected);
+        Mouse.eval_cursor();
 
         return false;
     };
