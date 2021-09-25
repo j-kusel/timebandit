@@ -245,26 +245,14 @@ class App extends Component {
 
       //var updateMeasure = (inst, id, start, end, timesig, denom, offset) => {
       var updateMeasure = (selected) => {
-          
-          console.log(selected);
-              /*let oldMeas = this.state.instruments[inst].measures[id];
-              
-              offset = (typeof offset === 'number') ? offset : oldMeas.offset;
-              var calc = MeasureCalc({ start, end, timesig, offset, denom}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
-
-              // preserve locks
-              if ('locks' in oldMeas)
-                  calc.locks = Object.assign({}, oldMeas.locks);
-                  */
-
-          
-
-          // re-order measures
           self.setState(oldState => {
-            let instruments = oldState.instruments;
-            let ordered_cpy = Object.assign(oldState.ordered, {});
+            // ensure selected argument is an Array
             if (!Array.isArray(selected))
               selected = [selected];
+
+            // re-order measures
+            let instruments = oldState.instruments;
+            let ordered_cpy = Object.assign(oldState.ordered, {});
             selected.forEach((meas) => {
               let inst, id;
               ({ inst, id } = meas);
@@ -463,7 +451,6 @@ class App extends Component {
       var newMeasure = (measures) => { //inst, start, end, timesig, offset) => {
           if (!Array.isArray(measures))
             measures = [measures];
-          console.log(measures);
 
           this.setState(oldState => {
               let newState = _.pick(oldState, ['instruments', 'ordered']);
@@ -477,7 +464,6 @@ class App extends Component {
                   let inst = meas.inst;
                   let measure = { ...calc, id, inst, beat_nodes: [], locks: {} };
                   
-                  console.log(measure);
                   newState.instruments[inst].measures[id] = measure;
                   measure.beats.forEach((beat) =>
                       newState.ordered = ordered.tree.insert(beat + measure.offset, measure, newState.ordered)
