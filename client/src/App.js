@@ -460,21 +460,34 @@ class App extends Component {
           });
 
 
-      var newMeasure = (inst, start, end, timesig, offset) => {
-          var calc = MeasureCalc({ start, end, timesig, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
+      var newMeasure = (measures) => { //inst, start, end, timesig, offset) => {
+          if (!Array.isArray(measures))
+            measures = [measures];
+          console.log(measures);
 
-          let id = uuidv4();
+          this.setState(oldState => {
+              let newState = _.pick(oldState, ['instruments', 'ordered']);
+              measures.forEach(meas => {
+                  var calc = MeasureCalc(
+                    _.pick(meas, ['start', 'end', 'timesig', 'offset', 'denom']),
+                      { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo }
+                  );
 
-          let measure = { ...calc, id, inst, beat_nodes: [], locks: {} };
-          
-          let newState = { instruments: this.state.instruments, ordered: this.state.ordered };
-          newState.instruments[inst].measures[id] = measure;
-          measure.beats.forEach((beat) =>
-              newState.ordered = ordered.tree.insert(beat + measure.offset, measure, newState.ordered)
-          );
+                  let id = uuidv4();
+                  let inst = meas.inst;
+                  let measure = { ...calc, id, inst, beat_nodes: [], locks: {} };
+                  
+                  console.log(measure);
+                  newState.instruments[inst].measures[id] = measure;
+                  measure.beats.forEach((beat) =>
+                      newState.ordered = ordered.tree.insert(beat + measure.offset, measure, newState.ordered)
+                  );
+              });
+              return newState;
+          });
 
-          this.setState(newState);
-          return measure;
+          //this.setState(newState);
+          //return measure;
       };
 
       return { printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };

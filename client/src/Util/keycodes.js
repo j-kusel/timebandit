@@ -14,10 +14,8 @@ const NUM = [];
 for (let i=48; i < 58; i++)
     NUM.push(i);
 const LETTERS = {};
-const alpha = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
-alpha.forEach((c, i) => LETTERS[i+65] = c);
 
-module.exports = {
+let exported = {
     LEFT, UP, RIGHT, DOWN,
     PERIOD,
     TAB, ENTER,
@@ -25,3 +23,12 @@ module.exports = {
     KeyC, KeyI, KeyV, KeyH, KeyJ, KeyK, KeyL, KeyZ,
     NUM, LETTERS
 };
+
+const alpha = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z'];
+alpha.forEach((c, i) => {
+    exported.LETTERS[i+65] = c;
+    exported['Key' + c.toUpperCase()] = i+65;
+});
+
+
+module.exports = exported;

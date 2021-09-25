@@ -19,7 +19,9 @@ import { Debugger } from '../Util/debugger.js';
 import Printer from '../Util/printer.js';
 import keycodes from '../Util/keycodes.js';
 import { NUM, LETTERS } from '../Util/keycodes.js';
-import { /*CTRL,*/ MOD, LEFT, RIGHT, PERIOD } from '../Util/keycodes.js';
+import { /*CTRL,*/ MOD, LEFT, UP, RIGHT, DOWN, PERIOD } from '../Util/keycodes.js';
+import { SPACE, DEL, BACK, ESC } from '../Util/keycodes.js';
+import { KeyY, KeyP, KeyI, KeyC, KeyV } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
 
@@ -31,19 +33,6 @@ var input;
 
 var conflict = [Infinity, -Infinity];
 var obstacles = [Infinity, -Infinity];
-
-
-const [SPACE, DEL, BACK, ESC] = [32, 46, 8, 27];
-//const [SHIFT, ALT] = [16, 18];
-const [KeyC, KeyI, KeyV] = [67, 73, 86];
-//const [KeyH, KeyJ, KeyK, KeyL] = [72, 74, 75, 76];
-//const [KeyZ] = [90];
-//const [LEFT, UP, RIGHT, DOWN] = [37, 38, 39, 40];
-
-
-var mergeGaps = (gaps) => {
-
-};
 
 // tweaks learning rate for nudge algorithms
 var monitor = (gap, new_gap, alpha) => {
@@ -107,9 +96,6 @@ export default function measure(p) {
             });
             return acc;
         }, { min: Infinity, max: -Infinity });
-
-    // temporary holding for editing measures
-    var copied;
 
     var locks = 0;
 
@@ -635,6 +621,29 @@ export default function measure(p) {
 
             });
 
+            if (Window.pasteMeas.length) {
+                Window.pasteMeas.forEach(meas => {
+                    if (meas.inst === i_ind) {
+                        let origin = Mouse.move.origin;
+
+
+                         // skip if offscreen
+                        if (origin + meas.ms < 0 ||
+                            origin > p.width
+                        )
+                            return;
+                   
+                        p.push();
+                        p.translate(origin+(meas.center_offset*Window.scale), 0);
+                        p.fill(255, 0, 0);
+                        p.rect(0, 0, meas.cache.ms, c.INST_HEIGHT);
+                        p.pop();
+
+                    }
+                });
+            }
+
+
             
             // draw all conflict boxes
             conflicts.forEach(func => func());
@@ -698,6 +707,7 @@ export default function measure(p) {
             p.rect(Window.ms_to_x(obstacles[0]), 0, (obstacles[1]-obstacles[0])*Window.scale, instruments.length*c.INST_HEIGHT); 
             p.pop();
         };
+
 
         if (Window.modulation || (Window.POLL_FLAG && Mouse.rollover.type === 'beat'))
             Window.drawTempoPicker(Mouse.rollover);
@@ -966,6 +976,8 @@ export default function measure(p) {
     }
 
     p.keyPressed = function(e) {
+        console.log(e.code);
+        console.log(p.keyCode, KeyC);
         if (API.modalCheck())
             return;
 
@@ -996,6 +1008,8 @@ export default function measure(p) {
                 Window.exit_instName();
                 return;
             }
+            if (Window.pasteMeas.length)
+                return Window.exit_paste_mode();
             if (Window.modulation) {
                 Window.set_modulation();
                 if (Window.editor.type)
@@ -1095,32 +1109,49 @@ export default function measure(p) {
         if (API.checkFocus()) // && Keyboard.checkNumPress())
             return;
 
+        if (p.keyCode === KeyY && Window.selected.meas) {
+            e.preventDefault();
+            Window.copy();
+            return false;
+            //logger.log(`Copying measures ${copied.join(', ')}.`);
+        } else if (p.keyCode === KeyP && Window.copied.length) {
+            console.log(Window.copied);
+            // new multiple-selection pasting code
+            Window.enter_paste_mode();
+            
+            //console.log(Window.pasteMeas);
+            let breaks = global_gaps(
+                instruments.map(i => i.ordered),
+                Window.pasteMeas,
+                true
+            );
+            Mouse.pasteMode(breaks);
+            Mouse.move.filter_move();
+            return;
+        }
 
         // CTRL/MOD functions
         if (p.keyIsDown(MOD)) {
-            if (p.keyCode === KeyC && Window.selected.meas) {
-                copied = Window.getSelection().map(key => Window.selected[key]);
-                logger.log(`Copying measures ${copied.join(', ')}.`);
-                //copied = Window.selected.meas; //instruments[Window.selected.inst].measures[Window.selected.meas];
-                return;
-            } else if (p.keyCode === KeyV && copied) {
+            /*if (p.keyCode === KeyC && Window.selected.meas) {
+                e.preventDefault();
+                Window.copy();
+                return false;
+                //logger.log(`Copying measures ${copied.join(', ')}.`);
+            } else if (p.keyCode === KeyV && Window.copied.length) {
+                console.log(Window.copied);
                 // new multiple-selection pasting code
-                let copied_meas = copied.map((copy, id) => 
-                    Object.assign(_.pick(copy, [
-                        'inst', 'start', 'end', 'timesig', 'denom', 'offset', 'ms'
-                    ]), { id })
-                );
+                Window.enter_paste_mode();
                 
+                //console.log(Window.pasteMeas);
                 let breaks = global_gaps(
                     instruments.map(i => i.ordered),
-                    copied_meas,
+                    Window.pasteMeas,
                     true
                 );
-                console.log(breaks);
                 Mouse.pasteMode(breaks);
-                //API.paste(Window.selected.inst, copied, (p.mouseX-Window.viewport-c.PANES_WIDTH)/Window.scale);
                 return;
             }
+            */
             /* ADD UNDO HISTORY HERE
             else if (p.keyCode === KeyZ)
                 p.keyIsDown(SHIFT) ?
@@ -1214,6 +1245,10 @@ export default function measure(p) {
         if (zoom) {
             if ('beats' in Window.insertMeas)
                 Window.insertMeas.cache = calculate_insertMeas_cache(Window.insertMeas);
+            if (Window.pasteMeas.length) {
+                Window.pasteMeas.forEach(m => m.cache = Window.calculate_cache(m));
+                Mouse.move.filter_move();
+            }
             instruments.forEach(inst => {
                 inst.ordered.forEach(meas =>
                     meas.cache = Window.calculate_cache(('temp' in meas) ? meas.temp : meas)
@@ -1237,6 +1272,12 @@ export default function measure(p) {
 
         if (Mouse.cancel)
             return;
+
+        if (Window.pasteMeas.length) {
+            let pasting = Window.confirm_paste(Mouse.move.origin_ms);
+            Mouse.resetMove();
+            API.newMeasure(pasting);
+        }
 
         // all editor mode functions should be grouped together here.
         // confirming hover?
@@ -2058,7 +2099,7 @@ export default function measure(p) {
         Window.updateCursorLoc();
 
         if (Mouse.move.type === 'paste') {
-            console.log(Window.x_to_ms(p.mouseX), Mouse.move.filter_move());
+            Mouse.move.filter_move();
             return;
 
         }

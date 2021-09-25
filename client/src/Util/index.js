@@ -80,15 +80,12 @@ var global_gaps = (inst_ordereds, selections, addition) => {
     let first = Infinity;
     let last = -Infinity;
     let instGaps = instMeas.map((ids, ind) => {
-        let gaps = calc_gaps(inst_ordereds[ind], ids).gaps;
-        console.log(gaps);
+        let gaps = calc_gaps(inst_ordereds[ind], addition ? [] : ids).gaps;
         first = Math.min(first, gaps[0][1]);
         last = Math.max(last, gaps[gaps.length-1][0]);
         return gaps;
     });
 
-    console.log(instMeas);
-    console.log(instGaps);
     var fit_check = (select, bias, gap) => {
         let offset = select.offset + bias;
         return gte(offset, gap[0]) && lte(offset + select.ms, gap[1]);
@@ -102,6 +99,7 @@ var global_gaps = (inst_ordereds, selections, addition) => {
     //
     // is this even necessary, or is it handled in the loops below?
     let gapTraces = {};
+    let span = [Infinity, -Infinity];
     selections.forEach(select => {
         let meas = gapTraces[select.id] = {
             meas: select,
@@ -112,6 +110,9 @@ var global_gaps = (inst_ordereds, selections, addition) => {
             meas.pointer = meas.initial = meas.gaps.length-1;
             // add a new measure the minimum known clearance after the end
             meas.meas.offset += breaks.span;
+            span = [Math.min(span[0], meas.meas.offset),
+                Math.max(span[1], meas.meas.offset + meas.meas.ms)];
+
             return;
         }
 
@@ -123,6 +124,14 @@ var global_gaps = (inst_ordereds, selections, addition) => {
         meas.initial = meas.pointer;
     });
 
+    let center = (span[1] + span[0]) * 0.5;
+    let center_half = (span[1] - span[0]) * 0.5;
+    let leftmost = Infinity;
+    selections.forEach(select => {
+        select.center_offset = select.offset - center;
+        leftmost = Math.min(select.offset, leftmost);
+    });
+    console.log(leftmost);
 
     // find global obstacles on left/right
     // - dependent on gapTraces object, fit_check function
@@ -133,6 +142,8 @@ var global_gaps = (inst_ordereds, selections, addition) => {
         //depth--;
         if (!isFinite(bias))
             return arr;
+        
+        let left = (dir==='left');
         let valid = true;
         let result = Object.keys(gapTraces).reduce((acc, key) => {
             console.group();
@@ -140,13 +151,14 @@ var global_gaps = (inst_ordereds, selections, addition) => {
             let meas = select.meas;
             console.log(`checking measure ${meas.timesig}/${meas.denom} in inst `, meas.inst);
             let gap = select.gaps[select.pointer];
+            
+
             console.log(gap);
             // if there are no gaps (meaning no obstacles), return generic acc
             if (!gap) {
                 console.groupEnd();
                 return acc;
             }
-            let left = (dir==='left');
             let fit = left ?
                 fit_check(meas, -bias, gap) :
                 fit_check(meas, bias, gap);
@@ -154,35 +166,47 @@ var global_gaps = (inst_ordereds, selections, addition) => {
                 select.pointer === 0 :
                 select.pointer >= select.gaps.length-1;
             if (final) {
+                let nearest_gap = left ?
+                    select.gaps[0][1] :
+                    select.gaps[select.gaps.length-1][0];
                 let candidate = left ?
-                    meas.offset - (select.gaps[0][1]-meas.ms) :
-                    select.gaps[select.gaps.length-1][0]-meas.offset;
-                if (gt(candidate, bias))
-                    acc.nearest = Math.min(candidate, acc.nearest);
+                    meas.offset - (nearest_gap-meas.ms) :
+                    nearest_gap-meas.offset;
+                if (gt(candidate, bias) && lt(candidate, acc.nearest)) {
+                    acc.nearest = candidate;
+                    acc.nearest_gap = nearest_gap;
+                }
             } else {
                 console.log('changing nearest');
                 console.log('current nearest: ', acc.nearest);
-                if (left) {
-                    console.log('offset ', meas.offset, ' ms ', meas.ms);
-                    console.log('previous ', select.gaps[select.pointer-1]);
-                    console.log('current ', select.gaps[select.pointer]);
-                    console.log('calculated nearest: ', meas.offset-(select.gaps[select.pointer-1][1]-meas.ms));
+                let nearest_gap = left ?
+                    select.gaps[select.pointer-1][1] :
+                    select.gaps[select.pointer+1][0];
+                
+                let candidate = left ?
+                    meas.offset - (nearest_gap-meas.ms) :
+                    nearest_gap-meas.offset
+                console.log('candidate: ', candidate);
+
+                if (lt(candidate, acc.nearest)) {
+                    console.log('new nearest');
+                    acc.nearest = candidate;
+                    acc.nearest_gap = nearest_gap;
                 }
-                acc.nearest = Math.min(acc.nearest,
-                    left ?
-                        meas.offset - (select.gaps[select.pointer-1][1]-meas.ms) :
-                        select.gaps[select.pointer+1][0]-meas.offset
-                );
             }
             if (!fit) {
                 if (left) {
                     let end_gap = gap[1];
                     let end_meas = meas.offset-bias+meas.ms;
-                    console.log(end_gap, end_meas);
                     if (lt(end_gap, end_meas)) {
                         console.log('still more to go');
-                        acc.nearest = Math.min(acc.nearest, meas.offset - (select.gaps[select.pointer][1]-meas.ms));
-                        console.log(acc.nearest);
+                        let nearest_gap = select.gaps[select.pointer][1];
+                        let nearest = meas.offset - (nearest_gap-meas.ms);
+                        if (lt(nearest, acc.nearest)) {
+                            console.log('new nearest: ', nearest);
+                            acc.nearest = nearest;
+                            acc.nearest_gap = nearest;
+                        }
                     } else if (!final)
                         select.pointer -= 1;
                 } else {
@@ -190,7 +214,12 @@ var global_gaps = (inst_ordereds, selections, addition) => {
                     let start_meas = meas.offset+bias;
                     if (gt(start_gap > start_meas)) {
                         console.log('still more to go');
-                        acc.nearest = Math.min(acc.nearest, start_gap - meas.offset);
+                        let nearest = start_gap - meas.offset;
+                        if (lt(nearest, acc.nearest)) {
+                            console.log('new nearest: ', nearest);
+                            acc.nearest = nearest;
+                            acc.nearest_gap = start_gap;
+                        }
                     } else if (!final)
                         select.pointer += 1;
                 }
@@ -201,25 +230,39 @@ var global_gaps = (inst_ordereds, selections, addition) => {
                 console.log('measure fits');
             }
             console.log('bias: ', bias, 'offset: ', meas.offset);
-            if (valid)
-                acc.wiggle = Math.min(acc.wiggle,
-                    left ?
-                        meas.offset - gap[0]:
-                        gap[1]-meas.ms-meas.offset
-                );
+            if (valid) {
+                // how much can we keep moving?
+                let wiggle = left ?
+                    meas.offset - gap[0]:
+                    gap[1]-meas.ms-meas.offset;
+
+                if (wiggle < acc.wiggle) {
+                    acc.wiggle = wiggle;
+                    acc.abs_left = left ? 
+                        gap[0] : gap[1];
+                }
+
+            }
             console.groupEnd();
             return acc;
-        }, { nearest: Infinity, wiggle: Infinity, bias });
+        }, { nearest: Infinity, wiggle: Infinity,  abs_left: -Infinity, bias });
         if (valid) {
             // link previous result to current one
             result.half = (result.nearest+result.wiggle)*0.5;
+            result.center_far = left ?
+                center - result.wiggle :
+                center + result.wiggle;
             if (arr.length) {
                 let prev = arr[arr.length-1];
                 prev.next = result;
                 prev.break = (result.bias+prev.wiggle)*0.5;
+                result.abs_right = prev.nearest_gap;
+                result.center_near = left ?
+                    (center - bias) : (center + bias); 
             }
             arr.push(result);
         }
+        console.log(center);
         return break_check(arr, dir, result.nearest);
     };
 
@@ -228,8 +271,8 @@ var global_gaps = (inst_ordereds, selections, addition) => {
     console.log(breaks.left);
     // reset pointers
     Object.keys(gapTraces).forEach(key => gapTraces[key].pointer = gapTraces[key].initial);
-    depth = 10;
     breaks.right = break_check([], 'right', 0);
+    Object.assign(breaks, { span, center, center_half, leftmost });
     return breaks;
 }
 

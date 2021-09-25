@@ -21,18 +21,17 @@ var cursors = {
         mods.ctrl ? (mods.shift ? 'text' : 'pointer') : 'default'
 };
 
+var DRAG_DEFAULT = { x: 0, y: 0, mode: '' };
+var MOVE_DEFAULT = { x: 0, y: 0, mode: '' };
+
+
+
 export default (p, Window) => {
     class _Mouse {
         constructor() {
             this.grabbed = 0;
-            this.drag = {
-                x: 0, y: 0,
-                mode: '',
-            };
-            this.move = {
-                x: 0, y: 0,
-                mode: ''
-            };
+            this.drag = Object.assign({}, DRAG_DEFAULT);
+            this.move = Object.assign({}, MOVE_DEFAULT);
             this.cancel = true;
             this.rollover = { type: '' };
             this._rollover = {};
@@ -82,13 +81,18 @@ export default (p, Window) => {
             }), 'pressInit');
         }
 
+        // might need to separate this later but it works for now
         resetDrag() {
-            delete this.drag.filter_drag;
+            this.drag = Object.assign({}, DRAG_DEFAULT);
+            /*delete this.drag.filter_drag;
+            delete this.move.filter_move;
             Object.assign(this.drag, { x: 0, y: 0, mode: '' });
+            Object.assign(this.drag, { x: 0, y: 0, mode: '' });
+            */
         }
 
         resetMove() {
-            
+            this.move = Object.assign({}, MOVE_DEFAULT);
         }
 
         select(type) {
@@ -153,31 +157,35 @@ export default (p, Window) => {
 
         pasteMode(breaks) {
             this.move.type = 'paste';
+            this.move.center = (breaks.span[1] - breaks.span[0]) * 0.5;
+            console.log(breaks);
             let mouse_start = Window.x_to_ms(p.mouseX - c.PANES_WIDTH);
+            let origin = breaks.span;
             // search takes mouse drag and breaks
-            let search = (drag, b) => {
+            let search_l = (x, b) => {
                 if (!b)
-                    return [drag];
-                if (drag > b.bias && drag < b.wiggle)
-                    return [drag, b.bias, b.wiggle];
+                    return [x];
+                if (x > b.center_far && x < b.center_near)
+                    return [x, b.center_far, b.center_near];
                 // which side does it snap to?
-                if (b.next && drag < b.next.bias)
-                    return [(drag > (b.next.bias+b.wiggle)*0.5) ?
-                        b.next.bias : b.wiggle,
-                        null, null];
+                if (b.next && x > b.next.center_near)
+                    return [(x < (b.next.center_near+b.center_far)*0.5) ?
+                        b.next.center_near : b.center_far,
+                        b];
                 // otherwise keep searching
-                return search(drag, b.next);
+                return search_l(x, b.next);
             };
 
             this.move.filter_move = () => {
-                let move = Window.x_to_ms(p.mouseX - c.PANES_WIDTH) - mouse_start;
-                console.log(p.mouseX, move, mouse_start);
-                if (move < 0) {
-                    let left = search(-move, breaks.left[0]);
-                    if (left[0]) left[0] *= -1;
-                    return left;
+                let move = Window.x_to_ms(p.mouseX - c.PANES_WIDTH);
+                if (move < breaks.span[0] - breaks.left[0].wiggle + breaks.center_half) {
+                    let left = search_l(move, breaks.left[0]);
+                    this.move.origin = Window.ms_to_x(left[0]);
+                    this.move.origin_ms = left[0];
+                } else {
+                    this.move.origin = Window.ms_to_x(move);
+                    this.move.origin_ms = move;
                 }
-                return search(move, breaks.right[0]);
             }
 
         }

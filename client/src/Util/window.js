@@ -59,6 +59,8 @@ export default (p) => {
             this.mods = {};
 
             this.insertMeas = {};
+            this.copied = [];
+            this.pasteMeas = [];
             this.editMeas = {};
             this._lockingCandidate = null;
             this.range = { tempo: [0, 100] };
@@ -247,6 +249,38 @@ export default (p) => {
             this.editor.next[this.editor.type] = this.editor.hover_next_string;
             this.editor_hover(null);
             this.start_editor_timer();
+        }
+
+        copy() {
+            this.copied = this.getSelection().map(key => this.selected[key]);
+            console.log(this.copied);
+        }
+
+        enter_paste_mode() {
+            this.pasteMeas = this.copied.map((copy, id) => {
+                let meas = Object.assign(_.pick(copy, [
+                    'inst', 'start', 'end', 'timesig',
+                    'denom', 'offset', 'ms', 'beats', 'ticks'
+                ]), { id });
+                this.initialize_temp(meas);
+                return meas;
+            });
+        }
+
+        confirm_paste(origin) {
+            let pasting = this.pasteMeas.map(meas =>
+                Object.assign(
+                    _.pick(meas, ['inst', 'start', 'end', 'timesig', 'denom']),
+                    { offset: origin + meas.center_offset }
+                )
+            );
+            this.exit_paste_mode();
+            return pasting;
+        }
+
+        exit_paste_mode() {
+            this.pasteMeas = [];
+            console.log(this.copied);
         }
 
         set_polling_flag(type) {
