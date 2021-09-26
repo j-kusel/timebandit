@@ -19,11 +19,12 @@ import { Debugger } from '../Util/debugger.js';
 import Printer from '../Util/printer.js';
 import keycodes from '../Util/keycodes.js';
 import { NUM, LETTERS } from '../Util/keycodes.js';
-import { /*CTRL,*/ MOD, LEFT, UP, RIGHT, DOWN, PERIOD } from '../Util/keycodes.js';
+import { CTRL, MOD, SHIFT, LEFT, UP, RIGHT, DOWN, PERIOD } from '../Util/keycodes.js';
 import { SPACE, DEL, BACK, ESC } from '../Util/keycodes.js';
-import { KeyY, KeyP, KeyI, KeyC, KeyV } from '../Util/keycodes.js';
+import { KeyR, KeyU, KeyY, KeyP, KeyI, KeyC, KeyV, KeyZ } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
+console.log(KeyR, KeyU, CTRL);
 
 const DEBUG = process.env.NODE_ENV === 'development';
 const SLOW = process.env.NODE_ENV === 'development';
@@ -1103,6 +1104,12 @@ export default function measure(p) {
             return;
         }
 
+        if (p.keyCode === KeyU) 
+            return API.undo()
+        else if (p.keyIsDown(CTRL) && (p.keyCode === KeyR))
+            return API.redo();
+
+
         // CTRL/MOD functions
         if (p.keyIsDown(MOD)) {
             /*if (p.keyCode === KeyC && Window.selected.meas) {
@@ -1125,12 +1132,13 @@ export default function measure(p) {
                 return;
             }
             */
-            /* ADD UNDO HISTORY HERE
-            else if (p.keyCode === KeyZ)
+            // ADD UNDO HISTORY HERE
+            /*else if (p.keyCode === KeyZ)
                 p.keyIsDown(SHIFT) ?
-                    API.redo() : API.undo();
-            */
+                    API.redo() : API.undo()
+                    */
         };
+        
 
         let dir = Keyboard.checkDirection();
         if (Window.selected.meas && dir) {

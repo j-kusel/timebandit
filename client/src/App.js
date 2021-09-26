@@ -27,7 +27,7 @@ import debug from './Util/debug.json';
 const DEBUG = process.env.NODE_ENV === 'development';
 var counter = 0;
 var socket;
-
+var redo = [];
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 // later do custom PPQs
@@ -182,10 +182,45 @@ class App extends Component {
 		  //'confirmEdit',
 		  'toggleTutorials',
 		  'toggleExports',
-          'focusInsertSubmit'
+          'focusInsertSubmit',
+          'setStateHistory',
+          'undoStateHistory',
+          'redoStateHistory'
+
 	  ].forEach(func => self[func] = self[func].bind(this));
-      
+
+      this.history = [];
+      this.redo = [];
       this.API = this.initAPI();
+  }
+
+  setStateHistory(func) {
+    // eliminate redo history
+    this.redo = [];
+    this.history.push(_.cloneDeep(this.state));
+    console.log(this.history[this.history.length-1].instruments[1].measures);
+      //console.log(Object.assign({}, this.state/*.instruments[1].measures*/));
+    //console.log(this.state.instruments[1].measures);
+    this.setState(oldState => func(oldState));
+  }
+
+  undoStateHistory() {
+    console.log('undoing...');
+    if (!this.history.length)
+      return;
+    let last = this.history.pop();
+      
+    this.redo.push(_.cloneDeep(this.state));
+    this.setState(last);
+  }
+
+  redoStateHistory() {
+    console.log('redoing...');
+    if (!this.redo.length)
+      return;
+    let next = this.redo.pop();
+    this.history.push(_.cloneDeep(this.state));
+    this.setState(next);
   }
 
   /**
@@ -207,7 +242,9 @@ class App extends Component {
   initAPI() {
       var self = this;
 
-    
+      var undo = this.undoStateHistory/*(this)*/;
+      var redo = this.redoStateHistory/*(this)*/;
+
       var get = (name) => {
           if (name === 'isPlaying')
             return self.state.isPlaying;
@@ -245,7 +282,7 @@ class App extends Component {
 
       //var updateMeasure = (inst, id, start, end, timesig, denom, offset) => {
       var updateMeasure = (selected) => {
-          self.setState(oldState => {
+          self.setStateHistory(oldState => {
             // ensure selected argument is an Array
             if (!Array.isArray(selected))
               selected = [selected];
@@ -285,44 +322,50 @@ class App extends Component {
           });
       };
 
-      var deleteMeasure = (selected) => self.setState(oldState => {
-          console.log(selected);
-          let ordered_cpy = oldState.ordered;
-          if (Object.keys(ordered_cpy)) {
-              selected.forEach(meas => {
-                  let meas_to_delete = oldState.instruments[meas.inst].measures[meas.id];
-                  meas_to_delete
-                      .beats.forEach((beat, ind) => {
-                          ordered.tree.edit(ordered_cpy, { _clear: beat + meas_to_delete.offset, inst: selected.inst });
-                      });
-              });
-          }
+      var deleteMeasure = (selected) => {
+          this.setStateHistory(oS => {
+              let oldState = Object.assign({}, oS);
+              let ordered_cpy = oldState.ordered;
+              if (Object.keys(ordered_cpy)) {
+                  selected.forEach(meas => {
+                      let meas_to_delete = oldState.instruments[meas.inst].measures[meas.id];
+                      meas_to_delete
+                          .beats.forEach((beat, ind) => {
+                              ordered.tree.edit(ordered_cpy, { _clear: beat + meas_to_delete.offset, inst: selected.inst });
+                          });
+                  });
+              }
 
-          selected.forEach(meas => {
-              logger.log(`Deleting measure ${meas.id} from instrument ${meas.inst}.`);
-              delete oldState.instruments[meas.inst].measures[meas.id]
+              selected.forEach(meas => {
+                  logger.log(`Deleting measure ${meas.id} from instrument ${meas.inst}.`);
+                  delete oldState.instruments[meas.inst].measures[meas.id]
+              });
+              return { instruments: oldState.instruments, selected: {}, ordered: ordered_cpy };
           });
-          return ({ instruments: oldState.instruments, selected: {}, ordered: ordered_cpy });
-      });
+          //self.setState/*History({ instruments: oldState.instruments, selected: {}, ordered: ordered_cpy });*/
+      }
 
       /**
        * Updates React application state with the current selection
        */
       var displaySelected = (selected) => {
-          let newState = {
-              selected,
-              editMeas: {}
-          };
-          if (selected.meas)
-              Object.assign(newState, {
-                  edit_start: selected.meas.start,
-                  edit_end: selected.meas.end,
-                  edit_timesig: selected.meas.timesig
-              });
-          self.setState(oldState => newState);
+          self.setStateHistory(oldState => {
+              let newState = {
+                  selected,
+                  editMeas: {}
+              };
+              if (selected.meas)
+                  Object.assign(newState, {
+                      edit_start: selected.meas.start,
+                      edit_end: selected.meas.end,
+                      edit_timesig: selected.meas.timesig
+                  });
+              return newState;
+          });
       };
 
       var newFile = () => {
+          // clear history here
           self.setState({
               selected: { inst: -1, meas: undefined },
               instruments: [],
@@ -340,7 +383,7 @@ class App extends Component {
       var paste = (inst, measure, offset) => {
           logger.log(`Pasting copied measure ${measure.id} into instrument ${inst}...`);
           var calc = MeasureCalc({ start: measure.start, end: measure.end, timesig: measure.beats.length - 1, offset}, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
-          self.setState(oldState => {
+          self.setStateHistory(oldState => {
               let instruments = oldState.instruments;
               let id = uuidv4();
 
@@ -437,7 +480,7 @@ class App extends Component {
       });
 
       var newInstrument = (name) =>
-          this.setState(oldState => {
+          this.setStateHistory(oldState => {
               let instruments = oldState.instruments;
               let audioId = uuidv4();
               let frequency = instruments.length ?
@@ -452,7 +495,7 @@ class App extends Component {
           if (!Array.isArray(measures))
             measures = [measures];
 
-          this.setState(oldState => {
+          this.setStateHistory(oldState => {
               let newState = _.pick(oldState, ['instruments', 'ordered']);
               measures.forEach(meas => {
                   var calc = MeasureCalc(
@@ -476,7 +519,7 @@ class App extends Component {
           //return measure;
       };
 
-      return { printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -514,7 +557,7 @@ class App extends Component {
           audioId
       }
 
-      this.setState((oldState) => {
+      this.setStateHistory((oldState) => {
           // add after selected
           let selected = oldState.selected.inst;
           let loc = ((!selected) || selected === -1) ?
@@ -533,16 +576,18 @@ class App extends Component {
           (dir === 'down' && inst === this.state.instruments.length-1)
       )
           return;
-      let instruments = [].concat(this.state.instruments);
-      let [moved] = instruments.splice(inst, 1);
-      instruments.splice(dir === 'up' ? inst-1 : inst+1, 0, moved);
-      // update all measures' inst information
-      instruments.forEach((inst, ind) => 
-          Object.keys(inst.measures).forEach(key =>
-              inst.measures[key].inst = ind
-          )
-      );
-      this.setState({ instruments });
+      this.setStateHistory(oldState => {
+          let instruments = [].concat(oldState.instruments);
+          let [moved] = instruments.splice(inst, 1);
+          instruments.splice(dir === 'up' ? inst-1 : inst+1, 0, moved);
+          // update all measures' inst information
+          instruments.forEach((inst, ind) => 
+              Object.keys(inst.measures).forEach(key =>
+                  inst.measures[key].inst = ind
+              )
+          );
+          return { instruments }
+      });
   }
 
   handleMeasure(e) {
@@ -570,7 +615,7 @@ class App extends Component {
 
       var calc = MeasureCalc(newMeasure, { PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo });
 
-      this.setState(oldState => {
+      this.setStateHistory(oldState => {
           let instruments = oldState.instruments;
           let id = uuidv4();
           instruments[inst].measures[id] = { ...calc, id, inst };
