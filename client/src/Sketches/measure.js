@@ -555,8 +555,16 @@ export default function measure(p) {
                 // draw events
                 if (measure.events)
                     Window.drawEvents(measure);
+                // entering an event?
+                if (Mouse.rollover.type === 'entry' &&
+                    Mouse.rollover.meas.id === measure.id
+                ) {
+                    Mouse.rollover.hover()
+                }
+
                 // return from measure translate
                 p.pop();
+
                 if (cache.invalid) {
                     let conflictColor = p.color(colors.accent);
                     conflictColor.setAlpha(150);
@@ -2115,17 +2123,34 @@ export default function measure(p) {
 
                     if (Window.entry.mode) {
                         let last = 0;
-                        meas.cache.ticks//.slice(base_tick)
+                        let quantize = Math.round(Window.CONSTANTS.PPQ / Math.pow(2, Window.entry.duration));
+
+                        let cache = meas.cache;
+                        let rollover = { type: 'entry', inst, meas };
+                        if (!cache.ticks
                             .some((tick, t) => {
-                                if (frameXmeas >= tick - c.ROLLOVER_TOLERANCE &&
-                                    frameXmeas <= tick + c.ROLLOVER_TOLERANCE
-                                ) {
-                                    Mouse.setRollover({ type: 'entry', inst, meas, tick: t });
-                                    console.log(Mouse.rollover);
+                                if ((!t) || (t%quantize))
+                                    return false;
+                                let tick_split = (tick + last) * 0.5;
+                                if (frameXmeas < tick_split) {
+                                    rollover.tick = t-quantize;
                                     return true;
                                 }
-                                //sum += tick;
-                            });
+                                last = tick;
+                            }))
+                                rollover.tick = cache.ticks.length - quantize;
+
+                        rollover.hover = () => {
+                            let duration = Window.entry.duration;
+                            let position = cache.ticks[rollover.tick];
+                            let end_tick = rollover.tick + (Window.CONSTANTS.PPQ / Math.pow(2, duration));
+                            // catch duration for last tick cluster if necessary
+                            let release = end_tick < cache.ticks.length ?
+                                cache.ticks[end_tick] : cache.ms;
+                            Window.drawEvent(0, position, release - position);
+                        };
+
+                        Mouse.setRollover(rollover);
                         return true;
                     }
 

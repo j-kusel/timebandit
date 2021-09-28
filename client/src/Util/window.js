@@ -854,27 +854,29 @@ export default (p) => {
             this.updateViewCallback(this.viewport, this.scale, this.scroll);
         }
 
-        drawEvents(measure) {
+        drawEvent(y_base, position, duration) {
             p.push();
             p.translate(0, c.INST_HEIGHT * 0.5);
+            let col = p.color(colors.contrast);
+            col.setAlpha(100);
+            p.stroke(col);
+            p.fill(col);
+            let height = c.INST_HEIGHT / 3;
+            p.rect(position, y_base-height*0.2, duration, height*0.4);
+            col.setAlpha(200);
+            p.stroke(col);
+            p.fill(col);
+            p.rect(position-2, y_base-height*0.5, 4, height);
+            p.pop();
+        };
+
+        drawEvents(measure) {
             measure.events.forEach(event => {
                 let position = measure.cache.ticks[event.tick];
                 let duration = measure.cache.ticks[event.tick+event.duration] - position;
-                p.push();
-                let col = p.color(colors.contrast);
-                col.setAlpha(100);
-                p.stroke(col);
-                p.fill(col);
-                let height = c.INST_HEIGHT / 3;
-                p.rect(position, -height*0.2, duration, height*0.4);
-                col.setAlpha(200);
-                p.stroke(col);
-                p.fill(col);
-                p.rect(position-2, -height*0.5, 4, height);
-                p.pop();
-            })
-            p.pop(); 
-        }
+                this.drawEvent(0, position, duration);
+            });
+        };
 
         drawLockMenu(type) {
             p.push();
