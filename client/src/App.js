@@ -198,9 +198,6 @@ class App extends Component {
     // eliminate redo history
     this.redo = [];
     this.history.push(_.cloneDeep(this.state));
-    console.log(this.history[this.history.length-1].instruments[1].measures);
-      //console.log(Object.assign({}, this.state/*.instruments[1].measures*/));
-    //console.log(this.state.instruments[1].measures);
     this.setState(oldState => func(oldState));
   }
 
@@ -323,8 +320,7 @@ class App extends Component {
       };
 
       var deleteMeasure = (selected) => {
-          this.setStateHistory(oS => {
-              let oldState = Object.assign({}, oS);
+          this.setStateHistory(oldState => {
               let ordered_cpy = oldState.ordered;
               if (Object.keys(ordered_cpy)) {
                   selected.forEach(meas => {
@@ -505,7 +501,8 @@ class App extends Component {
 
                   let id = uuidv4();
                   let inst = meas.inst;
-                  let measure = { ...calc, id, inst, beat_nodes: [], locks: {} };
+                  let measure = { ...calc, id, inst,
+                      beat_nodes: [], locks: {}, events: [] };
                   
                   newState.instruments[inst].measures[id] = measure;
                   measure.beats.forEach((beat) =>

@@ -22,6 +22,12 @@ let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
 
 }
 
+let DURATIONS = {
+    2: 4
+
+
+};
+
 // generates measure.gaps in 'measure' drag mode
 var calcGaps = (measures, id) => {
     var last = false;
@@ -58,6 +64,7 @@ export default (p) => {
             this.insts = 0;
             this.mods = {};
 
+            this.entry = {};
             this.insertMeas = {};
             this.copied = [];
             this.pasteMeas = [];
@@ -162,6 +169,34 @@ export default (p) => {
             if ('next' in this.modulation)
                 delete this.modulation.next;
             return null;
+        }
+
+        toggle_entry() {
+            this.entry = this.entry.mode ? {} : { mode: true, duration: 2 };
+        }
+
+        change_entry(input) {
+            let num = NUM.indexOf(input);
+            if (num < 0) return;
+            this.entry.duration = num;
+        }
+
+        enter_event(rollover) {
+            let meas = rollover.meas;
+            let event = {
+                tick: rollover.tick,
+                nominal: Math.pow(2, this.entry.duration)
+            };
+            event.duration = this.CONSTANTS.PPQ / event.nominal;
+            if (!(meas.events && meas.events.length))
+                return meas.events = [event];
+
+            // event insertion might conflict with other events!
+            if(!meas.events.some((n,i) =>
+                (event.tick < n.tick) && meas.events.splice(i, 0, event)
+            ))
+                meas.events.push(event);
+            console.log(meas.events);
         }
 
         enter_instName(inst, oldName) {
@@ -817,6 +852,28 @@ export default (p) => {
             }
 
             this.updateViewCallback(this.viewport, this.scale, this.scroll);
+        }
+
+        drawEvents(measure) {
+            p.push();
+            p.translate(0, c.INST_HEIGHT * 0.5);
+            measure.events.forEach(event => {
+                let position = measure.cache.ticks[event.tick];
+                let duration = measure.cache.ticks[event.tick+event.duration] - position;
+                p.push();
+                let col = p.color(colors.contrast);
+                col.setAlpha(100);
+                p.stroke(col);
+                p.fill(col);
+                let height = c.INST_HEIGHT / 3;
+                p.rect(position, -height*0.2, duration, height*0.4);
+                col.setAlpha(200);
+                p.stroke(col);
+                p.fill(col);
+                p.rect(position-2, -height*0.5, 4, height);
+                p.pop();
+            })
+            p.pop(); 
         }
 
         drawLockMenu(type) {

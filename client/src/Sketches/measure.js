@@ -21,7 +21,7 @@ import keycodes from '../Util/keycodes.js';
 import { NUM, LETTERS } from '../Util/keycodes.js';
 import { CTRL, MOD, SHIFT, LEFT, UP, RIGHT, DOWN, PERIOD } from '../Util/keycodes.js';
 import { SPACE, DEL, BACK, ESC } from '../Util/keycodes.js';
-import { KeyR, KeyU, KeyY, KeyP, KeyI, KeyC, KeyV, KeyZ } from '../Util/keycodes.js';
+import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, KeyC, KeyV, KeyZ } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
 console.log(KeyR, KeyU, CTRL);
@@ -551,6 +551,10 @@ export default function measure(p) {
                     }
                     p.text(...text);
                 });
+
+                // draw events
+                if (measure.events)
+                    Window.drawEvents(measure);
                 // return from measure translate
                 p.pop();
                 if (cache.invalid) {
@@ -966,7 +970,7 @@ export default function measure(p) {
                 Window.mods[k.toLowerCase()] = true;
                 mod_change_flag = true;
             }
-        })
+        });
 
         // this updates the mouse cursor when turning mod keys on and off
         // (otherwise the cursor would only refresh on movement!)
@@ -995,25 +999,26 @@ export default function measure(p) {
                 Mouse.drag.mode = '';
                 return;
             }
-            if (Window.editor.type) {
-                Window.exit_editor(true, 
+            if (Window.editor.type)
+                return Window.exit_editor(true, 
                     () => {
                         let r = gatherRanges();
                         Window.updateRange({ tempo: [r.min, r.max] });
                     });
-                return;
-            }
+            if (Window.entry.mode)
+                return Window.toggle_entry();
             if (Window.mode === 0)
-                API.toggleInst(true);
-            else {
-                Window.mode = 0;
-                API.updateMode(Window.mode);
-            }
+                API.toggleInst(true)
+            else
+                API.updateMode(Window.mode = 0);
             return;
         };
 
         if ([...NUM, ...Object.keys(LETTERS).map(l => parseInt(l, 10)), DEL, BACK, LEFT, RIGHT, PERIOD].indexOf(p.keyCode) > -1) {
-            if (NUM.indexOf(p.keyCode) > -1 && Window.modulation) {
+            if (Window.entry.mode) {
+                e.preventDefault();
+                Window.change_entry(p.keyCode);
+            } else if (NUM.indexOf(p.keyCode) > -1 && Window.modulation) {
                 e.preventDefault();
                 Window.change_modulation(p.keyCode);
                 return;
@@ -1103,6 +1108,9 @@ export default function measure(p) {
             Mouse.move.filter_move();
             return;
         }
+
+        if (p.keyCode === KeyE)
+            return Window.toggle_entry();
 
         if (p.keyCode === KeyU) 
             return API.undo()
@@ -1246,6 +1254,7 @@ export default function measure(p) {
         if (Mouse.cancel)
             return;
 
+
         if (Window.pasteMeas.length) {
             let pasting = Window.confirm_paste(Mouse.move.origin_ms);
             Mouse.resetMove();
@@ -1268,6 +1277,9 @@ export default function measure(p) {
             Window.exit_editor(true, gatherRanges);
             return;
         }
+
+        if (Window.entry.mode && Mouse.rollover.meas)
+            return Window.enter_event(Mouse.rollover);
 
         // polling mode functions
         if (Window.POLL_FLAG && Mouse.rollover.type === 'beat') {
@@ -2074,9 +2086,9 @@ export default function measure(p) {
         // checking for rollover.
         // which instrument?
         let y_loc = p.mouseY - c.PLAYBACK_HEIGHT + Window.scroll;
-        let inst_row = Math.floor(y_loc/c.INST_HEIGHT);
-        if (inst_row < instruments.length && inst_row >= 0) {
-            let inst = instruments[inst_row];
+        let inst = Math.floor(y_loc/c.INST_HEIGHT);
+        if (inst < instruments.length && inst >= 0) {
+            let instrument = instruments[inst];
             // translating to viewport
             let X = p.mouseX - c.PANES_WIDTH;
             let frameX = X - Window.viewport;
@@ -2085,21 +2097,38 @@ export default function measure(p) {
             //
             p.push();
             p.textSize(12);
-            let nameWidth = p.textWidth(inst.name);
+            let nameWidth = p.textWidth(instrument.name);
             p.pop();
             if ((frameY >= c.INST_HEIGHT - 20) &&
                 (X <= nameWidth + 10) &&
                 (frameY <= c.INST_HEIGHT - 12) &&
                 (X >= 10)
             ) {
-                Mouse.setRollover({ type: 'instName_marking', inst: inst_row });
+                Mouse.setRollover({ type: 'instName_marking', inst });
             // check for measure rollover
-            } else if (!inst.ordered.some(meas => {
+            } else if (!instrument.ordered.some(meas => {
                 if ((frameX > meas.cache.offset)
                     && (frameX < meas.cache.offset + meas.cache.ms)
                 ) {
                     // translating to measure
                     let frameXmeas = frameX - meas.cache.offset;
+
+                    if (Window.entry.mode) {
+                        let last = 0;
+                        meas.cache.ticks//.slice(base_tick)
+                            .some((tick, t) => {
+                                if (frameXmeas >= tick - c.ROLLOVER_TOLERANCE &&
+                                    frameXmeas <= tick + c.ROLLOVER_TOLERANCE
+                                ) {
+                                    Mouse.setRollover({ type: 'entry', inst, meas, tick: t });
+                                    console.log(Mouse.rollover);
+                                    return true;
+                                }
+                                //sum += tick;
+                            });
+                        return true;
+                    }
+
 
                     // check markings
                     let bounds = meas.cache.bounding;
@@ -2108,12 +2137,13 @@ export default function measure(p) {
                         if (frameXmeas > bounds[0] && frameXmeas < bounds[2] && 
                             frameY > bounds[1] && frameY < bounds[3]
                         ) {
-                            Mouse.setRollover({ type, inst: inst_row, meas });
+                            Mouse.setRollover({ type, inst, meas });
                             return true;
                         }
                         return false;
                     }))
                         return true;
+
 
                     // check for beat rollover
                     if (!meas.cache.beats.some((beat, ind) => {
@@ -2121,7 +2151,7 @@ export default function measure(p) {
                             (frameXmeas < beat + c.ROLLOVER_TOLERANCE)
                         ) {
                             let tempo = (meas.end - meas.start)/meas.timesig * ind + meas.start;
-                            Mouse.setRollover({ type: 'beat', inst: inst_row, meas, beat: ind, tempo });
+                            Mouse.setRollover({ type: 'beat', inst, meas, beat: ind, tempo });
                             if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                 Window.editor_hover(tempo);
                             }
@@ -2134,7 +2164,7 @@ export default function measure(p) {
                                 if (frameY > y - c.ROLLOVER_TOLERANCE &&
                                     frameY < y + c.ROLLOVER_TOLERANCE
                                 ) {
-                                    let rollover = { type: 'tempo', inst: inst_row, meas, beat: ind };
+                                    let rollover = { type: 'tempo', inst, meas, beat: ind };
                                     if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                         let spread = meas.cache.beats[ind + 1] - beat;
                                         let perc = (frameXmeas - beat)/spread;
@@ -2153,12 +2183,12 @@ export default function measure(p) {
                         } else
                             return false;
                     }))
-                        Mouse.setRollover({ type: 'measure', inst: inst_row, meas });
+                        Mouse.setRollover({ type: 'measure', inst, meas });
                     return true;
                 } else
                     return false;
             }))
-                Mouse.setRollover({ type: 'inst', inst: inst_row });
+                Mouse.setRollover({ type: 'inst', inst });
         }
 
         // set cursor based on Mouse.rollover
