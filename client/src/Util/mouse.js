@@ -206,6 +206,11 @@ export default (p, Window) => {
             this.drag.grab = this.rollover.beat;
         }
 
+        entryMode() {
+            this.drag.mode = 'entry';
+            Window.press_event(this.rollover);
+        }
+
         printMode() {
             this.drag.mode = 'printer';
         }

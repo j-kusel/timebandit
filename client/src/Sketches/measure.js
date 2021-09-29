@@ -556,7 +556,8 @@ export default function measure(p) {
                 if (measure.events)
                     Window.drawEvents(measure);
                 // entering an event?
-                if (Mouse.rollover.type === 'entry' &&
+                if (Window.entry.mode &&
+                    Mouse.rollover.type === 'entry' &&
                     Mouse.rollover.meas.id === measure.id
                 ) {
                     Mouse.rollover.hover()
@@ -706,6 +707,10 @@ export default function measure(p) {
 
         if (/*Window.editor.type && */Window.modulation)
             Window.drawModWheel()
+
+        if (Mouse.drag.mode === 'entry')
+            Window.drawEntryTuplet();
+
 
 
         // draw snaps
@@ -1013,8 +1018,10 @@ export default function measure(p) {
                         let r = gatherRanges();
                         Window.updateRange({ tempo: [r.min, r.max] });
                     });
-            if (Window.entry.mode)
+            if (Window.entry.mode) {
+                Mouse.resetDrag();
                 return Window.toggle_entry();
+            }
             if (Window.mode === 0)
                 API.toggleInst(true)
             else
@@ -1025,7 +1032,9 @@ export default function measure(p) {
         if ([...NUM, ...Object.keys(LETTERS).map(l => parseInt(l, 10)), DEL, BACK, LEFT, RIGHT, PERIOD].indexOf(p.keyCode) > -1) {
             if (Window.entry.mode) {
                 e.preventDefault();
-                Window.change_entry(p.keyCode);
+                return (Mouse.drag.mode === 'entry') ? 
+                    Window.change_entry_tuplet(p.keyCode) : 
+                    Window.change_entry_duration(p.keyCode);
             } else if (NUM.indexOf(p.keyCode) > -1 && Window.modulation) {
                 e.preventDefault();
                 Window.change_modulation(p.keyCode);
@@ -1041,12 +1050,14 @@ export default function measure(p) {
             }
         }
 
-
-        if (p.keyCode === keycodes.TAB && Window.editor.type) {
-            e.preventDefault();
-            let types = ['start', 'end', 'timesig', 'denom'];
-            Window.editor.type = types[(types.indexOf(Window.editor.type) + 1) % 4];
-            return;
+        if (p.keyCode === keycodes.TAB) {
+            if (Window.editor.type) {
+                let types = ['start', 'end', 'timesig', 'denom'];
+                return Window.editor.type = types[(types.indexOf(Window.editor.type) + 1) % 4];
+            } else if (Mouse.drag.mode === 'entry') {
+                e.preventDefault();
+                return Window.toggle_entry_tuplet();
+            }
         }
 
         if (p.keyCode === keycodes.ENTER) {
@@ -1287,7 +1298,7 @@ export default function measure(p) {
         }
 
         if (Window.entry.mode && Mouse.rollover.meas)
-            return Window.enter_event(Mouse.rollover);
+            return Mouse.entryMode();
 
         // polling mode functions
         if (Window.POLL_FLAG && Mouse.rollover.type === 'beat') {
@@ -1977,6 +1988,12 @@ export default function measure(p) {
             }
         }
 
+        if (Mouse.drag.mode === 'entry') {
+            Window.confirm_event();
+            Mouse.resetDrag();
+            return;
+        }
+
         if (Mouse.drag.mode === 'printer') {
             Mouse.resetDrag();
             if (Window.printTemp.end - Window.printTemp.start > 500)
@@ -2141,9 +2158,8 @@ export default function measure(p) {
                                 rollover.tick = cache.ticks.length - quantize;
 
                         rollover.hover = () => {
-                            let duration = Window.entry.duration;
                             let position = cache.ticks[rollover.tick];
-                            let end_tick = rollover.tick + (Window.CONSTANTS.PPQ / Math.pow(2, duration));
+                            let end_tick = rollover.tick + Math.round(Window.entry.calc_duration);
                             // catch duration for last tick cluster if necessary
                             let release = end_tick < cache.ticks.length ?
                                 cache.ticks[end_tick] : cache.ms;

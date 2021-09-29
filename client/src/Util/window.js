@@ -153,13 +153,6 @@ export default (p) => {
                         (tuplet_mods[1])
                     );
 
-                    /*(base * 
-                        Math.pow(2, this.modulation.indexLeft-1) * 
-                        (tuplet_mods[0])
-                    ) / (
-                        Math.pow(2, this.modulation.indexRight-1) * 
-                        (tuplet_mods[1])
-                    );*/
                 if (this.editor.type) {
                     this.editor.hover_next_number = this.modulation.next;
                     this.editor.hover_next_string = this.modulation.next.toString();
@@ -172,47 +165,91 @@ export default (p) => {
         }
 
         toggle_entry() {
-            this.entry = this.entry.mode ? {} : { mode: true, duration: 2 };
+            this.entry = this.entry.mode ? {} : {
+                mode: true, duration: 2,
+                calc_duration: this.CONSTANTS.PPQ / 4,
+                tuplet: [1,1]
+            };
         }
 
-        change_entry(input) {
+        toggle_entry_tuplet() {
+            this.entry.tuplet_target ^= 1;
+        }
+
+        change_entry_tuplet(input) {
+            let num = NUM.indexOf(input);
+            if (num < 0) return;
+            this.entry.tuplet[this.entry.tuplet_target] = num;
+            this.recalc_entry_tuplet();
+        }
+
+        change_entry_duration(input) {
             let num = NUM.indexOf(input);
             if (num < 0) return;
             this.entry.duration = num;
+            this.recalc_entry_tuplet();
         }
 
-        enter_event(rollover) {
-            let meas = rollover.meas;
+        recalc_entry_tuplet() {
+            let original = this.CONSTANTS.PPQ / Math.pow(2,this.entry.duration);
+            original *= this.entry.tuplet[1] / this.entry.tuplet[0];
+            this.entry.calc_duration = original;
+            console.log(this.entry.calc_duration);
+        }
+
+        press_event(rollover) {
+            console.log(this.entry.calc_duration);
             let event = {
+                meas: rollover.meas,
                 tick: rollover.tick,
-                nominal: Math.pow(2, this.entry.duration)
+                nominal: Math.pow(2, this.entry.duration),
+                calc_duration: this.entry.calc_duration,
+                duration: this.CONSTANTS.PPQ / Math.pow(2, this.entry.duration),
+                tuplet: this.entry.tuplet
             };
-            event.duration = this.CONSTANTS.PPQ / event.nominal;
+            Object.assign(this.entry, {
+                event, tuplet_target: 0,
+                //tuplet: [1,1]
+            });
+        }
+
+        confirm_event() {
+            let event = this.entry.event;
+            event.calc_duration = this.entry.calc_duration;
+            let meas = event.meas;
+
+            if (event.tuplet[0] !== event.tuplet[1]) {
+                let schema = {
+                    basis: event.tick,
+                    //ticks: 
+                    end: event.tick + (event.duration*event.tuplet[1]),
+                    tuplet: event.tuplet
+                }
+                if (!('schemas' in meas))
+                    meas.schemas = {};
+                if (!('schemaIds' in meas))
+                    meas.schemaIds = [];
+
+                meas.schemas[event.tick] = schema;
+                if(!meas.schemaIds.some((n,i) =>
+                    (event.tick < n) && meas.schemaIds.splice(i, 0, event.tick)
+                ))
+                    meas.schemaIds.push(event.tick);
+            }
+
             if (!(meas.events && meas.events.length))
-                return meas.events = [event];
+                meas.events = [event]
 
             // event insertion might conflict with other events!
-            if(!meas.events.some((n,i) =>
+            else if (!meas.events.some((n,i) =>
                 (event.tick < n.tick) && meas.events.splice(i, 0, event)
             ))
                 meas.events.push(event);
-            console.log(meas.events);
+            delete this.entry.event;
+            console.log(meas.schemas, meas.schemaIds);
         }
 
         enter_instName(inst, oldName) {
-            /*var input = p.createInput(oldName);
-            input.style(`
-                z-index: 1;
-                border-width: 0;
-                border: none;
-                outline: none;
-                background: transparent;
-                font-size: 12pt;
-            `);
-            input.position(10, (c.INST_HEIGHT*(inst+1))-20);
-            input.elt.onchange = (e) => console.log('changed!', e);
-            */
-
             this.instName = {
                 inst,
                 oldName,
@@ -873,10 +910,36 @@ export default (p) => {
         drawEvents(measure) {
             measure.events.forEach(event => {
                 let position = measure.cache.ticks[event.tick];
-                let duration = measure.cache.ticks[event.tick+event.duration] - position;
+                let duration = measure.cache.ticks[
+                    event.tick+Math.round(event.calc_duration)
+                ] - position;
                 this.drawEvent(0, position, duration);
             });
         };
+
+        drawEntryTuplet() {
+            p.push();
+            p.translate(p.mouseX - c.PANES_WIDTH + 20, p.mouseY - 20);
+            p.textAlign(p.CENTER, p.CENTER);
+            p.stroke(primary);
+            p.fill(primary);
+            p.text(':', 0, 0);
+            p.textAlign(p.LEFT, p.CENTER);
+            let width = [0,1].map(i => p.textWidth(this.entry.tuplet[i]));
+            if (this.entry.tuplet_target === 0) {
+                p.rect((-width[0])-3, -7, width[0]+1, 14); 
+                p.stroke(secondary);
+                p.fill(secondary);
+            } else {
+                p.rect(4, -7, width[1]+1, 14); 
+            }
+            p.text(this.entry.tuplet[0], (-width[0]-2), 0);
+            let col = (this.entry.tuplet_target === 0) ? primary : secondary;
+            p.stroke(col);
+            p.fill(col);
+            p.text(this.entry.tuplet[1], 4, 0);
+            p.pop();
+        }
 
         drawLockMenu(type) {
             p.push();
