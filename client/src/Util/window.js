@@ -205,12 +205,12 @@ export default (p) => {
                 nominal: Math.pow(2, this.entry.duration),
                 calc_duration: this.entry.calc_duration,
                 duration: this.CONSTANTS.PPQ / Math.pow(2, this.entry.duration),
-                tuplet: this.entry.tuplet
             };
             Object.assign(this.entry, {
                 event, tuplet_target: 0,
-                //tuplet: [1,1]
+                tuplet: [1,1]
             });
+            event.tuplet = this.entry.tuplet;
         }
 
         confirm_event() {
@@ -221,10 +221,15 @@ export default (p) => {
             if (event.tuplet[0] !== event.tuplet[1]) {
                 let schema = {
                     basis: event.tick,
-                    //ticks: 
                     end: event.tick + (event.duration*event.tuplet[1]),
-                    tuplet: event.tuplet
+                    tuplet: event.tuplet,
+                    ticks: []
                 }
+                schema.len = schema.end - schema.basis;
+                let frac = schema.len/schema.tuplet[0];
+                for (let i=schema.basis; i<=schema.end; i+=frac)
+                    schema.ticks.push(Math.round(i));
+                
                 if (!('schemas' in meas))
                     meas.schemas = {};
                 if (!('schemaIds' in meas))
@@ -246,7 +251,9 @@ export default (p) => {
             ))
                 meas.events.push(event);
             delete this.entry.event;
-            console.log(meas.schemas, meas.schemaIds);
+            this.entry.tuplet = [1,1];
+            this.entry.tuplet_target = 0;
+            this.recalc_entry_tuplet();
         }
 
         enter_instName(inst, oldName) {
@@ -890,6 +897,21 @@ export default (p) => {
 
             this.updateViewCallback(this.viewport, this.scale, this.scroll);
         }
+        
+        drawSchemas(measure) {
+            measure.schemaIds.forEach(id => {
+                let schema = measure.schemas[id];
+                let position = measure.cache.ticks[schema.basis];
+                let duration = measure.cache.ticks[schema.end] - position;
+                p.push();
+                let col = p.color(colors.contrast_lighter);
+                col.setAlpha(100);
+                p.stroke(col);
+                p.fill(col);
+                p.rect(position, 0, duration, c.INST_HEIGHT);
+                p.pop();
+            });
+        }
 
         drawEvent(y_base, position, duration) {
             p.push();
@@ -906,6 +928,8 @@ export default (p) => {
             p.rect(position-2, y_base-height*0.5, 4, height);
             p.pop();
         };
+
+
 
         drawEvents(measure) {
             measure.events.forEach(event => {

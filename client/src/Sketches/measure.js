@@ -552,6 +552,10 @@ export default function measure(p) {
                     p.text(...text);
                 });
 
+                // draw schemas
+                if (measure.schemas)
+                    Window.drawSchemas(measure);
+
                 // draw events
                 if (measure.events)
                     Window.drawEvents(measure);
@@ -2139,33 +2143,82 @@ export default function measure(p) {
                     let frameXmeas = frameX - meas.cache.offset;
 
                     if (Window.entry.mode) {
-                        let last = 0;
+                        let last = [0,0];
                         let quantize = Math.round(Window.CONSTANTS.PPQ / Math.pow(2, Window.entry.duration));
 
                         let cache = meas.cache;
                         let rollover = { type: 'entry', inst, meas };
+                        let in_schema = false;
                         if (!cache.ticks
                             .some((tick, t) => {
+                                //console.log(last);
+                                if (meas.schemas && (/*t*/last[1] in meas.schemas)) {
+                                    in_schema = meas.schemas[last[1]/*t*/];
+                                    console.log('entering schema');
+                                }
+                                if (in_schema) {
+                                    if (t >/*=*/ in_schema.end) {
+                                        console.log('exiting schema');
+                                        in_schema = false;
+                                        console.log(last);
+                                    } else if (in_schema.ticks.indexOf(t) > -1) {
+                                        let tick_split = (tick + last[0]) * 0.5;
+                                        console.log(last, tick_split-frameXmeas, tick);
+                                        if (frameXmeas < tick_split) {
+                                            rollover.tick = last[1];
+                                            return true;
+                                        }
+                                        last = [tick,t];    
+                                        return false;
+                                    } else
+                                        return false;
+                                    /*else {
+                                        console.log(t);
+                                        //let quantize = Math.round(Window.CONSTANTS.PPQ / Math.pow(2, Window.entry.duration) / in_schema
+                                        if (!(t in in_schema.ticks))
+                                            return false;
+                                        let tick_split = (tick + last) * 0.5;
+                                        if (frameXmeas < tick_split) {
+                                            rollover.tick = t;
+                                            return true;
+                                        }
+                                        last = tick;
+                                        return false;
+                                    }
+                                    */
+                                }
+
                                 if ((!t) || (t%quantize))
                                     return false;
-                                let tick_split = (tick + last) * 0.5;
+                                let tick_split = (tick + last[0]) * 0.5;
                                 if (frameXmeas < tick_split) {
-                                    rollover.tick = t-quantize;
+                                    rollover.tick = last[1];//t-quantize;
                                     return true;
                                 }
-                                last = tick;
+                                last = [tick,t];
                             }))
-                                rollover.tick = cache.ticks.length - quantize;
+                                // still in schema?
+                                rollover.tick = in_schema ? 
+                                    in_schema.ticks[in_schema.ticks.length-2] :
+                                    cache.ticks.length - quantize;
+
+                        console.log(in_schema);
+                        rollover.schema = (in_schema && (rollover.tick >= in_schema.basis)) ?
+                             in_schema : null;
+
+                        let position = cache.ticks[rollover.tick];
 
                         rollover.hover = () => {
-                            let position = cache.ticks[rollover.tick];
-                            let end_tick = rollover.tick + Math.round(Window.entry.calc_duration);
+                            let calc_duration = rollover.schema ?
+                                Window.entry.calc_duration * rollover.schema.tuplet[1] / rollover.schema.tuplet[0] :
+                                Window.entry.calc_duration;
+
+                            let end_tick = rollover.tick + Math.round(calc_duration);
                             // catch duration for last tick cluster if necessary
                             let release = end_tick < cache.ticks.length ?
                                 cache.ticks[end_tick] : cache.ms;
                             Window.drawEvent(0, position, release - position);
                         };
-
                         Mouse.setRollover(rollover);
                         return true;
                     }
