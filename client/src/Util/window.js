@@ -200,7 +200,7 @@ export default (p) => {
         press_event(rollover) {
             // needs: meas, tick
             // start point confirmed, end point still variable
-            let event = _.pick(rollover, ['meas', 'beat', 'start', 'tick']);
+            let event = _.pick(rollover, ['meas', 'beat', 'start', 'tick', 'schema']);
             console.log(event);
             Object.assign(event, {
                 nominal: Math.pow(2, this.entry.duration),
@@ -237,22 +237,6 @@ export default (p) => {
                 }
                 console.log(schema);
 
-                /*let schema = {
-                    nominal: event.tick * this.CONSTANTS.PPQ,
-                    start: event.start,
-                    end: original*event.tuplet[1],
-                    basis: event.tick,
-                    //end: event.tick + (event.duration*event.tuplet[1]),
-                    tuplet: event.tuplet,
-                    ticks: []
-                }
-                console.log(schema);
-                schema.duration = schema.end * this.CONSTANTS.PPQ - schema.nominal;
-                schema.len = schema.end - schema.basis;
-                let frac = schema.len/schema.tuplet[0];
-                for (let i=schema.basis; i<=schema.end; i+=frac)
-                    schema.ticks.push(Math.round(i));
-                    */
                 schema.cache = this.calculate_schema_cache(meas.cache, schema);
                 
                 if (!('schemas' in meas))

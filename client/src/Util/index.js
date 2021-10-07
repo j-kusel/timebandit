@@ -20,10 +20,6 @@ var gte = (x, y) =>
 var abs_location = (ticks, ms, tick_loc) => {
     let s_tick = Math.floor(tick_loc);
     let s_remainder = tick_loc - s_tick;
-    /*console.log(ticks.length);
-    console.log(s_tick, s_remainder);
-    console.log((ticks[s_tick+1] || ms), ticks[s_tick]);
-    */
     return ticks[s_tick] + 
         ((ticks[s_tick+1] || ms) - ticks[s_tick]) * s_remainder;
 };
