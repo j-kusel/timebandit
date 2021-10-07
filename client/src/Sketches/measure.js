@@ -3,7 +3,7 @@
  * @module sketch
  */
 
-import { order_by_key, check_proximity_by_key, parse_bits, crowding, initial_gap, anticipate_gap, calc_gaps, global_gaps } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, parse_bits, crowding, initial_gap, anticipate_gap, calc_gaps, global_gaps, abs_location } from '../Util/index.js';
 import { lt, lte, gt, gte } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
@@ -2139,29 +2139,229 @@ export default function measure(p) {
                 if ((frameX > meas.cache.offset)
                     && (frameX < meas.cache.offset + meas.cache.ms)
                 ) {
+
                     // translating to measure
                     let frameXmeas = frameX - meas.cache.offset;
 
+                    // fourth pass -_-
                     if (Window.entry.mode) {
+                        let inc, initial;
+                        inc = initial = meas.denom / Math.pow(2, Window.entry.duration);
+
+                        //console.log(inc, /*meas.denom /*/ Window.entry.calc_duration / meas.timesig);
+                   
+                        let tick_perc = 1/meas.cache.ticks.length;
+                        let perc;
+                        // default to end
+                        let frac = meas.timesig;
+                        let last = 0;
+                        meas.cache.ticks.slice(1).some((tick,i) => {
+                            if (tick > frameXmeas) {
+                                let remainder = (frameXmeas - last)/(tick-last);
+                                perc = (i+remainder)*tick_perc;
+                                frac = perc * meas.timesig;
+                                return true;
+                            }
+                            last = tick;
+                        });
+                        let quantize = 0;
+                        last = 0;
+                        let schema_pointer = 0;
+                        let in_schema = false;
+                        let beat;
+                        // loop through beat fractions, checking for mouse to quantize.
+                        for (let acc=0; acc < meas.timesig; acc+=inc) {
+                            accarr.push(acc);
+                            // exiting schema?
+                            if (in_schema && gte(acc, in_schema.beat_end)) {
+                                inc = initial;
+                                // should acc be reset here to avoid float weirdness?
+                                // acc = in_schema.beat_end
+                                last_schema = in_schema;
+                                in_schema = false;
+                                schema_pointer++;
+                            }                            
+                            // entering schema?
+                            if (meas.schemas && (acc) >= meas.schemaIds[schema_pointer]) {
+                                in_schema = meas.schemas[meas.schemaIds[schema_pointer]];
+                                inc = initial * in_schema.tuplet[1] / in_schema.tuplet[0];
+                            }
+                            if (acc > frac) {
+                                // found the mouse.
+                                // because inc still determines duration,
+                                // we need to know if we're using the previous
+                                // or next "inc"
+                                let half = (acc + last[0]) * 0.5;
+                                [beat, inc] = (frac > half) ?
+                                    [acc, inc] : last;
+                                break;
+                            }
+                            if (last_schema)
+                                last_schema = false;
+                            // save inc here in case we need to revert above.
+                            last = [acc, inc];
+                        }
+                        if (!(typeof beat === 'number'))
+                            beat = meas.timesig - inc;
+                        let PPQ = Window.CONSTANTS.PPQ;
+                        let PPQ_adjust = Window.CONSTANTS.PPQ*(4/meas.denom);
+                        let start = abs_location(meas.cache.ticks, meas.cache.ms, beat*PPQ_adjust);
+                        console.log(in_schema);
+
+                        console.log(inc);
+                        let tuplet_inc = in_schema ?
+                            inc * in_schema.tuplet[1] / in_schema.tuplet[0] :
+                            inc;
+                        console.log(tuplet_inc);
+                        let end = abs_location(meas.cache.ticks, meas.cache.ms, (beat+tuplet_inc)*PPQ_adjust/* + Window.entry.calc_duration*/);
+                        if (!end)
+                            end = meas.cache.ms;
+                        let int = Math.floor(quantize);
+                        let remainder = quantize-int;
+                        let rollover = { meas, inst, type: 'entry', start, beat };
+                        rollover.hover = () => {
+                            let calc_duration = /*rollover.schema ?
+                                Window.entry.calc_duration * rollover.schema.tuplet[1] / rollover.schema.tuplet[0] :*/
+                                Window.entry.calc_duration;
+
+                            let end_tick = rollover.tick + Math.round(calc_duration);
+                            // catch duration for last tick cluster if necessary
+                            /*let release = end_tick < cache.ticks.length ?
+                                cache.ticks[end_tick] : cache.ms;
+                                */
+                            //Window.drawEvent(0, position, release - position);
+                            //
+                            let end = abs_location(meas.cache.ticks, meas.cache.ms, (beat+inc)*PPQ_adjust); //beat*PPQ_adjust + Window.entry.calc_duration/*duration*/);
+                            if (!end)
+                                end = meas.cache.ms;
+                            Window.drawEvent(0, start, end-start);
+                        };
+                        Mouse.setRollover(rollover);
+                        return true;
+
+                    }
+
+
+                    // third pass
+                    if (Window.entry.mode && false) {
+                        // let's get a graph of tick possibilities:
+                        // - copy schema info into a tick list
+                        // - "ticks" can be either numbers or references now
+
+                        // copy and skip if no schemas
+                        let ticks = meas.cache.ticks.slice(0);
+                        if (meas.schemas)
+                            meas.schemaIds.forEach(s => ticks[s] = Object.assign({ms:ticks[s]}, meas.schema[s]));
+                        let last = 0;
+                        let current = 0;
+                        let in_schema = false;
+                        ticks.some((t, i) => {
+                            if (in_schema && i >= in_schema.end)
+                                in_schema = false;
+                            if (typeof t === 'object') {
+                                in_schema = t;
+                                current = t.ms;
+                            } else
+                                current = t;
+                            if (current > frameXmeas) {
+                                
+                            }
+                            last = t;
+                        });
+                    }
+
+
+                    //second pass
+                    if (Window.entry.mode && false) {
+                        let quantize = Window.CONSTANTS.PPQ / Math.pow(2, Window.entry.duration);
+                        let inc = quantize;
+                        let in_schema = false;
+                        // compile all quantizable points
+                        let points = [];
+                        for (let i=0; i < meas.cache.ticks.length; i+=inc)
+                            points.push(i);
+
+                        // overwrite schema
+                        if (meas.schemas) {
+                            meas.schemaIds.forEach(id => {
+                                let schema = meas.schemas[id];
+                                let [basis, end] = [schema.basis, schema.end];
+                                let pb, pe;
+                                points.some((p, i) => {
+                                    if (!pb && p >= basis)
+                                        pb = i;
+                                    if (!pe && p >= end)
+                                        pe = i
+
+                                    return (typeof pb==='number' && typeof pe==='number');
+                                });
+                                let inc = quantize * schema.tuplet[1] / schema.tuplet[0];
+                                let s_pts = [];
+                                for (let i=basis; i < end; i+=inc)
+                                    s_pts.push(i);
+                                points = points.slice(0,pb)
+                                    .concat(s_pts)
+                                    .concat(points.slice(pe));
+                            });
+                        }
+
+                        // now where is the mouse closest to?
+                        let last = 0;
+                        // default to last point if nothing found
+                        let tick = Math.round(points[points.length-1]);
+                        points.slice(1).some((p,i) => {
+                            if (frameXmeas < p) {
+                                tick = Math.round((frameXmeas > (p+last) * 0.5) ?
+                                    p : last);
+                                return true;
+                            }
+                            last = p;
+                        });
+
+                        /*if (!meas.cache.ticks.slice(0).some((t, i) => {
+                            in_schema = 
+                                (meas.schemas && (i in meas.schemas)) ?
+                                    meas.schemas[i] : false;
+                            if (frameXmeas < t) {
+                                // when we pass the mouse, record the closest tick
+                                tick = (frameXmeas > (t+last) * 0.5) ?
+                                    i+1 : i;
+                                // now go find a schema?
+                                if (meas.schemas) {
+                                    meas.schemaIds.some(
+                                }
+                                return true;
+                            }
+                            last = t;
+                        }));
+                        */
+
+
+                    }
+
+                    if (Window.entry.mode && false) {
                         let last = [0,0];
                         let quantize = Math.round(Window.CONSTANTS.PPQ / Math.pow(2, Window.entry.duration));
 
                         let cache = meas.cache;
                         let rollover = { type: 'entry', inst, meas };
                         let in_schema = false;
+                        let schema_quantize = false;
                         if (!cache.ticks
                             .some((tick, t) => {
-                                //console.log(last);
+                                // using last here is working for now!
                                 if (meas.schemas && (/*t*/last[1] in meas.schemas)) {
                                     in_schema = meas.schemas[last[1]/*t*/];
+                                    schema_quantize = Math.round(Window.CONSTANTS.PPQ / Math.pow(2, Window.entry.calc_duration) * in_schema.tuplet[1] / in_schema.tuplet[0]); 
                                     console.log('entering schema');
                                 }
                                 if (in_schema) {
                                     if (t >/*=*/ in_schema.end) {
                                         console.log('exiting schema');
                                         in_schema = false;
+                                        schema_quantize = false;
                                         console.log(last);
-                                    } else if (in_schema.ticks.indexOf(t) > -1) {
+                                    } else if (!(t%schema_quantize)/*in_schema.ticks.indexOf(t) > -1*/) {
                                         let tick_split = (tick + last[0]) * 0.5;
                                         console.log(last, tick_split-frameXmeas, tick);
                                         if (frameXmeas < tick_split) {
@@ -2172,23 +2372,10 @@ export default function measure(p) {
                                         return false;
                                     } else
                                         return false;
-                                    /*else {
-                                        console.log(t);
-                                        //let quantize = Math.round(Window.CONSTANTS.PPQ / Math.pow(2, Window.entry.duration) / in_schema
-                                        if (!(t in in_schema.ticks))
-                                            return false;
-                                        let tick_split = (tick + last) * 0.5;
-                                        if (frameXmeas < tick_split) {
-                                            rollover.tick = t;
-                                            return true;
-                                        }
-                                        last = tick;
-                                        return false;
-                                    }
-                                    */
                                 }
 
-                                if ((!t) || (t%quantize))
+                                let mod = schema_quantize || quantize;
+                                if ((!t) || (t%mod))
                                     return false;
                                 let tick_split = (tick + last[0]) * 0.5;
                                 if (frameXmeas < tick_split) {

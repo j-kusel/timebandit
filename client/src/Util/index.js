@@ -16,6 +16,19 @@ var gte = (x, y) =>
     (isFinite(x) ? MUL(x):x)
         >= (isFinite(y) ? MUL(y):y);
 
+// returns ms from float tick values
+var abs_location = (ticks, ms, tick_loc) => {
+    let s_tick = Math.floor(tick_loc);
+    let s_remainder = tick_loc - s_tick;
+    /*console.log(ticks.length);
+    console.log(s_tick, s_remainder);
+    console.log((ticks[s_tick+1] || ms), ticks[s_tick]);
+    */
+    return ticks[s_tick] + 
+        ((ticks[s_tick+1] || ms) - ticks[s_tick]) * s_remainder;
+};
+
+
 // generates measure.gaps in 'measure' drag mode
 var calc_gaps = (measures, id) => {
     var last = false;
@@ -504,7 +517,8 @@ var parse_bits = (n) => {
 
 export { MeasureCalc, order_by_key, check_proximity_by_key,
     bit_toggle, parse_bits, crowding, anticipate_gap, initial_gap, calc_gaps, global_gaps,
-    lt, lte, gt, gte
+    lt, lte, gt, gte,
+    abs_location
 };
 
 

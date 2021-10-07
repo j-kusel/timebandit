@@ -1,7 +1,7 @@
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
-import { crowding } from '../Util/index.js';
+import { crowding, abs_location } from '../Util/index.js';
 import { NUM, LETTERS, LEFT, RIGHT, DEL, BACK, PERIOD } from './keycodes';
 import _ from 'lodash';
 
@@ -167,7 +167,7 @@ export default (p) => {
         toggle_entry() {
             this.entry = this.entry.mode ? {} : {
                 mode: true, duration: 2,
-                calc_duration: this.CONSTANTS.PPQ / 4,
+                calc_duration: this.CONSTANTS.PPQ,
                 tuplet: [1,1]
             };
         }
@@ -191,21 +191,22 @@ export default (p) => {
         }
 
         recalc_entry_tuplet() {
-            let original = this.CONSTANTS.PPQ / Math.pow(2,this.entry.duration);
+            let quavers = 1 / Math.pow(2,this.entry.duration-2);
+            let original = this.CONSTANTS.PPQ * quavers;
             original *= this.entry.tuplet[1] / this.entry.tuplet[0];
             this.entry.calc_duration = original;
-            console.log(this.entry.calc_duration);
         }
 
         press_event(rollover) {
-            console.log(this.entry.calc_duration);
-            let event = {
-                meas: rollover.meas,
-                tick: rollover.tick,
+            // needs: meas, tick
+            // start point confirmed, end point still variable
+            let event = _.pick(rollover, ['meas', 'beat', 'start', 'tick']);
+            console.log(event);
+            Object.assign(event, {
                 nominal: Math.pow(2, this.entry.duration),
                 calc_duration: this.entry.calc_duration,
-                duration: this.CONSTANTS.PPQ / Math.pow(2, this.entry.duration),
-            };
+                duration: this.CONSTANTS.PPQ / Math.pow(2, this.entry.duration-2),
+            });
             Object.assign(this.entry, {
                 event, tuplet_target: 0,
                 tuplet: [1,1]
@@ -215,31 +216,56 @@ export default (p) => {
 
         confirm_event() {
             let event = this.entry.event;
+            console.log(event);
             event.calc_duration = this.entry.calc_duration;
             let meas = event.meas;
 
             if (event.tuplet[0] !== event.tuplet[1]) {
+                let quavers = 1 / Math.pow(2,this.entry.duration-2);
+                console.log(quavers);
+                let original = this.CONSTANTS.PPQ * quavers;
+
+                let basis = Math.pow(2, this.entry.duration);
                 let schema = {
+                    nominal: event.tuplet.join('/') + '-' + basis,
+                    basis,
+                    beat_start: event.beat,
+                    beat_end: event.beat+(meas.denom/4)*quavers*event.tuplet[1],
+                    start: event.beat * (4/meas.denom) * this.CONSTANTS.PPQ,
+                    end: original*event.tuplet[1],
+                    tuplet: event.tuplet,
+                }
+                console.log(schema);
+
+                /*let schema = {
+                    nominal: event.tick * this.CONSTANTS.PPQ,
+                    start: event.start,
+                    end: original*event.tuplet[1],
                     basis: event.tick,
-                    end: event.tick + (event.duration*event.tuplet[1]),
+                    //end: event.tick + (event.duration*event.tuplet[1]),
                     tuplet: event.tuplet,
                     ticks: []
                 }
+                console.log(schema);
+                schema.duration = schema.end * this.CONSTANTS.PPQ - schema.nominal;
                 schema.len = schema.end - schema.basis;
                 let frac = schema.len/schema.tuplet[0];
                 for (let i=schema.basis; i<=schema.end; i+=frac)
                     schema.ticks.push(Math.round(i));
+                    */
+                schema.cache = this.calculate_schema_cache(meas.cache, schema);
                 
                 if (!('schemas' in meas))
                     meas.schemas = {};
                 if (!('schemaIds' in meas))
                     meas.schemaIds = [];
 
-                meas.schemas[event.tick] = schema;
+                meas.schemas[event.beat] = schema;
                 if(!meas.schemaIds.some((n,i) =>
-                    (event.tick < n) && meas.schemaIds.splice(i, 0, event.tick)
+                    (event.beat < n) && meas.schemaIds.splice(i, 0, event.beat)
                 ))
-                    meas.schemaIds.push(event.tick);
+                    meas.schemaIds.push(event.beat);
+                console.log(meas.schemas, meas.schemaIds);
             }
 
             if (!(meas.events && meas.events.length))
@@ -249,7 +275,10 @@ export default (p) => {
             else if (!meas.events.some((n,i) =>
                 (event.tick < n.tick) && meas.events.splice(i, 0, event)
             ))
+
                 meas.events.push(event);
+
+            console.log(meas.events);
             delete this.entry.event;
             this.entry.tuplet = [1,1];
             this.entry.tuplet_target = 0;
@@ -576,9 +605,6 @@ export default (p) => {
                 cache.invalid.start = meas.invalid.start * this.scale;
             if (meas.invalid.end)
                 cache.invalid.end = meas.invalid.end * this.scale;
-            
-            //Object.assign(meas, { cache });
-            //Object.assign(meas.cache, this.calculate_tempo_cache(meas));
 
             Object.assign(cache, this.calculate_tempo_cache(meas, cache));
             return cache;
@@ -713,6 +739,15 @@ export default (p) => {
 
             obj.bounding.push(bound);
             return obj;
+        }
+
+        calculate_schema_cache(cache, schema) {
+            console.log(schema.start, schema.end);
+            return ({
+                start: abs_location(cache.ticks, cache.ms, schema.start),
+                end: abs_location(cache.ticks, cache.ms, schema.start + schema.end)
+                    || cache.ms
+            });
         }
 
         setRangeRefresh(refresh) {
@@ -901,8 +936,8 @@ export default (p) => {
         drawSchemas(measure) {
             measure.schemaIds.forEach(id => {
                 let schema = measure.schemas[id];
-                let position = measure.cache.ticks[schema.basis];
-                let duration = measure.cache.ticks[schema.end] - position;
+                let position = schema.cache.start;//measure.cache.ticks[schema.basis];
+                let duration = schema.cache.end - position;//measure.cache.ticks[schema.end] - position;
                 p.push();
                 let col = p.color(colors.contrast_lighter);
                 col.setAlpha(100);
@@ -933,10 +968,15 @@ export default (p) => {
 
         drawEvents(measure) {
             measure.events.forEach(event => {
-                let position = measure.cache.ticks[event.tick];
-                let duration = measure.cache.ticks[
+                //let position = measure.cache.ticks[event.tick];
+                let beat = event.beat * this.CONSTANTS.PPQ*(4/measure.denom);
+                let position = abs_location(measure.cache.ticks, measure.cache.ms, beat);
+                /*let duration = measure.cache.ticks[
                     event.tick+Math.round(event.calc_duration)
                 ] - position;
+                */
+                let duration = abs_location(measure.cache.ticks, measure.cache.ms,
+                    beat + event.calc_duration) - position;
                 this.drawEvent(0, position, duration);
             });
         };
