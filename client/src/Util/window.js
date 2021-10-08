@@ -220,36 +220,79 @@ export default (p) => {
             event.calc_duration = this.entry.calc_duration;
             let meas = event.meas;
 
+
+
+            let basis = Math.pow(2, this.entry.duration);
+            let quavers = 1 / Math.pow(2,this.entry.duration-2);
+            console.log(basis, quavers);
+            let beat_end = (meas.denom/4)*quavers*event.tuplet[1];
+            let schema = event.schema;
+            let chain = [];
+            while (schema) {
+                chain.push(schema);
+                schema = schema.parent;
+            }
+            console.log(chain);
+            let old_beat = 1;
+            let new_beat = quavers * (meas.denom/4);
+            console.log(new_beat);
+            let relative_length;
+            while (chain.length) {
+                let c = chain.pop();
+                /*let length_in_beats = meas.denom/c.basis*c.tuplet[1];
+                relative_length = length_in_beats * old_beat;
+                new_beat = relative_length / c.tuplet[0];
+                console.log(c);
+                console.log(length_in_beats, relative_length, new_beat);
+                */
+                new_beat *= (c.tuplet[1]/c.tuplet[0]);
+                //old_beat = new_beat;
+            }
+            console.log(new_beat);
+
+
             if (event.tuplet[0] !== event.tuplet[1]) {
-                let quavers = 1 / Math.pow(2,this.entry.duration-2);
                 console.log(quavers);
                 let original = this.CONSTANTS.PPQ * quavers;
 
-                let basis = Math.pow(2, this.entry.duration);
                 let schema = {
                     nominal: event.tuplet.join('/') + '-' + basis,
                     basis,
                     beat_start: event.beat,
-                    beat_end: event.beat+(meas.denom/4)*quavers*event.tuplet[1],
-                    start: event.beat * (4/meas.denom) * this.CONSTANTS.PPQ,
-                    end: original*event.tuplet[1],
+                    beat_end: event.beat+new_beat*/**(meas.denom/4)*quavers**/event.tuplet[1],
                     tuplet: event.tuplet,
                 }
-                console.log(schema);
+                schema.start = schema.beat_start * (4/meas.denom) * this.CONSTANTS.PPQ; //event.beat * (4/meas.denom) * this.CONSTANTS.PPQ,
+                schema.end = schema.beat_end * (4/meas.denom) * this.CONSTANTS.PPQ;
+                if (event.schema) {
+                    if (!event.schema.schemas) {
+                        event.schema.schemas = {};
+                        event.schema.schemaIds = [];
+                    }
+                    if (!event.schema.schemaIds.some((c,i) =>
+                        (c > event.beat) &&
+                            event.schema.schemaIds.splice(i,0,event.beat)
+                    ))
+                        event.schema.schemaIds.push(event.beat);
+                    event.schema.schemas[event.beat] = schema;
+                    schema.parent = event.schema;
+                } else {
+                    // don't attach subschemas to measure
+                    if (!('schemas' in meas))
+                        meas.schemas = {};
+                    if (!('schemaIds' in meas))
+                        meas.schemaIds = [];
+
+                    meas.schemas[event.beat] = schema;
+                    if(!meas.schemaIds.some((n,i) =>
+                        (event.beat < n) && meas.schemaIds.splice(i, 0, event.beat)
+                    ))
+                        meas.schemaIds.push(event.beat);
+                };
 
                 schema.cache = this.calculate_schema_cache(meas.cache, schema);
-                
-                if (!('schemas' in meas))
-                    meas.schemas = {};
-                if (!('schemaIds' in meas))
-                    meas.schemaIds = [];
 
-                meas.schemas[event.beat] = schema;
-                if(!meas.schemaIds.some((n,i) =>
-                    (event.beat < n) && meas.schemaIds.splice(i, 0, event.beat)
-                ))
-                    meas.schemaIds.push(event.beat);
-                console.log(meas.schemas, meas.schemaIds);
+                console.log(schema);
             }
 
             if (!(meas.events && meas.events.length))
@@ -729,7 +772,7 @@ export default (p) => {
             console.log(schema.start, schema.end);
             return ({
                 start: abs_location(cache.ticks, cache.ms, schema.start),
-                end: abs_location(cache.ticks, cache.ms, schema.start + schema.end)
+                end: abs_location(cache.ticks, cache.ms, /*schema.start + */schema.end)
                     || cache.ms
             });
         }
@@ -920,8 +963,8 @@ export default (p) => {
         drawSchemas(measure) {
             measure.schemaIds.forEach(id => {
                 let schema = measure.schemas[id];
-                let position = schema.cache.start;//measure.cache.ticks[schema.basis];
-                let duration = schema.cache.end - position;//measure.cache.ticks[schema.end] - position;
+                let position = schema.cache.start;
+                let duration = schema.cache.end - position;
                 p.push();
                 let col = p.color(colors.contrast_lighter);
                 col.setAlpha(100);
@@ -929,6 +972,8 @@ export default (p) => {
                 p.fill(col);
                 p.rect(position, 0, duration, c.INST_HEIGHT);
                 p.pop();
+                if (schema.schemas)
+                    this.drawSchemas(schema);
             });
         }
 

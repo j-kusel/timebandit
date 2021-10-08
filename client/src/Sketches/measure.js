@@ -2148,8 +2148,6 @@ export default function measure(p) {
                         let inc, initial;
                         inc = initial = meas.denom / Math.pow(2, Window.entry.duration);
 
-                        //console.log(inc, /*meas.denom /*/ Window.entry.calc_duration / meas.timesig);
-                   
                         let tick_perc = 1/meas.cache.ticks.length;
                         let perc;
                         // default to end
@@ -2167,22 +2165,67 @@ export default function measure(p) {
                         let quantize = 0;
                         last = 0;
                         let schema_pointer = 0;
+                        let sub_pointers = [0];
                         let in_schema = false;
                         let beat;
+                        let tuplet_stack = [];
+                        let inc_stack = [];
                         // loop through beat fractions, checking for mouse to quantize.
+                        let log = false;
                         for (let acc=0; acc <= meas.timesig; acc+=inc) {
-                            // exiting schema?
-                            if (in_schema && gte(acc, in_schema.beat_end)) {
-                                inc = initial;
-                                // should acc be reset here to avoid float weirdness?
-                                // acc = in_schema.beat_end
-                                in_schema = false;
-                                schema_pointer++;
+                            if (log) console.log("we're at ", acc);
+                            // exiting schemas?
+                            if (in_schema) {
+                                if (log) console.log('in a schema, checking exits');
+                                // traverse backwards until unfinished schema is found
+                                while(in_schema && gte(acc, in_schema.beat_end)) {
+                                    if (log) console.log(in_schema.beat_end, ' passed, time to exit');
+                                    inc = inc_stack.pop();
+                                    if (log) console.log('new inc: ', inc);
+                                    // should acc be reset here to avoid float weirdness?
+                                    // acc = in_schema.beat_end
+                                    sub_pointers.pop();//[sub_pointers.length-1]++;
+                                    sub_pointers[sub_pointers.length-1]++;
+                                    in_schema = (in_schema.parent) ?
+                                        in_schema.parent : false;
+                                }
+                                if (log) console.log('done exiting.');
                             }                            
                             // entering schema?
-                            if (meas.schemas && (acc) >= meas.schemaIds[schema_pointer]) {
-                                in_schema = meas.schemas[meas.schemaIds[schema_pointer]];
-                                inc = initial * in_schema.tuplet[1] / in_schema.tuplet[0];
+                            if (meas.schemas) {
+                                if (log) console.log('searching for new schema');
+                                // if we're at root level...
+                                if (sub_pointers.length === 1) {
+                                    if (log) console.log('searching root level...');
+                                    if (gte(acc, meas.schemaIds[sub_pointers[0]])) {
+                                        if (log) console.log('going inside first level');
+                                        let new_schema = meas.schemas[meas.schemaIds[0]];
+                                        sub_pointers.push(0);
+                                        inc_stack.push(inc);
+                                        inc *= new_schema.tuplet[1] / new_schema.tuplet[0];
+                                        if (log) console.log('new inc: ', inc);
+                                        if (log) console.log('new schema: ', new_schema.nominal);
+                                        in_schema = new_schema;
+                                    }
+                                }
+                                // if we're now in a schema
+                                if (in_schema && in_schema.schemas) {
+                                    let last_ptr = sub_pointers[sub_pointers.length-1];
+                                    // what subschema are we looking for?
+                                    if (log) console.log('looking for ', in_schema.nominal, ' subschemas');
+                                    while (in_schema.schemas && (acc) >= in_schema.schemaIds[last_ptr]) {
+                                        let new_schema = in_schema.schemas[in_schema.schemaIds[last_ptr]];
+                                        sub_pointers.push(0);
+                                        last_ptr = sub_pointers[sub_pointers.length-1];
+                                        inc_stack.push(inc);
+                                        if (log) console.log(inc);
+                                        inc *= new_schema.tuplet[1] / new_schema.tuplet[0];
+                                       if (log) console.log('going deeper: ', new_schema.nominal);
+                                       if (log) console.log(new_schema);
+                                       if (log) console.log('new inc: ', inc);
+                                        in_schema = new_schema;
+                                    }
+                                }
                             }
                             if (acc > frac) {
                                 // found the mouse.
@@ -2194,20 +2237,20 @@ export default function measure(p) {
                                     break;
                                 }
                                 let half = (acc + last[0]) * 0.5;
-                                [beat, inc] = (frac > half) ?
-                                    [acc, inc] : last;
+                                [beat, inc, in_schema] = (frac > half) ?
+                                    [acc, inc, in_schema] : last;
                                 break;
                             }
                             // save inc here in case we need to revert above.
-                            last = [acc, inc];
+                            last = [acc, inc, in_schema];
                         }
                         /*if (!(typeof beat === 'number'))
                             beat = meas.timesig - inc;
                             */
-                        let PPQ = Window.CONSTANTS.PPQ;
                         let PPQ_adjust = Window.CONSTANTS.PPQ*(4/meas.denom);
                         let start = abs_location(meas.cache.ticks, meas.cache.ms, beat*PPQ_adjust);
-                        let rollover = { meas, inst, type: 'entry', start, beat, duration: inc };
+
+                        let rollover = { meas, inst, type: 'entry', start, beat, schema: in_schema };
                         rollover.hover = () => {
                             // end is recalculated if duration changes, but we can cache this elsewhere.
                             let end = abs_location(meas.cache.ticks, meas.cache.ms, (beat+inc)*PPQ_adjust); 
