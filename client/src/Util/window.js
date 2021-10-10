@@ -10,7 +10,6 @@ let selected_obj = {
 };
 
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
-    //console.log(oldMeas);
     let old_slope = oldMeas.end - oldMeas.start;
     let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
     let lock_percent = beat_lock.beat / oldMeas.timesig;
@@ -21,12 +20,6 @@ let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     return newMeas;
 
 }
-
-let DURATIONS = {
-    2: 4
-
-
-};
 
 // generates measure.gaps in 'measure' drag mode
 var calcGaps = (measures, id) => {
@@ -167,7 +160,7 @@ export default (p) => {
         toggle_entry() {
             this.entry = this.entry.mode ? {} : {
                 mode: true, duration: 2,
-                calc_duration: this.CONSTANTS.PPQ,
+                //calc_duration: this.CONSTANTS.PPQ,
                 tuplet: [1,1]
             };
         }
@@ -194,19 +187,17 @@ export default (p) => {
             let quavers = 1 / Math.pow(2,this.entry.duration-2);
             let original = this.CONSTANTS.PPQ * quavers;
             original *= this.entry.tuplet[1] / this.entry.tuplet[0];
-            this.entry.calc_duration = original;
+            //this.entry.calc_duration = original;
         }
 
         press_event(rollover) {
             // needs: meas, tick
             // start point confirmed, end point still variable
-            let event = _.pick(rollover, ['meas', 'beat', 'start', 'tick', 'schema']);
-            console.log(event);
-            Object.assign(event, {
-                nominal: Math.pow(2, this.entry.duration),
-                calc_duration: this.entry.calc_duration,
-                duration: this.CONSTANTS.PPQ / Math.pow(2, this.entry.duration-2),
-            });
+            let event = _.pick(rollover, [
+                'meas', 'beat_start', 'beat_dur',
+                'tick_start', 'tick_dur', 'schema',
+                'nominal', 'beat', 'note'
+            ]);
             Object.assign(this.entry, {
                 event, tuplet_target: 0,
                 tuplet: [1,1]
@@ -216,96 +207,67 @@ export default (p) => {
 
         confirm_event() {
             let event = this.entry.event;
-            console.log(event);
-            event.calc_duration = this.entry.calc_duration;
+            event.basis = Math.pow(2, this.entry.duration);
             let meas = event.meas;
 
-
-
-            let basis = Math.pow(2, this.entry.duration);
-            let quavers = 1 / Math.pow(2,this.entry.duration-2);
-            console.log(basis, quavers);
-            let beat_end = (meas.denom/4)*quavers*event.tuplet[1];
-            let schema = event.schema;
-            let chain = [];
-            while (schema) {
-                chain.push(schema);
-                schema = schema.parent;
-            }
-            console.log(chain);
-            let old_beat = 1;
-            let new_beat = quavers * (meas.denom/4);
-            console.log(new_beat);
-            let relative_length;
-            while (chain.length) {
-                let c = chain.pop();
-                /*let length_in_beats = meas.denom/c.basis*c.tuplet[1];
-                relative_length = length_in_beats * old_beat;
-                new_beat = relative_length / c.tuplet[0];
-                console.log(c);
-                console.log(length_in_beats, relative_length, new_beat);
-                */
-                new_beat *= (c.tuplet[1]/c.tuplet[0]);
-                //old_beat = new_beat;
-            }
-            console.log(new_beat);
-
-
             if (event.tuplet[0] !== event.tuplet[1]) {
-                console.log(quavers);
-                let original = this.CONSTANTS.PPQ * quavers;
+                event.beat_dur *= event.tuplet[1] / event.tuplet[0];
+                event.tick_dur *= event.tuplet[1] / event.tuplet[0];
 
-                let schema = {
-                    nominal: event.tuplet.join('/') + '-' + basis,
-                    basis,
-                    beat_start: event.beat,
-                    beat_end: event.beat+new_beat*/**(meas.denom/4)*quavers**/event.tuplet[1],
-                    tuplet: event.tuplet,
-                }
-                schema.start = schema.beat_start * (4/meas.denom) * this.CONSTANTS.PPQ; //event.beat * (4/meas.denom) * this.CONSTANTS.PPQ,
-                schema.end = schema.beat_end * (4/meas.denom) * this.CONSTANTS.PPQ;
+                let schema = _.pick(event, ['beat_start', 'tuplet', 'basis']);
+                Object.assign(schema, {
+                    nominal: schema.tuplet.join('/') + '-' + schema.basis,
+                    beat: [event.beat, event.note].join('/'),
+                    beat_end: schema.beat_start + event.beat_dur*schema.tuplet[0],
+                });
+                let PPB = (4/meas.denom) * this.CONSTANTS.PPQ;
+                schema.tick_start = schema.beat_start * PPB;
+                schema.tick_end = schema.beat_end * PPB;
+
+                // attach new schema to parent schema, if any
                 if (event.schema) {
                     if (!event.schema.schemas) {
                         event.schema.schemas = {};
                         event.schema.schemaIds = [];
                     }
                     if (!event.schema.schemaIds.some((c,i) =>
-                        (c > event.beat) &&
-                            event.schema.schemaIds.splice(i,0,event.beat)
+                        (c > event.beat_start) &&
+                            event.schema.schemaIds.splice(i,0,event.beat_start)
                     ))
-                        event.schema.schemaIds.push(event.beat);
-                    event.schema.schemas[event.beat] = schema;
+                        event.schema.schemaIds.push(event.beat_start);
+                    event.schema.schemas[event.beat_start] = schema;
                     schema.parent = event.schema;
                 } else {
                     // don't attach subschemas to measure
-                    if (!('schemas' in meas))
-                        meas.schemas = {};
-                    if (!('schemaIds' in meas))
-                        meas.schemaIds = [];
+                    if (!('schemas' in meas)) meas.schemas = {};
+                    if (!('schemaIds' in meas)) meas.schemaIds = [];
 
-                    meas.schemas[event.beat] = schema;
+                    meas.schemas[event.beat_start] = schema;
                     if(!meas.schemaIds.some((n,i) =>
-                        (event.beat < n) && meas.schemaIds.splice(i, 0, event.beat)
+                        (event.beat_start < n) && meas.schemaIds.splice(i, 0, event.beat_start)
                     ))
-                        meas.schemaIds.push(event.beat);
+                        meas.schemaIds.push(event.beat_start);
                 };
-
+                // replace parent schema with new schema created by event
+                event.schema = schema;
+                
                 schema.cache = this.calculate_schema_cache(meas.cache, schema);
-
-                console.log(schema);
             }
+
+            event.cache = this.calculate_event_cache(meas, meas.cache, event);
 
             if (!(meas.events && meas.events.length))
                 meas.events = [event]
-
             // event insertion might conflict with other events!
             else if (!meas.events.some((n,i) =>
-                (event.tick < n.tick) && meas.events.splice(i, 0, event)
+                (event.tick_start < n.tick_start) && meas.events.splice(i, 0, event)
+                //(event.tick < n.tick) && meas.events.splice(i, 0, event)
             ))
-
                 meas.events.push(event);
 
             console.log(meas.events);
+            console.log(meas.schemas);
+
             delete this.entry.event;
             this.entry.tuplet = [1,1];
             this.entry.tuplet_target = 0;
@@ -608,7 +570,6 @@ export default (p) => {
             if (crowd.start[1] < 0) {
                 invalid.start = crowd.start[1];
                 meas.cache.invalid.start = crowd.start[1] * this.scale;
-                console.log(meas.cache.invalid);
                 //updated.offset -= crowd.start[1];
             }
 
@@ -635,6 +596,15 @@ export default (p) => {
 
             Object.assign(cache, this.calculate_tempo_cache(meas, cache));
             return cache;
+        }
+
+        calculate_entry_cache(cache, beat, duration) {
+            let ms_start = abs_location(cache.ticks, cache.ms, beat);
+            return {
+                ms_start,
+                ms_dur: (abs_location(cache.ticks, cache.ms, beat+duration)
+                    || cache.ms) - ms_start
+            };
         }
 
         calculate_tempo_cache(meas, cache) {
@@ -769,12 +739,17 @@ export default (p) => {
         }
 
         calculate_schema_cache(cache, schema) {
-            console.log(schema.start, schema.end);
             return ({
-                start: abs_location(cache.ticks, cache.ms, schema.start),
-                end: abs_location(cache.ticks, cache.ms, /*schema.start + */schema.end)
+                ms_start: abs_location(cache.ticks, cache.ms, schema.tick_start),
+                ms_end: abs_location(cache.ticks, cache.ms, schema.tick_end)
                     || cache.ms
             });
+        }
+
+        calculate_event_cache(meas, cache, event) {
+            let abs = (loc) => abs_location(cache.ticks, cache.ms, loc);
+            let x = abs(event.tick_start);
+            return { x, width: abs(event.tick_start + event.tick_dur) - x };
         }
 
         setRangeRefresh(refresh) {
@@ -963,8 +938,8 @@ export default (p) => {
         drawSchemas(measure) {
             measure.schemaIds.forEach(id => {
                 let schema = measure.schemas[id];
-                let position = schema.cache.start;
-                let duration = schema.cache.end - position;
+                let position = schema.cache.ms_start;
+                let duration = schema.cache.ms_end - position;
                 p.push();
                 let col = p.color(colors.contrast_lighter);
                 col.setAlpha(100);
@@ -998,15 +973,12 @@ export default (p) => {
         drawEvents(measure) {
             measure.events.forEach(event => {
                 //let position = measure.cache.ticks[event.tick];
-                let beat = event.beat * this.CONSTANTS.PPQ*(4/measure.denom);
+                /*let beat = event.beat * this.CONSTANTS.PPQ*(4/measure.denom);
                 let position = abs_location(measure.cache.ticks, measure.cache.ms, beat);
-                /*let duration = measure.cache.ticks[
-                    event.tick+Math.round(event.calc_duration)
-                ] - position;
-                */
                 let duration = abs_location(measure.cache.ticks, measure.cache.ms,
-                    beat + event.calc_duration) - position;
-                this.drawEvent(0, position, duration);
+                    beat + event.duration) - position;
+                    */
+                this.drawEvent(0, event.cache.x, event.cache.width);
             });
         };
 

@@ -564,7 +564,8 @@ export default function measure(p) {
                     Mouse.rollover.type === 'entry' &&
                     Mouse.rollover.meas.id === measure.id
                 ) {
-                    Mouse.rollover.hover()
+                    //Mouse.rollover.hover()
+                    Window.drawEvent(0, Window.entry.ms_start, Window.entry.ms_dur);
                 }
 
                 // return from measure translate
@@ -1254,10 +1255,32 @@ export default function measure(p) {
                 Mouse.move.filter_move();
             }
             instruments.forEach(inst => {
-                inst.ordered.forEach(meas =>
+                inst.ordered.forEach(meas => {
                     meas.cache = Window.calculate_cache(('temp' in meas) ? meas.temp : meas)
-                )
-            })
+                    if (meas.schemas) {
+                        let search = (s) => {
+                            if (!s)
+                                return;
+                            s.cache = Window.calculate_schema_cache(meas.cache, s);
+                            if (s.schemas)
+                                s.schemaIds.forEach(id => search(s.schemas[id]))
+                        }
+                        meas.schemaIds.forEach(id => search(meas.schemas[id]));
+                    }
+                    if (meas.events)
+                        meas.events.forEach(event =>
+                            event.cache = Window.calculate_event_cache(meas, meas.cache, event)
+                        );
+                })
+            });
+            if (Mouse.rollover && Mouse.rollover.type === 'entry') {
+                let meas = Mouse.rollover.meas;
+                let PPQ_adjust = Window.CONSTANTS.PPQ*(4/meas.denom);
+                // WHY IS DURATION STORED AS TICKS BUT BEAT ISN'T??
+                Object.assign(Window.entry, Window.calculate_entry_cache(meas.cache,
+                    Mouse.rollover.tick_start, Mouse.rollover.tick_dur));
+            }
+
         }
         if (API.pollSelecting('offset'))
             insertMeasSelecting();
@@ -1953,7 +1976,6 @@ export default function measure(p) {
 
             let close_calc = closest(loc, measure.inst, snaps.div_index);
             let snap_to = close_calc.target;
-            console.log(close_calc);
             
             let gap = loc - snap_to;
 
@@ -1965,9 +1987,7 @@ export default function measure(p) {
 
                     // nudge factory - tick mouse drag, snap to adjacent measure beats
                     let type = (beat_lock.type === 'tempo' || beat_lock.type === 'both') ?
-                        ((gap > 0) ? 'rot_right' : 'rot_left') :
-                            //'rot_left' : 'rot_right'
-                        0;
+                        ((gap > 0) ? 'rot_right' : 'rot_left') : 0;
 
                     let nudge = nudge_factory(measure, snap_to, Mouse.drag.grab, beat_lock, locks, type); 
                     nudge_cache = nudge(gap, 0.001, 0);
@@ -2143,11 +2163,13 @@ export default function measure(p) {
                     // translating to measure
                     let frameXmeas = frameX - meas.cache.offset;
 
-                    // fourth pass -_-
+                    // fifth pass -_-
                     if (Window.entry.mode) {
-                        let inc, initial;
-                        inc = initial = meas.denom / Math.pow(2, Window.entry.duration);
+                        let note = Math.pow(2, Window.entry.duration);
+                        let inc = meas.denom / Math.max(note, meas.denom);
+                        let beat_dur = meas.denom / note;
 
+                        // convert tick index to beat decimal
                         let tick_perc = 1/meas.cache.ticks.length;
                         let perc;
                         // default to end
@@ -2162,102 +2184,79 @@ export default function measure(p) {
                             }
                             last = tick;
                         });
-                        let quantize = 0;
-                        last = 0;
-                        let schema_pointer = 0;
-                        let sub_pointers = [0];
-                        let in_schema = false;
-                        let beat;
-                        let tuplet_stack = [];
-                        let inc_stack = [];
-                        // loop through beat fractions, checking for mouse to quantize.
-                        let log = false;
-                        for (let acc=0; acc <= meas.timesig; acc+=inc) {
-                            if (log) console.log("we're at ", acc);
-                            // exiting schemas?
-                            if (in_schema) {
-                                if (log) console.log('in a schema, checking exits');
-                                // traverse backwards until unfinished schema is found
-                                while(in_schema && gte(acc, in_schema.beat_end)) {
-                                    if (log) console.log(in_schema.beat_end, ' passed, time to exit');
-                                    inc = inc_stack.pop();
-                                    if (log) console.log('new inc: ', inc);
-                                    // should acc be reset here to avoid float weirdness?
-                                    // acc = in_schema.beat_end
-                                    sub_pointers.pop();//[sub_pointers.length-1]++;
-                                    sub_pointers[sub_pointers.length-1]++;
-                                    in_schema = (in_schema.parent) ?
-                                        in_schema.parent : false;
-                                }
-                                if (log) console.log('done exiting.');
-                            }                            
-                            // entering schema?
-                            if (meas.schemas) {
-                                if (log) console.log('searching for new schema');
-                                // if we're at root level...
-                                if (sub_pointers.length === 1) {
-                                    if (log) console.log('searching root level...');
-                                    if (gte(acc, meas.schemaIds[sub_pointers[0]])) {
-                                        if (log) console.log('going inside first level');
-                                        let new_schema = meas.schemas[meas.schemaIds[0]];
-                                        sub_pointers.push(0);
-                                        inc_stack.push(inc);
-                                        inc *= new_schema.tuplet[1] / new_schema.tuplet[0];
-                                        if (log) console.log('new inc: ', inc);
-                                        if (log) console.log('new schema: ', new_schema.nominal);
-                                        in_schema = new_schema;
-                                    }
-                                }
-                                // if we're now in a schema
-                                if (in_schema && in_schema.schemas) {
-                                    let last_ptr = sub_pointers[sub_pointers.length-1];
-                                    // what subschema are we looking for?
-                                    if (log) console.log('looking for ', in_schema.nominal, ' subschemas');
-                                    while (in_schema.schemas && (acc) >= in_schema.schemaIds[last_ptr]) {
-                                        let new_schema = in_schema.schemas[in_schema.schemaIds[last_ptr]];
-                                        sub_pointers.push(0);
-                                        last_ptr = sub_pointers[sub_pointers.length-1];
-                                        inc_stack.push(inc);
-                                        if (log) console.log(inc);
-                                        inc *= new_schema.tuplet[1] / new_schema.tuplet[0];
-                                       if (log) console.log('going deeper: ', new_schema.nominal);
-                                       if (log) console.log(new_schema);
-                                       if (log) console.log('new inc: ', inc);
-                                        in_schema = new_schema;
-                                    }
-                                }
-                            }
-                            if (acc > frac) {
-                                // found the mouse.
-                                // because inc still determines duration,
-                                // we need to know if we're using the previous
-                                // or next "inc"
-                                if (acc >= meas.timesig) {
-                                    [beat, inc] = last;
-                                    break;
-                                }
-                                let half = (acc + last[0]) * 0.5;
-                                [beat, inc, in_schema] = (frac > half) ?
-                                    [acc, inc, in_schema] : last;
-                                break;
-                            }
-                            // save inc here in case we need to revert above.
-                            last = [acc, inc, in_schema];
-                        }
-                        /*if (!(typeof beat === 'number'))
-                            beat = meas.timesig - inc;
-                            */
-                        let PPQ_adjust = Window.CONSTANTS.PPQ*(4/meas.denom);
-                        let start = abs_location(meas.cache.ticks, meas.cache.ms, beat*PPQ_adjust);
 
-                        let rollover = { meas, inst, type: 'entry', start, beat, schema: in_schema };
-                        rollover.hover = () => {
-                            // end is recalculated if duration changes, but we can cache this elsewhere.
-                            let end = abs_location(meas.cache.ticks, meas.cache.ms, (beat+inc)*PPQ_adjust); 
-                            if (!end)
-                                end = meas.cache.ms;
-                            Window.drawEvent(0, start, end-start);
+                        let in_schema = false;
+
+                        let beat = Math.round(frac/inc);
+                        let beat_start = beat * inc;
+                        let nominal = [[beat+1, Math.max(note, meas.denom)].join('/')];
+                        let stack = [];
+                        let traverse = (frac, child) => {
+                            if (!child.schemas)
+                                return child;
+                            let in_schema = false;
+                            if (child.schemaIds.some(id => {
+                                let schema = child.schemas[id];
+                                if (gte(frac, schema.beat_start) && lt(frac, schema.beat_end))
+                                    return in_schema = traverse(frac, schema);
+                            }))
+                                return in_schema;
+                            return child;
                         };
+                        if (meas.schemas) {
+                            let search = input => 
+                                (id => {
+                                    let s = meas.schemas[id];
+                                    // shortcut if cursor is before all later schemas
+                                    if (lt(input, s.beat_start))
+                                        return true;
+                                    if (gte(input, s.beat_start) && lt(input, s.beat_end))
+                                        return in_schema = traverse(input, s);
+                                });
+
+                            meas.schemaIds.some(search(frac));
+                            //let beat;
+                            if (in_schema) {
+                                console.log(beat_start);
+                                let inc = (in_schema.beat_end - in_schema.beat_start) / in_schema.tuplet[0];
+                                //nominal.push(
+                                let div_relation = in_schema.basis / Math.max(note, in_schema.basis);
+                                let div = inc * div_relation;
+                                let schema_start = frac - in_schema.beat_start;
+                                beat = Math.round(schema_start/div);
+                                beat_start = beat * div + in_schema.beat_start;
+                                in_schema = false;
+                            }
+                            // search again for duration
+                            meas.schemaIds.some(search(beat_start));
+                            if (in_schema) {
+                                console.log(in_schema);
+                                inc = (in_schema.beat_end - in_schema.beat_start) / in_schema.tuplet[0];
+                                nominal = [[(beat+1).toString(), note].join('/')];
+                                let dur_relation = in_schema.basis / note;
+                                beat_dur = inc * dur_relation;
+                                // clip duration at end of schema ?
+                                if (gt(beat_start + beat_dur, in_schema.beat_end))
+                                    beat_dur = in_schema.beat_end - beat_start;
+                                let sschema = in_schema;
+                                while (sschema) {
+                                    nominal.push(`(${sschema.nominal}, ${sschema.beat})`);
+                                    sschema = sschema.parent;
+                                }
+                            }
+                        }
+                        let PPB = Window.CONSTANTS.PPQ*(4/meas.denom);
+
+
+                        let rollover = { meas, inst, type: 'entry', 
+                            nominal, beat: (beat+1).toString(), note,
+                            beat_start, beat_dur,
+                            tick_start: beat_start*PPB,
+                            tick_dur: beat_dur*PPB,
+                            schema: in_schema
+                        };
+                        console.log(nominal);
+                        Object.assign(Window.entry, Window.calculate_entry_cache(meas.cache, rollover.tick_start, rollover.tick_dur));
                         Mouse.setRollover(rollover);
                         return true;
                     }

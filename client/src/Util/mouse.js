@@ -208,6 +208,7 @@ export default (p, Window) => {
 
         entryMode() {
             this.drag.mode = 'entry';
+            console.log(this.rollover);
             Window.press_event(this.rollover);
         }
 
