@@ -160,7 +160,6 @@ export default (p) => {
         toggle_entry() {
             this.entry = this.entry.mode ? {} : {
                 mode: true, duration: 2,
-                //calc_duration: this.CONSTANTS.PPQ,
                 tuplet: [1,1]
             };
         }
@@ -187,7 +186,6 @@ export default (p) => {
             let quavers = 1 / Math.pow(2,this.entry.duration-2);
             let original = this.CONSTANTS.PPQ * quavers;
             original *= this.entry.tuplet[1] / this.entry.tuplet[0];
-            //this.entry.calc_duration = original;
         }
 
         press_event(rollover) {
@@ -223,6 +221,9 @@ export default (p) => {
                 let PPB = (4/meas.denom) * this.CONSTANTS.PPQ;
                 schema.tick_start = schema.beat_start * PPB;
                 schema.tick_end = schema.beat_end * PPB;
+                let div = (schema.tick_end - schema.tick_start)/schema.tuplet[0];
+                schema.tick_beats = Array.from({length: schema.tuplet[0]}, 
+                    (__,i) => schema.tick_start + i*div);
 
                 // attach new schema to parent schema, if any
                 if (event.schema) {
@@ -739,10 +740,12 @@ export default (p) => {
         }
 
         calculate_schema_cache(cache, schema) {
+            let abs = (loc) => abs_location(cache.ticks, cache.ms, loc);
             return ({
-                ms_start: abs_location(cache.ticks, cache.ms, schema.tick_start),
-                ms_end: abs_location(cache.ticks, cache.ms, schema.tick_end)
-                    || cache.ms
+                ms_start: abs(schema.tick_start),
+                ms_end: abs(schema.tick_end)
+                    || cache.ms,
+                ms_beats: schema.tick_beats.map(b => abs(b))
             });
         }
 
@@ -935,20 +938,55 @@ export default (p) => {
             this.updateViewCallback(this.viewport, this.scale, this.scroll);
         }
         
-        drawSchemas(measure) {
+        drawSchemas(measure, depth) {
             measure.schemaIds.forEach(id => {
                 let schema = measure.schemas[id];
-                let position = schema.cache.ms_start;
-                let duration = schema.cache.ms_end - position;
+                let start = schema.cache.ms_start;
+                let end = schema.cache.ms_end;
+                let halfway = (start + end) * 0.5;
+
                 p.push();
                 let col = p.color(colors.contrast_lighter);
                 col.setAlpha(100);
                 p.stroke(col);
                 p.fill(col);
-                p.rect(position, 0, duration, c.INST_HEIGHT);
+                p.rect(start, 0, end-start, c.INST_HEIGHT);
+                // draw text
+                let tuplet = schema.tuplet.join(':');
+                p.stroke(colors.primary);
+                p.fill(colors.primary);
+                p.textStyle(p.ITALIC);
+                p.textSize(12);
+                
+                // version two
+                p.textAlign(p.LEFT, p.BOTTOM);
+                let col2 = p.color(colors.primary);
+                if (this.scale < 0.3)
+                    (this.scale > 0.15) ?
+                        col2.setAlpha(255 * (this.scale-0.15)/0.15) :
+                        col2.setAlpha(0);
+                p.stroke(col2);
+                p.fill(col2);
+                p.translate(0, c.INST_HEIGHT - (depth)*8)
+                p.text(tuplet, start+4, -4);
+                schema.cache.ms_beats.forEach(b =>
+                    p.line(b, -12, b, -4));
+                p.line(start, -4, end-4, -4);
+
+                // version one
+                /*p.textAlign(p.CENTER, p.CENTER);
+                let y = (depth+1)*8;
+                p.text(tuplet, halfway, y);
+                let t_width = p.textWidth(tuplet)+16;
+                p.line(start+y, y, halfway-t_width/2, y);
+                p.line(start+y, y, start+y, y+8);
+                p.line(halfway+t_width/2, y, end-y, y);
+                p.line(end-y, y, end-y, y+8);
+                */
+
                 p.pop();
                 if (schema.schemas)
-                    this.drawSchemas(schema);
+                    this.drawSchemas(schema, depth+1);
             });
         }
 

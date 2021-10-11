@@ -554,7 +554,7 @@ export default function measure(p) {
 
                 // draw schemas
                 if (measure.schemas)
-                    Window.drawSchemas(measure);
+                    Window.drawSchemas(measure, 0);
 
                 // draw events
                 if (measure.events)
@@ -563,10 +563,8 @@ export default function measure(p) {
                 if (Window.entry.mode &&
                     Mouse.rollover.type === 'entry' &&
                     Mouse.rollover.meas.id === measure.id
-                ) {
-                    //Mouse.rollover.hover()
+                )
                     Window.drawEvent(0, Window.entry.ms_start, Window.entry.ms_dur);
-                }
 
                 // return from measure translate
                 p.pop();
@@ -2255,7 +2253,6 @@ export default function measure(p) {
                             tick_dur: beat_dur*PPB,
                             schema: in_schema
                         };
-                        console.log(nominal);
                         Object.assign(Window.entry, Window.calculate_entry_cache(meas.cache, rollover.tick_start, rollover.tick_dur));
                         Mouse.setRollover(rollover);
                         return true;
