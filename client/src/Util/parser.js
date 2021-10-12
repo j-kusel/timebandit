@@ -40,7 +40,7 @@ export class Parser {
                 return Object.assign(acc, {
                     [id]: {
                         ...MeasureCalc(meas, this.PPQs),
-                        id, inst: ind, beat_nodes: [], locks: {}
+                        id, inst: ind, beat_nodes: [], locks: {}, schemas: {}, schemaIds: [], events: []
                     }
                 });
             }, {});

@@ -24,8 +24,6 @@ import { SPACE, DEL, BACK, ESC } from '../Util/keycodes.js';
 import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, KeyC, KeyV, KeyZ } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 
-console.log(KeyR, KeyU, CTRL);
-
 const DEBUG = process.env.NODE_ENV === 'development';
 const SLOW = process.env.NODE_ENV === 'development';
 
@@ -348,8 +346,10 @@ export default function measure(p) {
 
         // calculate beat visual locations for all measures
         instruments.forEach(inst =>
-            inst.ordered.forEach(meas =>
-                meas.cache = Window.calculate_cache(meas))
+            inst.ordered.forEach(meas => {
+                meas.cache = Window.calculate_cache(meas);
+                Window.event_system_cache(meas);
+            })
         );
 
         // calculate insertMeas visual locations
@@ -1255,20 +1255,7 @@ export default function measure(p) {
             instruments.forEach(inst => {
                 inst.ordered.forEach(meas => {
                     meas.cache = Window.calculate_cache(('temp' in meas) ? meas.temp : meas)
-                    if (meas.schemas) {
-                        let search = (s) => {
-                            if (!s)
-                                return;
-                            s.cache = Window.calculate_schema_cache(meas.cache, s);
-                            if (s.schemas)
-                                s.schemaIds.forEach(id => search(s.schemas[id]))
-                        }
-                        meas.schemaIds.forEach(id => search(meas.schemas[id]));
-                    }
-                    if (meas.events)
-                        meas.events.forEach(event =>
-                            event.cache = Window.calculate_event_cache(meas, meas.cache, event)
-                        );
+                    Window.event_system_cache(meas);
                 })
             });
             if (Mouse.rollover && Mouse.rollover.type === 'entry') {
@@ -2011,7 +1998,9 @@ export default function measure(p) {
         }
 
         if (Mouse.drag.mode === 'entry') {
-            Window.confirm_event();
+            let event = Window.confirm_event();
+            let selected = { event, id: event.meas.id, inst: event.meas.inst };
+            API.updateEvent(selected);
             Mouse.resetDrag();
             return;
         }
@@ -2215,7 +2204,6 @@ export default function measure(p) {
                             meas.schemaIds.some(search(frac));
                             //let beat;
                             if (in_schema) {
-                                console.log(beat_start);
                                 let inc = (in_schema.beat_end - in_schema.beat_start) / in_schema.tuplet[0];
                                 //nominal.push(
                                 let div_relation = in_schema.basis / Math.max(note, in_schema.basis);
@@ -2228,7 +2216,6 @@ export default function measure(p) {
                             // search again for duration
                             meas.schemaIds.some(search(beat_start));
                             if (in_schema) {
-                                console.log(in_schema);
                                 inc = (in_schema.beat_end - in_schema.beat_start) / in_schema.tuplet[0];
                                 nominal = [[(beat+1).toString(), note].join('/')];
                                 let dur_relation = in_schema.basis / note;

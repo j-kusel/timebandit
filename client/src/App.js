@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import _ from 'lodash';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import uuidv4 from 'uuid/v4';
-import midi from './Audio/midi';
+import { click_track } from './Audio/midi';
 import audio from './Audio/audio';
 
 // logos
@@ -277,7 +277,92 @@ class App extends Component {
           }
       }
 
-      //var updateMeasure = (inst, id, start, end, timesig, denom, offset) => {
+      var updateSchema = (selected) => {
+          self.setStateHistory(oldState => {
+              let inst = oldState.instruments[selected.inst];
+              let meas = inst.measures[selected.meas.id];
+              let event = Array.isArray(selected.event) ?
+                  selected.event : [selected.event];
+                
+          });
+      }
+
+      var updateEvent = (selected) => {
+          self.setStateHistory(oldState => {
+              let instruments = oldState.instruments;
+              let meas = Object.assign({},instruments[selected.inst].measures[selected.id]);
+              /*let event = Array.isArray(selected.event) ?
+                  selected.event : [selected.event];
+                  */
+
+              let event = selected.event;
+
+
+              if (event.tuplet[0] !== event.tuplet[1]) {
+                  event.beat_dur *= event.tuplet[1] / event.tuplet[0];
+                  event.tick_dur *= event.tuplet[1] / event.tuplet[0];
+
+                  let schema = _.pick(event, ['beat_start', 'tuplet', 'basis']);
+                  Object.assign(schema, {
+                      nominal: schema.tuplet.join('/') + '-' + schema.basis,
+                      beat: [event.beat, event.note].join('/'),
+                      beat_end: schema.beat_start + event.beat_dur*schema.tuplet[0],
+                  });
+                  let PPB = (4/meas.denom) * this.state.PPQ;
+                  schema.tick_start = schema.beat_start * PPB;
+                  schema.tick_end = schema.beat_end * PPB;
+                  let div = (schema.tick_end - schema.tick_start)/schema.tuplet[0];
+                  schema.tick_beats = Array.from({length: schema.tuplet[0]}, 
+                      (__,i) => schema.tick_start + i*div);
+
+                  // attach new schema to parent schema, if any
+                  if (event.schema) {
+                      if (!event.schema.schemas) {
+                          event.schema.schemas = {};
+                          event.schema.schemaIds = [];
+                      }
+                      if (!event.schema.schemaIds.some((c,i) =>
+                          (c > event.beat_start) &&
+                              event.schema.schemaIds.splice(i,0,event.beat_start)
+                      ))
+                          event.schema.schemaIds.push(event.beat_start);
+                      event.schema.schemas[event.beat_start] = schema;
+                      schema.parent = event.schema;
+                  } else {
+                      // don't attach subschemas to measure
+                      if (!('schemas' in meas)) meas.schemas = {};
+                      if (!('schemaIds' in meas)) meas.schemaIds = [];
+
+                      meas.schemas[event.beat_start] = schema;
+                      if(!meas.schemaIds.some((n,i) =>
+                          (event.beat_start < n) && meas.schemaIds.splice(i, 0, event.beat_start)
+                      ))
+                          meas.schemaIds.push(event.beat_start);
+                  };
+                  // replace parent schema with new schema created by event
+                  event.schema = schema;
+                  
+              }
+              
+              if (!(meas.events && meas.events.length))
+                  meas.events = [event]
+              // event insertion might conflict with other events!
+              else {
+                  let events = meas.events.slice(0);
+                  if (!events.some((n,i) =>
+                      (event.tick_start < n.tick_start) && events.splice(i, 0, event)
+                  ))
+                      events.push(event);
+                  meas.events = events;
+              }
+
+              instruments[selected.inst].measures[selected.id] = meas;
+              console.log(meas);
+              console.log(instruments);
+              return ({ instruments });
+          });
+      };
+
       var updateMeasure = (selected) => {
           self.setStateHistory(oldState => {
             // ensure selected argument is an Array
@@ -302,7 +387,7 @@ class App extends Component {
               if ('locks' in oldMeas)
                   calc.locks = Object.assign({}, oldMeas.locks);
 
-              let newMeas = { ...calc, id, inst, beat_nodes: [], locks: {} };
+              let newMeas = { ...calc, id, inst, beat_nodes: [], locks: {}, events: [], schemas: {}, schemaIds: [] };
               if (Object.keys(ordered_cpy))
                   calc.beats.forEach((beat, ind) =>
                       ordered.tree.edit(ordered_cpy, {
@@ -516,7 +601,7 @@ class App extends Component {
           //return measure;
       };
 
-      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, updateEvent, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -864,7 +949,7 @@ class App extends Component {
               return ({ tempi, beats, name: inst.name });
           });
 
-          midi(tracks, this.state.PPQ, this.state.PPQ_tempo);
+          click_track(tracks, this.state.PPQ, this.state.PPQ_tempo);
           return;
       }
 
@@ -882,27 +967,34 @@ class App extends Component {
           let last = 0;
 
           let tpm = 60000.0 / this.state.PPQ;
+
+
+          let events = [];
+          let clicks = [];
           let rest = `T${this.state.PPQ - 1}`;
-
-
-          let beats = [];
           let tempi = order_by_key(inst.measures, 'offset').reduce((acc, meas, ind) => {
               // push empty message if within delta threshold
 
-              let new_beat = { duration: 'T1', pitch: ['C4'] };
+              let PPB = (4/last.denom) * this.state.PPQ;
 
               let delta = this.state.PPQ - 1;
 
               if (last) {
                   let gap = meas.offset - (last.offset + last.ms);
+                  console.log(last.offset, last.ms, meas.offset);
+                  console.log(gap);
+                  console.log(acc[acc.length-1]);
                   if (gap > CONFIG.DELTA_THRESHOLD) {
                       // in the future, may want to use 300BPM instead of last.end for greater accuracy
                       let gap_tempo = /*last.end*/ 300;
-                      delta = parseInt((gap_tempo / 60000.0) * gap * this.state.PPQ, 10);
+                      let beat_total = (gap_tempo / 60000.0) * gap;
+                      console.log('num of beats at 300bpm: ', beat_total);
+                      delta = Math.round(beat_total * this.state.PPQ);//parseInt(beat_total * this.state.PPQ, 10);
+                      console.log('delta: ', delta);
                       acc.push({ delta, tempo: gap_tempo });
                       // if we're not adding final beats of measures, need to delay first measure after gaps
                       // by one "beat" (PPQ);
-                      delta += this.state.PPQ;
+                      delta += PPB;
 
                       // testing a gap offset correction here
                       delta -= 1;
@@ -917,30 +1009,70 @@ class App extends Component {
               last = meas;
 
               let slope = (meas.end - meas.start)/meas.ticks.length;
-              acc.push({ tempo: meas.start, timesig: meas.timesig });
-              beats.push({ ...new_beat, wait });
+              //acc.push({ tempo: meas.start, timesig: meas.timesig, denom: meas.denom });
 
-              meas.ticks.forEach((_, i) => {
+              let new_beat = { duration: 'T1', pitch: ['C4'] };
+              //clicks.push({ ...new_beat, wait });
+
+
+              let ev_ptr = 0;
+              let beat_ptr = 0;
+              let event_ticks = meas.events.map(e => Math.round(e.tick_start));
+
+
+              /*if (event_ticks.length && event_ticks[0] === 0) {
+                  ev_ptr++;
+                  clicks[clicks.length-1].pitch.push('C5');
+              }*/
+
+
+              let last_tick = -delta-1;
+              console.log(0-(-delta-1)-1);
+              for (let i=0; i<meas.ticks.length; i++) {
+                  let pitch = [];
+                  let acc_push = (!i) ?
+                      { timesig: meas.timesig, denom: meas.denom } : {}
+                      
+                  if (!(i % this.state.PPQ_mod)) {
+                      if (!(i % (meas.ticks.length / meas.timesig)))
+                          pitch.push('C4');
+                      acc_push.tempo = meas.start + i * slope;
+                      acc.push(acc_push);
+                  };
+                  if (event_ticks[ev_ptr] === i) {
+                      ev_ptr++;
+                      pitch.push('C5');
+                  }
+                  if (pitch.length) {
+                      console.log(i-last_tick-1);
+                      clicks.push({ duration: 'T1', pitch, wait: `T${i-last_tick-1}` });
+                      last_tick = i;
+                  }
+              }
+              /*meas.ticks.forEach((_, i) => {
                   // first beat will always be handled above, so skip it.
                   if (i === 0)
                       return;
                   if (!(i % this.state.PPQ_mod)) {
                       if (!(i % (meas.ticks.length / meas.timesig)))
-                          beats.push({ ...new_beat, wait: rest });
+                          clicks.push({ ...new_beat, wait: rest });
                       acc.push({ tempo: meas.start + i * slope });
                   };
               });
+              */
+
+              console.log(clicks);
 
               return acc;
           }, []);
           
-          beats.push({ duration: 'T1', pitch: ['C4'], wait: rest });
+          clicks.push({ duration: 'T1', pitch: ['C4'], wait: rest });
           tempi.push({ tempo: last.end });
-          return ({ tempi, beats, name: inst.name });
+          return ({ tempi, clicks, name: inst.name });
       });
       
       console.log(tracks);
-      midi(tracks, this.state.PPQ, this.state.PPQ_tempo);
+      click_track(tracks, this.state.PPQ, this.state.PPQ_tempo);
 
   };
 

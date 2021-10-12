@@ -208,71 +208,12 @@ export default (p) => {
             event.basis = Math.pow(2, this.entry.duration);
             let meas = event.meas;
 
-            if (event.tuplet[0] !== event.tuplet[1]) {
-                event.beat_dur *= event.tuplet[1] / event.tuplet[0];
-                event.tick_dur *= event.tuplet[1] / event.tuplet[0];
-
-                let schema = _.pick(event, ['beat_start', 'tuplet', 'basis']);
-                Object.assign(schema, {
-                    nominal: schema.tuplet.join('/') + '-' + schema.basis,
-                    beat: [event.beat, event.note].join('/'),
-                    beat_end: schema.beat_start + event.beat_dur*schema.tuplet[0],
-                });
-                let PPB = (4/meas.denom) * this.CONSTANTS.PPQ;
-                schema.tick_start = schema.beat_start * PPB;
-                schema.tick_end = schema.beat_end * PPB;
-                let div = (schema.tick_end - schema.tick_start)/schema.tuplet[0];
-                schema.tick_beats = Array.from({length: schema.tuplet[0]}, 
-                    (__,i) => schema.tick_start + i*div);
-
-                // attach new schema to parent schema, if any
-                if (event.schema) {
-                    if (!event.schema.schemas) {
-                        event.schema.schemas = {};
-                        event.schema.schemaIds = [];
-                    }
-                    if (!event.schema.schemaIds.some((c,i) =>
-                        (c > event.beat_start) &&
-                            event.schema.schemaIds.splice(i,0,event.beat_start)
-                    ))
-                        event.schema.schemaIds.push(event.beat_start);
-                    event.schema.schemas[event.beat_start] = schema;
-                    schema.parent = event.schema;
-                } else {
-                    // don't attach subschemas to measure
-                    if (!('schemas' in meas)) meas.schemas = {};
-                    if (!('schemaIds' in meas)) meas.schemaIds = [];
-
-                    meas.schemas[event.beat_start] = schema;
-                    if(!meas.schemaIds.some((n,i) =>
-                        (event.beat_start < n) && meas.schemaIds.splice(i, 0, event.beat_start)
-                    ))
-                        meas.schemaIds.push(event.beat_start);
-                };
-                // replace parent schema with new schema created by event
-                event.schema = schema;
-                
-                schema.cache = this.calculate_schema_cache(meas.cache, schema);
-            }
-
-            event.cache = this.calculate_event_cache(meas, meas.cache, event);
-
-            if (!(meas.events && meas.events.length))
-                meas.events = [event]
-            // event insertion might conflict with other events!
-            else if (!meas.events.some((n,i) =>
-                (event.tick_start < n.tick_start) && meas.events.splice(i, 0, event)
-                //(event.tick < n.tick) && meas.events.splice(i, 0, event)
-            ))
-                meas.events.push(event);
-
-            console.log(meas.events);
-            console.log(meas.schemas);
-
             delete this.entry.event;
             this.entry.tuplet = [1,1];
             this.entry.tuplet_target = 0;
             this.recalc_entry_tuplet();
+
+            return event;
         }
 
         enter_instName(inst, oldName) {
@@ -749,11 +690,28 @@ export default (p) => {
             });
         }
 
-        calculate_event_cache(meas, cache, event) {
+        calculate_event_cache(cache, event) {
             let abs = (loc) => abs_location(cache.ticks, cache.ms, loc);
             let x = abs(event.tick_start);
             return { x, width: abs(event.tick_start + event.tick_dur) - x };
         }
+
+        event_system_cache(meas) {
+            if (meas.schemas) {
+                let search = (s) => {
+                    if (!s)
+                        return;
+                    s.cache = this.calculate_schema_cache(meas.cache, s);
+                    if (s.schemas)
+                        s.schemaIds.forEach(id => search(s.schemas[id]))
+                }
+                meas.schemaIds.forEach(id => search(meas.schemas[id]));
+            }
+            if (meas.events)
+                meas.events.forEach(event =>
+                    event.cache = this.calculate_event_cache(meas.cache, event));
+        }
+
 
         setRangeRefresh(refresh) {
             this.rangeRefresh = refresh;

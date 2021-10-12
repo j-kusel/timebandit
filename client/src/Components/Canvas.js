@@ -58,8 +58,10 @@ class UI extends Component {
         // OR assignment short-circuits all expensive equality checks
         // ...but CREATE REACT APP DOESN'T INCLUDE @babel/process-env!! never mind
         let flag = false;
+
         return nextProps.instruments.some((inst, index) => {
             let oldInst = this.props.instruments[index];
+
             flag = flag || (inst.name !== oldInst.name);
             flag = flag || (Object.keys(inst.measures).length !== Object.keys(oldInst.measures).length);
             flag = flag || Object.keys(inst.measures).some((key) => {
@@ -67,6 +69,12 @@ class UI extends Component {
                 flag = flag || ['start', 'end', 'offset', 'timesig', 'denom'].some((attr) =>
                     inst.measures[key][attr] !== this.props.instruments[index].measures[key][attr]
                 );
+                flag = flag || 
+                    ('events' in inst.measures[key] &&
+                    !('events' in oldInst.measures[key]));
+                flag = flag || 
+                    ('events' in inst.measures[key] && 
+                    (inst.measures[key].events.length !== oldInst.measures[key].events.length));
                 return flag;
             });
             return flag;
