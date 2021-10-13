@@ -206,9 +206,13 @@ export default (p, Window) => {
             this.drag.grab = this.rollover.beat;
         }
 
+        menuMode(name) {
+            this.drag.mode = 'menu';
+            Window.toggle_menu(name);
+        }
+
         entryMode() {
             this.drag.mode = 'entry';
-            console.log(this.rollover);
             Window.press_event(this.rollover);
         }
 

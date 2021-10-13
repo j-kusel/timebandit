@@ -23,6 +23,7 @@ import { CTRL, MOD, SHIFT, LEFT, UP, RIGHT, DOWN, PERIOD } from '../Util/keycode
 import { SPACE, DEL, BACK, ESC } from '../Util/keycodes.js';
 import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, KeyC, KeyV, KeyZ } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
+import { MenuComposer } from '../Util/menus.js';
 
 const DEBUG = process.env.NODE_ENV === 'development';
 const SLOW = process.env.NODE_ENV === 'development';
@@ -32,6 +33,8 @@ var input;
 
 var conflict = [Infinity, -Infinity];
 var obstacles = [Infinity, -Infinity];
+
+window.addEventListener("contextmenu", e => e.preventDefault());
 
 // tweaks learning rate for nudge algorithms
 var monitor = (gap, new_gap, alpha) => {
@@ -116,6 +119,52 @@ export default function measure(p) {
     var Window = _Window(p);
     var Mouse = _Mouse(p, Window);
     var Keyboard = _Keyboard(p);
+    var composeMenu = MenuComposer(p);
+
+    var paste_mode = () => {
+        console.log('IN PASTE MODE');
+        Window.enter_paste_mode();
+        let breaks = global_gaps(
+            instruments.map(i => i.ordered),
+            Window.pasteMeas,
+            true
+        );
+        Mouse.pasteMode(breaks);
+        Mouse.move.filter_move();
+    };
+
+    // each menu is a named object with an array of Items(name, func, argv)
+    let menus = [
+        {
+            name: 'unselected',
+            items: [{ 
+                name: 'paste', 
+                func: () => paste_mode() && Mouse.resetDrag()
+            }]
+        },
+        {
+            name: 'selected',
+            items: [
+                { 
+                    name: 'export selected', 
+                    func: () => API.exportSelected(
+                        Window.getSelection().map(key => Window.selected[key])
+                    )
+                },
+                {
+                    name: 'copy',
+                    func: () => Window.copy() && Mouse.resetDrag()
+                }
+            ]
+        }
+    ]
+
+    Window.initialize_menus(
+        menus.reduce((acc,m) => {
+            acc[m.name] = composeMenu(m.items);
+            return acc;
+        }, {})
+    );
 
     var printer = new Printer(p);
 
@@ -264,6 +313,7 @@ export default function measure(p) {
         Object.assign(API, props.API);
         Window.setUpdateViewCallback(API.reportWindow);
 
+
         // THIS SHOULD BE MOVED INTO APP.JS WITH DEPENDENCIES
         // PASSED IN THE OTHER DIRECTION!
         API.registerTuts(tuts);
@@ -341,7 +391,6 @@ export default function measure(p) {
 
             // cache gaps
             inst.gap_cache = calc_gaps(inst.ordered, '').gaps;
-            console.log(inst.gap_cache);
         });
 
         // calculate beat visual locations for all measures
@@ -554,7 +603,7 @@ export default function measure(p) {
 
                 // draw schemas
                 if (measure.schemas)
-                    Window.drawSchemas(measure, 0);
+                    Window.drawSchemas(measure, Mouse.rollover, 0);
 
                 // draw events
                 if (measure.events)
@@ -565,6 +614,7 @@ export default function measure(p) {
                     Mouse.rollover.meas.id === measure.id
                 )
                     Window.drawEvent(0, Window.entry.ms_start, Window.entry.ms_dur);
+
 
                 // return from measure translate
                 p.pop();
@@ -616,6 +666,7 @@ export default function measure(p) {
                 }
 
             });
+
 
             if (Window.pasteMeas.length) {
                 Window.pasteMeas.forEach(meas => {
@@ -857,6 +908,10 @@ export default function measure(p) {
         p.pop();
 
         Window.drawPrinter(printer.pages);
+
+        if (Window.menu_open)
+            Window.drawMenu(Mouse.drag);
+
 
         // draw lock menu
         if (Mouse.drag.mode === 'lock') {
@@ -1120,15 +1175,7 @@ export default function measure(p) {
             //logger.log(`Copying measures ${copied.join(', ')}.`);
         } else if (p.keyCode === KeyP && Window.copied.length) {
             // new multiple-selection pasting code
-            Window.enter_paste_mode();
-            let breaks = global_gaps(
-                instruments.map(i => i.ordered),
-                Window.pasteMeas,
-                true
-            );
-            Mouse.pasteMode(breaks);
-            Mouse.move.filter_move();
-            return;
+            return paste_mode();
         }
 
         if (p.keyCode === KeyE)
@@ -1272,6 +1319,10 @@ export default function measure(p) {
     };
 
     p.mousePressed = function(e) {
+        // make menu calculations, this guarantees the renderer has loaded
+        // PUT THIS ELSEWHERE
+        Object.keys(Window.menus).forEach(k => Window.menus[k].calc_all());
+
         let checks = [
             { name: 'API.modalCheck', func: API.modalCheck, },
             { name: 'tuts._mouseBlocker', func: tuts._mouseBlocker, },
@@ -1285,6 +1336,18 @@ export default function measure(p) {
         if (Mouse.cancel)
             return;
 
+        if (Mouse.rollover.schema_info && Mouse.rollover.schema_info.schemaX)
+            return API.deleteSchema(Mouse.rollover.schema);
+
+        if (p.mouseButton === p.RIGHT) {
+            e.preventDefault();
+            if ('meas' in Mouse.rollover && Mouse.rollover.meas.id in Window.selected) {
+                Mouse.menuMode('selected');
+            } else if (Window.copied) {
+                Mouse.menuMode('unselected');
+            }
+            return false;
+        }
 
         if (Window.pasteMeas.length) {
             let pasting = Window.confirm_paste(Mouse.move.origin_ms);
@@ -1422,6 +1485,9 @@ export default function measure(p) {
     p.mouseDragged = function(event) {
         Mouse.drag.x = p.mouseX - p.mouseDown.x;
         Mouse.drag.y = p.mouseY - p.mouseDown.y;
+
+        if (Mouse.drag.mode === 'menu')
+            return;
 
         // for metric modulation menu
         if (Window.modulation) {
@@ -1997,6 +2063,13 @@ export default function measure(p) {
             }
         }
 
+        if (Mouse.drag.mode === 'menu') {
+            console.log('menu clicked');
+            Window.press_menu(Mouse.drag);
+            Mouse.resetDrag();
+            console.log(Mouse.drag);
+        }
+
         if (Mouse.drag.mode === 'entry') {
             let event = Window.confirm_event();
             let selected = { event, id: event.meas.id, inst: event.meas.inst };
@@ -2259,6 +2332,39 @@ export default function measure(p) {
                     }))
                         return true;
 
+                    // add schemas to rollover
+                    let schema_info = {
+                        schema_pos: 'right',
+                        schemaX: false
+                    }
+                    let schema = false;
+                    if (meas.schemaIds.length) {
+                        let search = (s) => {
+                            let schema = s;
+                            if (frameXmeas < s.cache.ms_start || frameXmeas > s.cache.ms_end)
+                                return false;
+                            if (s.schemas)
+                                s.schemaIds.some(id => 
+                                    schema = search(s.schemas[id]));
+                            return schema || s;
+                        }
+                        meas.schemaIds.some(id => schema = search(meas.schemas[id]));
+                        // check for X hover
+                        if (schema) {
+                            let cache = schema.cache;
+                            let y_check = frameY > 4 && frameY < 12;
+                            if (schema.beat_end >= measure.timesig) {
+                                schema_info.schema_pos = 'left';
+                                if (y_check && frameXmeas > cache.ms_start + 4 &&
+                                    frameXmeas < cache.ms_start + 12
+                                )
+                                    schema_info.schemaX = true;
+                            } else if (y_check && frameXmeas > cache.ms_end - 12 &&
+                                frameXmeas < cache.ms_end - 4
+                            )
+                                schema_info.schemaX = 'true';
+                        }
+                    }
 
                     // check for beat rollover
                     if (!meas.cache.beats.some((beat, ind) => {
@@ -2266,7 +2372,7 @@ export default function measure(p) {
                             (frameXmeas < beat + c.ROLLOVER_TOLERANCE)
                         ) {
                             let tempo = (meas.end - meas.start)/meas.timesig * ind + meas.start;
-                            Mouse.setRollover({ type: 'beat', inst, meas, beat: ind, tempo });
+                            Mouse.setRollover({ type: 'beat', inst, meas, beat: ind, tempo, schema, schema_info });
                             if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                 Window.editor_hover(tempo);
                             }
@@ -2279,7 +2385,7 @@ export default function measure(p) {
                                 if (frameY > y - c.ROLLOVER_TOLERANCE &&
                                     frameY < y + c.ROLLOVER_TOLERANCE
                                 ) {
-                                    let rollover = { type: 'tempo', inst, meas, beat: ind };
+                                    let rollover = { type: 'tempo', inst, meas, beat: ind, schema, schema_info };
                                     if ((Window.editor.type === 'start' || Window.editor.type === 'end') && Window.editor.meas.id !== meas.id) {
                                         let spread = meas.cache.beats[ind + 1] - beat;
                                         let perc = (frameXmeas - beat)/spread;
@@ -2297,8 +2403,9 @@ export default function measure(p) {
                             return false;
                         } else
                             return false;
-                    }))
-                        Mouse.setRollover({ type: 'measure', inst, meas });
+                    })) {
+                        Mouse.setRollover({ type: 'measure', inst, meas, schema, schema_info });
+                    }
                     return true;
                 } else
                     return false;

@@ -119,7 +119,8 @@ class App extends Component {
         'isPlaying', 'isPreviewing',
         'keysDisabled',
         'newInst', 'newFile',
-        'exportsOpen', 'printoutExport'
+        'exportsOpen', 'printoutExport',
+        'partialExport'
       ].forEach(key => this.state.key = false);
 
       [
@@ -277,6 +278,10 @@ class App extends Component {
           }
       }
 
+      var deleteSchema = (schema) => {
+        console.log('deleting!');
+      }
+
       var updateSchema = (selected) => {
           self.setStateHistory(oldState => {
               let inst = oldState.instruments[selected.inst];
@@ -357,8 +362,6 @@ class App extends Component {
               }
 
               instruments[selected.inst].measures[selected.id] = meas;
-              console.log(meas);
-              console.log(instruments);
               return ({ instruments });
           });
       };
@@ -405,6 +408,7 @@ class App extends Component {
       };
 
       var deleteMeasure = (selected) => {
+          console.log(selected);
           this.setStateHistory(oldState => {
               let ordered_cpy = oldState.ordered;
               if (Object.keys(ordered_cpy)) {
@@ -444,6 +448,21 @@ class App extends Component {
               return newState;
           });
       };
+
+      var exportSelected = (selected) => {
+          console.log(selected);
+          let instruments = this.state.instruments.map(
+              (inst,i) => ({ measures: {}, name: inst.name })
+          );
+          selected.forEach(sel =>
+              instruments[sel.inst].measures[sel.id] = sel
+          );
+          /*instruments.forEach(inst =>
+              inst.ordered = order_by_key(inst.measures, 'offset')
+          );*/
+          console.log(instruments);
+          this.setState({ partialExport: instruments, exportsOpen: true });
+      }
 
       var newFile = () => {
           // clear history here
@@ -601,7 +620,7 @@ class App extends Component {
           //return measure;
       };
 
-      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, updateInst, updateMeasure, updateEvent, newCursor, displaySelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, deleteSchema, updateInst, updateMeasure, updateEvent, newCursor, displaySelected, exportSelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -885,17 +904,16 @@ class App extends Component {
   };
 
   midi(type) {
+      let instruments = this.state.partialExport || this.state.instruments;
       if (type === 'global') {
           // gotta convert everything to 60 BPM.
-
           // going to try calculating absolute tick location as a percentage of the whole score.
           // this will (ideally) lessen the dependency that beat locations have on each other,
           // an unfortunate by-product of the midi protocol.
-
           // this works so well it should be adapted to the independent export!
           let tick_perc = this.state.PPQ / (60000.0 / 300); // Parts-Per-Quarter (per beat) / 1000ms per beat
 
-          let extremes = this.state.instruments.reduce((acc, inst) => {
+          let extremes = instruments.reduce((acc, inst) => {
               Object.keys(inst.measures).forEach(key => {
                   acc.min = Math.min(inst.measures[key].offset, acc.min);
                   acc.max = Math.max(inst.measures[key].offset + inst.measures[key].ms, acc.max);
@@ -906,7 +924,7 @@ class App extends Component {
           // total ticks in the score at 60 BPM
           let tick_total = parseInt((extremes.max - extremes.min) * tick_perc, 10);
 
-          let tracks = this.state.instruments.map((inst, i_ind) => {
+          let tracks = instruments.map((inst, i_ind) => {
               let tick_accum = 0;
               // iterate through measures, adding offsets
               let last = 0; 
@@ -954,7 +972,7 @@ class App extends Component {
       }
 
       // this eventually needs to use a similar absolute time system for constant error correction.
-      let tracks = this.state.instruments.map((inst, i_ind) => {
+      let tracks = instruments.map((inst, i_ind) => {
 
           // this would be solved by sorting measures on entry
           // looking for gaps between measures
@@ -981,18 +999,13 @@ class App extends Component {
 
               if (last) {
                   let gap = meas.offset - (last.offset + last.ms);
-                  console.log(last.offset, last.ms, meas.offset);
-                  console.log(gap);
-                  console.log(acc[acc.length-1]);
                   if (gap > CONFIG.DELTA_THRESHOLD) {
-                      // in the future, may want to use 300BPM instead of last.end for greater accuracy
-                      let gap_tempo = /*last.end*/ 300;
+                      let gap_tempo = 300;
                       let beat_total = (gap_tempo / 60000.0) * gap;
-                      console.log('num of beats at 300bpm: ', beat_total);
-                      delta = Math.round(beat_total * this.state.PPQ);//parseInt(beat_total * this.state.PPQ, 10);
-                      console.log('delta: ', delta);
+                      delta = Math.round(beat_total * this.state.PPQ);
                       acc.push({ delta, tempo: gap_tempo });
-                      // if we're not adding final beats of measures, need to delay first measure after gaps
+                      // if we're not adding final beats of measures,
+                      // need to delay first measure after gaps
                       // by one "beat" (PPQ);
                       delta += PPB;
 
@@ -1009,25 +1022,15 @@ class App extends Component {
               last = meas;
 
               let slope = (meas.end - meas.start)/meas.ticks.length;
-              //acc.push({ tempo: meas.start, timesig: meas.timesig, denom: meas.denom });
 
               let new_beat = { duration: 'T1', pitch: ['C4'] };
-              //clicks.push({ ...new_beat, wait });
 
 
               let ev_ptr = 0;
               let beat_ptr = 0;
               let event_ticks = meas.events.map(e => Math.round(e.tick_start));
 
-
-              /*if (event_ticks.length && event_ticks[0] === 0) {
-                  ev_ptr++;
-                  clicks[clicks.length-1].pitch.push('C5');
-              }*/
-
-
               let last_tick = -delta-1;
-              console.log(0-(-delta-1)-1);
               for (let i=0; i<meas.ticks.length; i++) {
                   let pitch = [];
                   let acc_push = (!i) ?
@@ -1044,24 +1047,10 @@ class App extends Component {
                       pitch.push('C5');
                   }
                   if (pitch.length) {
-                      console.log(i-last_tick-1);
                       clicks.push({ duration: 'T1', pitch, wait: `T${i-last_tick-1}` });
                       last_tick = i;
                   }
               }
-              /*meas.ticks.forEach((_, i) => {
-                  // first beat will always be handled above, so skip it.
-                  if (i === 0)
-                      return;
-                  if (!(i % this.state.PPQ_mod)) {
-                      if (!(i % (meas.ticks.length / meas.timesig)))
-                          clicks.push({ ...new_beat, wait: rest });
-                      acc.push({ tempo: meas.start + i * slope });
-                  };
-              });
-              */
-
-              console.log(clicks);
 
               return acc;
           }, []);
@@ -1071,7 +1060,6 @@ class App extends Component {
           return ({ tempi, clicks, name: inst.name });
       });
       
-      console.log(tracks);
       click_track(tracks, this.state.PPQ, this.state.PPQ_tempo);
 
   };
@@ -1080,7 +1068,6 @@ class App extends Component {
       if (this.state.mouseBlocker())
           return;
 
-      console.log(this.state.ordered);
       let newState = {};
       let audioIds = this.state.instruments.map(i => i.audioId);
       if (!isPlaying) {
@@ -1227,7 +1214,7 @@ class App extends Component {
   }
 
   toggleExports() {
-    this.setState(oldState => ({ exportsOpen: !oldState.exportsOpen }));
+    this.setState(oldState => ({ exportsOpen: !oldState.exportsOpen, partialExport: false }));
   }
 
 

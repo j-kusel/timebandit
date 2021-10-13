@@ -74,6 +74,9 @@ export default (p) => {
 
             this.editor = {};
             this.instName = {};
+            this.menu_open = false;
+            this.menus = [];
+
 
             // monkey patch selection color
             let sel_color = p.color(colors.contrast);
@@ -164,8 +167,21 @@ export default (p) => {
             };
         }
 
+        toggle_menu(target) {
+            this.menu_open = target || false;
+        }
+
+        press_menu(drag) {
+            this.menus[this.menu_open].press(drag);
+            this.toggle_menu();
+        }
+
         toggle_entry_tuplet() {
             this.entry.tuplet_target ^= 1;
+        }
+
+        initialize_menus(menus) {
+            this.menus = menus;
         }
 
         change_entry_tuplet(input) {
@@ -304,6 +320,7 @@ export default (p) => {
                 this.initialize_temp(meas);
                 return meas;
             });
+            console.log(this.pasteMeas);
         }
 
         confirm_paste(origin) {
@@ -712,7 +729,6 @@ export default (p) => {
                     event.cache = this.calculate_event_cache(meas.cache, event));
         }
 
-
         setRangeRefresh(refresh) {
             this.rangeRefresh = refresh;
         }
@@ -896,7 +912,10 @@ export default (p) => {
             this.updateViewCallback(this.viewport, this.scale, this.scroll);
         }
         
-        drawSchemas(measure, depth) {
+        drawSchemas(measure, rollover, depth) {
+            /*if (!rollover.schema)
+                return;
+                */
             measure.schemaIds.forEach(id => {
                 let schema = measure.schemas[id];
                 let start = schema.cache.ms_start;
@@ -905,6 +924,26 @@ export default (p) => {
 
                 p.push();
                 let col = p.color(colors.contrast_lighter);
+                if (rollover.schema === schema) {
+                    col = p.color(colors.accent);
+                    // draw X
+                    p.push();
+                    p.stroke(colors.primary);
+                    p.fill(colors.primary);
+                    p.textAlign(p.CENTER, p.CENTER);
+                    // offset X to avoid tempo indicators
+                    if (rollover.schema_info) {
+                        let ro = rollover.schema_info;
+                        if (ro.schemaX) {
+                            p.stroke(colors.accent);
+                            p.fill(colors.accent);
+                        }
+                        let x = ro.schema_pos === 'left' ?
+                            schema.cache.ms_start + 8 : schema.cache.ms_end - 8;
+                        p.text('X', x, 8);
+                    }
+                    p.pop();
+                }
                 col.setAlpha(100);
                 p.stroke(col);
                 p.fill(col);
@@ -944,8 +983,12 @@ export default (p) => {
 
                 p.pop();
                 if (schema.schemas)
-                    this.drawSchemas(schema, depth+1);
+                    this.drawSchemas(schema, rollover, depth+1);
             });
+        }
+
+        drawMenu(hover) {
+            this.menus[this.menu_open].draw([p.mouseDown.x, p.mouseDown.y], hover);
         }
 
         drawEvent(y_base, position, duration) {
