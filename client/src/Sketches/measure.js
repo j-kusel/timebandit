@@ -607,13 +607,15 @@ export default function measure(p) {
 
                 // draw events
                 if (measure.events)
-                    Window.drawEvents(measure);
+                    measure.events.forEach(event => {
+                        Window.drawEvent(event, Mouse.rollover);
+                    });
                 // entering an event?
                 if (Window.entry.mode &&
                     Mouse.rollover.type === 'entry' &&
                     Mouse.rollover.meas.id === measure.id
                 )
-                    Window.drawEvent(0, Window.entry.ms_start, Window.entry.ms_dur);
+                    Window.drawEvent({ cache: _.pick(Window.entry, ['ms_start', 'ms_dur']) });
 
 
                 // return from measure translate
@@ -1337,10 +1339,12 @@ export default function measure(p) {
             return;
 
         if (Mouse.rollover.schema_info && Mouse.rollover.schema_info.schemaX)
-            return API.deleteSchema(Mouse.rollover.schema);
+            return API.deleteSchema(Mouse.rollover.meas, Mouse.rollover.schema);
 
         if (p.mouseButton === p.RIGHT) {
             e.preventDefault();
+            if (Mouse.rollover.type === 'event')
+                return API.deleteEvent(Mouse.rollover.meas, Mouse.rollover.event);
             if ('meas' in Mouse.rollover && Mouse.rollover.meas.id in Window.selected) {
                 Mouse.menuMode('selected');
             } else if (Window.copied) {
@@ -2223,8 +2227,124 @@ export default function measure(p) {
                     // translating to measure
                     let frameXmeas = frameX - meas.cache.offset;
 
-                    // fifth pass -_-
+                    // sixth pass
                     if (Window.entry.mode) {
+                        let note = Math.pow(2, Window.entry.duration);
+                        let basis = Math.max(note, meas.denom);
+                        let inc = meas.denom / basis;
+                        let snaps = [];
+                        let ids = {};
+                        let count = 0;
+                        let PPB = Window.CONSTANTS.PPQ*(4/meas.denom);
+                        for (let i=0; i<meas.timesig; i+=inc) {
+                            snaps.push(i);
+                            let basis_ratio = basis / note;
+                            let meta = ids[i] = {
+                                schema: false, beat: [count+1, basis].join('/'),
+                                beat_start: i, beat_dur: inc * basis_ratio,
+                            }
+                            meta.nominal = [note + ': ' + meta.beat];
+                            meta.tick_start = meta.beat_start * PPB;
+                            meta.tick_dur = meta.beat_dur * PPB;
+                            count++;
+                        }
+                        if (meas.schemaIds.length) {
+                            let search = (schema, snaps) => {
+                                let s_snaps = [];
+                                let basis = Math.max(schema.basis, note);
+                                let ratio = schema.basis / basis;
+                                let dur_ratio = basis / note;
+                                inc = schema.beat_dur / schema.tuplet[0] * ratio;
+                                let count = 0;
+                                for (let i=0; lt(i, schema.beat_dur); i+=inc) {
+                                    let start = i+schema.beat_start;
+                                    s_snaps.push(start);
+                                    let meta = ids[start] = {
+                                        schema, beat: [count+1, basis].join('/'),
+                                        beat_start: start, beat_dur: inc * dur_ratio,
+                                    }
+                                    meta.nominal = [note + ': ' + meta.beat].concat(schema.nominal);
+                                    meta.tick_start = meta.beat_start * PPB;
+                                    meta.tick_dur = meta.beat_dur * PPB;
+                                    count++;
+                                }
+                                if (schema.schemaIds && schema.schemaIds.length)
+                                    schema.schemaIds.forEach(id =>
+                                        search(schema.schemas[id], s_snaps)
+                                    );
+                                let indices = [0,0];
+                                let last = 0;
+                                snaps.some((s,i) => {
+                                    if (lte(schema.beat_start, s)) {
+                                        console.log(schema.beat_start, s);
+                                        return indices[0] = i;
+                                    }
+                                    last = i;
+                                });
+                                snaps.some((s,i) => {
+                                    if (lte(schema.beat_end, s)) {
+                                        console.log(schema.beat_end, s);
+                                        console.log(snaps[i-1],snaps[i],snaps[i+1]);
+                                        return indices[1] = i;
+                                    }
+                                    last = s;
+                                });
+                                let removed = snaps.splice(indices[0],indices[1]-indices[0], ...s_snaps);
+
+                                //removed.forEach(r => delete ids[r]);
+                            };
+                            meas.schemaIds.forEach(id => {
+                                let schema = meas.schemas[id];
+                                search(schema, snaps);
+                            });
+                        }
+                        console.log(snaps);
+
+                        let tick_perc = 1/meas.cache.ticks.length;
+                        let perc;
+                        // default to end
+                        let frac = meas.timesig;
+                        let last = 0;
+                        meas.cache.ticks.slice(1).some((tick,i) => {
+                            if (tick > frameXmeas) {
+                                let remainder = (frameXmeas - last)/(tick-last);
+                                perc = (i+remainder)*tick_perc;
+                                frac = perc * meas.timesig;
+                                return true;
+                            }
+                            last = tick;
+                        });
+
+                        let in_schema = false;
+
+                        let beat = Math.round(frac/inc);
+
+
+                        let beat_start;
+                        last = 0;
+                        snaps.some(s => {
+                            if (frac < s) {
+                                let avg = (s + last) * 0.5;
+                                beat_start = (frac > avg) ? s : last;
+                                return true;
+                            }
+                            last = s;
+                        });
+                        console.log(beat_start);
+                        let rollover = { meas, inst, type: 'entry', note }; 
+                        if (beat_start in ids)
+                            Object.assign(rollover, ids[beat_start]);
+                            //nominal, place, beat: (beat+1).toString(), note,
+                            
+                        Mouse.setRollover(rollover);
+                        Object.assign(Window.entry, Window.calculate_entry_cache(meas.cache, rollover.tick_start, rollover.tick_dur));
+
+                        return true;
+
+                    }
+
+                    // fifth pass -_-
+                    if (Window.entry.mode && false) {
                         let note = Math.pow(2, Window.entry.duration);
                         let inc = meas.denom / Math.max(note, meas.denom);
                         let beat_dur = meas.denom / note;
@@ -2248,8 +2368,12 @@ export default function measure(p) {
                         let in_schema = false;
 
                         let beat = Math.round(frac/inc);
+                        let place = [beat+1, Math.max(note, meas.denom)].map(p => p.toString());
+                        let nominal = [
+                            note + ': ' +
+                            place.join('/')
+                        ];
                         let beat_start = beat * inc;
-                        let nominal = [[beat+1, Math.max(note, meas.denom)].join('/')];
                         let stack = [];
                         let traverse = (frac, child) => {
                             if (!child.schemas)
@@ -2275,22 +2399,43 @@ export default function measure(p) {
                                 });
 
                             meas.schemaIds.some(search(frac));
-                            //let beat;
+                            let last_beat = false;
+                            let old_schema = false;
                             if (in_schema) {
                                 let inc = (in_schema.beat_end - in_schema.beat_start) / in_schema.tuplet[0];
-                                //nominal.push(
                                 let div_relation = in_schema.basis / Math.max(note, in_schema.basis);
                                 let div = inc * div_relation;
                                 let schema_start = frac - in_schema.beat_start;
                                 beat = Math.round(schema_start/div);
+                                if (beat === in_schema.tuplet[0])
+                                    last_beat = true;
                                 beat_start = beat * div + in_schema.beat_start;
+                                old_schema = in_schema;
                                 in_schema = false;
                             }
+                            if (last_beat) {
+                                let frac = old_schema.beat.split('/').map(s=>parseInt(s,10));
+                                let end = old_schema.tuplet[1] + frac[0];
+                                last_beat = [end, frac[1]].map(s=>s.toString());
+                            }
+                            
+                            //console.log(last_beat);
+
                             // search again for duration
                             meas.schemaIds.some(search(beat_start));
                             if (in_schema) {
                                 inc = (in_schema.beat_end - in_schema.beat_start) / in_schema.tuplet[0];
-                                nominal = [[(beat+1).toString(), note].join('/')];
+                                let basis = in_schema.basis;
+                                if (last_beat) {
+                                    basis = Math.max(in_schema.basis, old_schema.basis);
+                                    let div_relation = in_schema.basis / Math.max(note, basis);
+                                    let div = inc * div_relation;
+                                    beat = Math.round((beat_start-in_schema.beat_start)/div);
+                                }
+
+                                place = [(beat+1), Math.max(note, basis)].map(p=>p.toString());
+                                //console.log(place);
+                                nominal = [note + ': ' + place.join('/')];
                                 let dur_relation = in_schema.basis / note;
                                 beat_dur = inc * dur_relation;
                                 // clip duration at end of schema ?
@@ -2298,16 +2443,19 @@ export default function measure(p) {
                                     beat_dur = in_schema.beat_end - beat_start;
                                 let sschema = in_schema;
                                 while (sschema) {
-                                    nominal.push(`(${sschema.nominal}, ${sschema.beat})`);
+                                    //nominal.push(`(${sschema.nominal}, ${sschema.beat})`);
+                                    nominal.push(sschema.nominal);
                                     sschema = sschema.parent;
                                 }
+                            } else if (old_schema && last_beat) {
+                                place = last_beat;//[(beat+1), Math.max(note, basis)].map(p=>p.toString());
                             }
-                        }
+                        } 
+                        console.log(place);
                         let PPB = Window.CONSTANTS.PPQ*(4/meas.denom);
 
-
                         let rollover = { meas, inst, type: 'entry', 
-                            nominal, beat: (beat+1).toString(), note,
+                            nominal, place, beat: (beat+1).toString(), note,
                             beat_start, beat_dur,
                             tick_start: beat_start*PPB,
                             tick_dur: beat_dur*PPB,
@@ -2365,6 +2513,16 @@ export default function measure(p) {
                                 schema_info.schemaX = 'true';
                         }
                     }
+
+                    // check for event rollover
+                    if (meas.events.length && meas.events.some((event, ind) => {
+                        if ((frameXmeas > event.cache.ms_start - c.ROLLOVER_TOLERANCE) &&
+                            (frameXmeas < event.cache.ms_start + c.ROLLOVER_TOLERANCE)
+                        ) {
+                            Mouse.setRollover({ type: 'event', inst, meas, schema, schema_info, event });
+                            return true;
+                        }
+                    })) return true;
 
                     // check for beat rollover
                     if (!meas.cache.beats.some((beat, ind) => {

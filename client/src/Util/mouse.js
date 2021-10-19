@@ -273,7 +273,7 @@ export default (p, Window) => {
         }
 
         setRollover(meta) {
-            this.rollover = meta
+            this.rollover = meta;
         }
 
         /* DEPRECATED

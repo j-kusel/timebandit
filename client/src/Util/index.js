@@ -465,6 +465,80 @@ var MeasureCalc = (features, options) => {
     return {start, end, timesig, denom, beats, ms, ticks, offset: features.offset};
 }
 
+var EventCalc = (meas, param, schema, PPQ) => {
+    let data = param[1].replace(/ /g, '').split(':');
+    let frac = data[1].split('/').map(n=>parseInt(n,10));
+    let event = {
+        meas, note: frac[1],
+        dur: data[0],
+        nominal: param.slice(1)
+    };
+
+    // create dummy schema to set local note division,
+    // or pass on schema division.
+    let div, beat_dur;
+    if (!schema) {
+        div = meas.denom / frac[1];
+        beat_dur = meas.denom / parseInt(event.dur, 10);
+        schema = { beat_start: 0, basis: frac[1] };
+    } else {
+        div = schema.beat_dur / schema.tuplet[0];
+        beat_dur = schema.basis / parseInt(event.dur, 10) * div;
+        event.schema = schema;
+    }
+    let PPB = (4/meas.denom) * PPQ;
+    Object.assign(event, {
+        beat: frac[0] * (schema.basis / frac[1]),
+        beat_dur,
+        beat_start: schema.beat_start + div * (frac[0]-1)
+    });
+
+    event.tick_start = event.beat_start * PPB;
+    event.tick_dur = event.beat_dur * PPB;
+
+    return event;
+}
+
+var SchemaCalc = (nominal, parent, denom, PPQ) => {
+    let schema = {};
+
+    console.log(nominal);
+    let frac = nominal[1].split('/').map(s => parseInt(s,10));
+    // correct 1-indexed frac
+    frac[0]--;
+    let tuplet, basis;
+    [tuplet, basis] = nominal[0].split('-');
+    schema.tuplet = tuplet.split('/').map(s => parseInt(s,10));
+    schema.basis = parseInt(basis, 10);
+    schema.nominal = nominal;
+
+    if (parent) {
+        schema.parent = parent;
+        let ratio = parent.basis / frac[1];
+        let div = parent.beat_dur / parent.tuplet[0];
+        schema.beat_start = div * frac[0] * ratio + parent.beat_start;
+        schema.beat_dur = div * schema.tuplet[1] * ratio;
+    } else {
+        schema.beat_start = frac[0]/frac[1] * denom;
+        schema.beat_dur = (1/schema.basis) * schema.tuplet[1] * denom;
+    }
+    schema.beat_end = schema.beat_start + schema.beat_dur;
+
+    let PPB = (4/denom) * PPQ;
+    schema.tick_start = schema.beat_start * PPB;
+    schema.tick_end = schema.beat_end * PPB;
+    let div = (schema.tick_end - schema.tick_start)/schema.tuplet[0];
+    schema.tick_beats = Array.from({length: schema.tuplet[0]}, 
+        (__,i) => schema.tick_start + i*div);
+
+    console.log(schema);
+
+    return schema;
+}
+
+
+
+
 var order_by_key = (obj, key) => {
     var merge = (arrL, arrR) => {
         let lI = 0, rI = 0, sorted=[];
@@ -511,7 +585,7 @@ var parse_bits = (n) => {
     return bits;
 };
 
-export { MeasureCalc, order_by_key, check_proximity_by_key,
+export { MeasureCalc, SchemaCalc, EventCalc, order_by_key, check_proximity_by_key,
     bit_toggle, parse_bits, crowding, anticipate_gap, initial_gap, calc_gaps, global_gaps,
     lt, lte, gt, gte,
     abs_location

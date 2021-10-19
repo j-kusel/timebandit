@@ -210,8 +210,9 @@ export default (p) => {
             let event = _.pick(rollover, [
                 'meas', 'beat_start', 'beat_dur',
                 'tick_start', 'tick_dur', 'schema',
-                'nominal', 'beat', 'note'
+                'nominal', 'place', 'beat', 'note'
             ]);
+            console.log(event);
             Object.assign(this.entry, {
                 event, tuplet_target: 0,
                 tuplet: [1,1]
@@ -229,6 +230,7 @@ export default (p) => {
             this.entry.tuplet_target = 0;
             this.recalc_entry_tuplet();
 
+            console.log(event);
             return event;
         }
 
@@ -559,11 +561,12 @@ export default (p) => {
 
         calculate_entry_cache(cache, beat, duration) {
             let ms_start = abs_location(cache.ticks, cache.ms, beat);
-            return {
+            let returned = {
                 ms_start,
                 ms_dur: (abs_location(cache.ticks, cache.ms, beat+duration)
                     || cache.ms) - ms_start
             };
+            return returned;
         }
 
         calculate_tempo_cache(meas, cache) {
@@ -709,8 +712,11 @@ export default (p) => {
 
         calculate_event_cache(cache, event) {
             let abs = (loc) => abs_location(cache.ticks, cache.ms, loc);
-            let x = abs(event.tick_start);
-            return { x, width: abs(event.tick_start + event.tick_dur) - x };
+            let ms_start = abs(event.tick_start);
+            return {
+                ms_start,
+                ms_dur: abs(event.tick_start + event.tick_dur) - ms_start
+            };
         }
 
         event_system_cache(meas) {
@@ -991,34 +997,26 @@ export default (p) => {
             this.menus[this.menu_open].draw([p.mouseDown.x, p.mouseDown.y], hover);
         }
 
-        drawEvent(y_base, position, duration) {
+        drawEvent(event, ro) {
+            let position = event.cache.ms_start;
+            let duration = event.cache.ms_dur;
             p.push();
             p.translate(0, c.INST_HEIGHT * 0.5);
             let col = p.color(colors.contrast);
             col.setAlpha(100);
+            if (ro && ro.event && ro.event.beat_start === event.beat_start)
+                col.setAlpha(200);
+
+                    
             p.stroke(col);
             p.fill(col);
             let height = c.INST_HEIGHT / 3;
-            p.rect(position, y_base-height*0.2, duration, height*0.4);
+            p.rect(position, -height*0.2, duration, height*0.4);
             col.setAlpha(200);
             p.stroke(col);
             p.fill(col);
-            p.rect(position-2, y_base-height*0.5, 4, height);
+            p.rect(position-2, -height*0.5, 4, height);
             p.pop();
-        };
-
-
-
-        drawEvents(measure) {
-            measure.events.forEach(event => {
-                //let position = measure.cache.ticks[event.tick];
-                /*let beat = event.beat * this.CONSTANTS.PPQ*(4/measure.denom);
-                let position = abs_location(measure.cache.ticks, measure.cache.ms, beat);
-                let duration = abs_location(measure.cache.ticks, measure.cache.ms,
-                    beat + event.duration) - position;
-                    */
-                this.drawEvent(0, event.cache.x, event.cache.width);
-            });
         };
 
         drawEntryTuplet() {

@@ -10,7 +10,7 @@ import github from './static/GitHub-Mark-32px.png';
 import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
 import styled from 'styled-components';
 
-import { MeasureCalc, order_by_key } from './Util/index';
+import { MeasureCalc, SchemaCalc, EventCalc, order_by_key } from './Util/index';
 import ordered from './Util/ordered';
 import logger from './Util/logger';
 import { Parser } from './Util/parser';
@@ -278,8 +278,32 @@ class App extends Component {
           }
       }
 
-      var deleteSchema = (schema) => {
-        console.log('deleting!');
+      var deleteSchema = (measure, schema) => {
+          self.setStateHistory(oldState => {
+              let instruments = oldState.instruments;
+              let meas = Object.assign({},instruments[measure.inst].measures[measure.id]);
+
+              meas.events = meas.events.filter(event =>
+                !(event.beat_start >= schema.beat_start && event.beat_start + event.beat_dur < schema.beat_end));
+              console.log(meas.events);
+
+              let chain = [];
+              let s = schema;
+              if (s.parent) {
+                  delete s.parent.schemas[s.beat_start];
+                  s.parent.schemaIds.splice(
+                      s.parent.schemaIds.indexOf(s.beat_start), 1);
+                  while (s.parent) s = s.parent;
+                  meas.schemas[s.beat_start] = s;
+              } else {
+                  delete meas.schemas[s.beat_start];
+                  meas.schemaIds.splice(
+                      meas.schemaIds.indexOf(s.beat_start), 1);
+              }
+                            
+              instruments[meas.inst].measures[meas.id] = meas;
+              return ({ instruments });
+          });
       }
 
       var updateSchema = (selected) => {
@@ -292,13 +316,22 @@ class App extends Component {
           });
       }
 
+      var deleteEvent = (measure, event) => {
+          self.setStateHistory(oldState => {
+              let instruments = oldState.instruments;
+              let meas = Object.assign({},instruments[measure.inst].measures[measure.id]);
+              meas.events = meas.events.filter(e =>
+                !(event.beat_start === e.beat_start));
+              instruments[meas.inst].measures[meas.id] = meas;
+              return ({ instruments });
+          });
+      }
+
       var updateEvent = (selected) => {
           self.setStateHistory(oldState => {
               let instruments = oldState.instruments;
+              console.log(selected.event);
               let meas = Object.assign({},instruments[selected.inst].measures[selected.id]);
-              /*let event = Array.isArray(selected.event) ?
-                  selected.event : [selected.event];
-                  */
 
               let event = selected.event;
 
@@ -308,12 +341,14 @@ class App extends Component {
                   event.tick_dur *= event.tuplet[1] / event.tuplet[0];
 
                   let schema = _.pick(event, ['beat_start', 'tuplet', 'basis']);
+                  let beat = event.beat;//place.join('/');
                   Object.assign(schema, {
-                      nominal: schema.tuplet.join('/') + '-' + schema.basis,
-                      beat: [event.beat, event.note].join('/'),
+                      nominal: `(${schema.tuplet.join('/')}-${schema.basis}: ${beat})`,
+                      beat,
                       beat_end: schema.beat_start + event.beat_dur*schema.tuplet[0],
                   });
                   let PPB = (4/meas.denom) * this.state.PPQ;
+                  schema.beat_dur = schema.beat_end - schema.beat_start;
                   schema.tick_start = schema.beat_start * PPB;
                   schema.tick_end = schema.beat_end * PPB;
                   let div = (schema.tick_end - schema.tick_start)/schema.tuplet[0];
@@ -346,6 +381,11 @@ class App extends Component {
                   };
                   // replace parent schema with new schema created by event
                   event.schema = schema;
+                  // change event nominal to reflect that it's in
+                  // its own created schema, with a "beat" relative
+                  // to this schema
+                  event.nominal.shift();
+                  event.nominal.unshift(event.note + ": 1/" + schema.basis, schema.nominal);
                   
               }
               
@@ -361,6 +401,7 @@ class App extends Component {
                   meas.events = events;
               }
 
+              console.log(event);
               instruments[selected.inst].measures[selected.id] = meas;
               return ({ instruments });
           });
@@ -620,7 +661,7 @@ class App extends Component {
           //return measure;
       };
 
-      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, deleteSchema, updateInst, updateMeasure, updateEvent, newCursor, displaySelected, exportSelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, deleteSchema, updateInst, updateMeasure, updateEvent, deleteEvent, newCursor, displaySelected, exportSelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -1133,18 +1174,26 @@ class App extends Component {
       let insts = this.state.instruments;
       let rows = [
         ['PPQ', this.state.PPQ.toString(), 'PPQ_tempo', this.state.PPQ_tempo.toString()],
-        ['inst', 'start', 'end', 'timesig', 'offset']
+        ['inst', 'start', 'end', 'timesig', 'denom', 'offset']
       ];
 
       Object.keys(insts).forEach((inst) => 
-          Object.keys(insts[inst].measures).forEach((meas) => 
+          Object.keys(insts[inst].measures).forEach((measure) => {
+              let meas = insts[inst].measures[measure];
               rows.push(
-                  [inst].concat(['start', 'end', 'timesig', 'offset']
-                      .map((key) => insts[inst].measures[meas][key]))
-              )
-          )
+                  [[inst, insts[inst].name].join('-')].concat(['start', 'end', 'timesig', 'denom', 'offset']
+                      .map((key) => meas[key]))
+              );
+              // events
+              if (meas.events)
+                  meas.events.forEach(e => {
+                      console.log(e.nominal);
+                      rows.push(
+                        [''].concat(e.nominal.shift())
+                            .concat(e.nominal.join(' ')));
+                  });
+          })
       );
-      
       var downloadLink = document.createElement('a');
       downloadLink.href = encodeURI(`data:text/csv;utf-8,`.concat(rows.join('\n')));
       downloadLink.download = this.state.filename + '.csv';
@@ -1248,47 +1297,91 @@ class App extends Component {
           for (let m=0; m<metaRow.length; m+=2)
               meta[metaRow[m]] = metaRow[m+1]
           
+          let lastMeas;
+          let parse = (input) => {
+            let current = input.replace(/ /g, '');
+            let params = current.split(':');
+            let frac = params[1].split('/').map(s => parseInt(s,10));
+            return { current, params, frac };
+          }
+          let schema_cache = {};
           let instruments = rows
               .slice(2) // remove headers
               .reduce((acc, line) => {
-                  let params = line.split(',');
-                  numInst = Math.max(numInst, params[0]);
+                  let param = line.split(',');
+
+                  // add events
+                  if (param.length && !param[0]) {
+                    let schema = null;
+                      console.log(param, param.length);
+                    if (param[2]) {
+                        let schema_list = [...param[2].matchAll(/\((.[^\)]*)\)/g)].map(s=>s[1]);
+                        let current, params, frac;
+                        ({ current, params, frac } = parse(schema_list.pop()));
+                        let beat_start = frac[0]/frac[1] * lastMeas.denom;
+                        if (!(beat_start in lastMeas.schemas)) {
+                            schema = SchemaCalc(params, null, lastMeas.denom, meta.PPQ);
+
+                            lastMeas.schemas[beat_start] = schema;
+                                lastMeas.schemaIds.some((s,i) =>
+                                (beat_start > s) ?
+                                    lastMeas.schemaIds.splice(i, 0, beat_start):
+                                    false
+                            ) || lastMeas.schemaIds.push(beat_start);
+                        } else
+                            schema = lastMeas.schemas[beat_start];
+                        let lastSchema = schema;
+                        while (schema_list && schema_list.length) {
+                            let schema_text = schema_list.pop();
+                            ({ current, params, frac } = parse(schema_text));
+                            let ratio = lastSchema.basis / frac[1];
+                            let div = lastSchema.beat_dur / lastSchema.tuplet[0] * ratio;
+                            beat_start = div * frac[0] + lastSchema.beat_start;
+                            if (!lastSchema.schemas) {
+                                lastSchema.schemas = {};
+                                lastSchema.schemaIds = [];
+                            }
+                            if (!(beat_start in lastSchema.schemas)) {
+                                schema = SchemaCalc(params, lastSchema, lastMeas.denom, meta.PPQ);
+                                lastSchema.schemas[beat_start] = schema;
+                                    lastSchema.schemaIds.some((s,i) =>
+                                    (beat_start > s) ?
+                                        lastSchema.schemaIds.splice(i, 0, beat_start):
+                                        false
+                                ) || lastSchema.schemaIds.push(beat_start);
+                                // add parent link to schemas, but not meas
+                                if (!lastSchema.id)
+                                    schema.parent = lastSchema;
+                            } else
+                                schema = lastSchema.schemas[beat_start];
+                            lastSchema = schema;
+                        }
+                    }
+
+                    let event = EventCalc(lastMeas, param, schema, this.state.PPQ);
+                    if (!lastMeas.events.some((n,i) =>
+                        (event.tick_start < n.tick_start) && lastMeas.events.splice(i, 0, event)
+                    ))
+                        lastMeas.events.push(event);
+                    console.log(lastMeas.events);
+                    
+                    return acc;
+                  }
+                      
+                  let inst_text = param[0].split('-');
+                  let index = parseInt(inst_text[0], 10);
+                  numInst = Math.max(numInst, index);
                   numMeas++;
                   let newMeas = MeasureCalc(
-                      ['start', 'end', 'timesig', 'offset']
-                          .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(params[ind+1], 10) }), {})
+                      ['start', 'end', 'timesig', 'denom', 'offset']
+                          .reduce((obj, key, ind) => ({ ...obj, [key]: parseFloat(param[ind+1], 10) }), {})
                       ,
                       ('PPQ' in meta && 'PPQ_tempo' in meta) ?
                         ({ PPQ: meta.PPQ, PPQ_tempo: meta.PPQ_tempo }) :
                         ({ PPQ: this.state.PPQ, PPQ_tempo: this.state.PPQ_tempo })
                   );
-                  /*let spread = [newMeas.offset, newMeas.offset + newMeas.ms];
-                  let clean = true;
-                  if (!gaps.length) {
-                      gaps.push([-Infinity, spread[0]]);
-                      gaps.push([spread[1], Infinity]);
-                  } else {
-                      for (let i=0; i<gaps.length; i++) {
-                          if (spread[0] > gaps[i][0]) {
-                              if (spread[0] 
-                              if (spread[1] < gaps[i][1]) {
-                                  gaps.splice(i + 1, [spread[1], gaps[i][1]]);
-                                  gaps[i][1] = spread[0];
-                                  break;
-                              } else {
-                                  // ending collision
-                                  alert('ending collision!');
-                                  clean = false;
-                                  break;
-                              }
-                          } else {
 
-                      gaps = gaps.reduce((acc, gap) => {
-                          if (
-                          */
-
-
-                  let pad = params[0] - (acc.length - 1);
+                  let pad = index - (acc.length - 1);
                   if (pad > 0) {
                       for (let i=0; i<=pad; i++) {
                           acc.push({ measures: {} });
@@ -1296,7 +1389,11 @@ class App extends Component {
                   };
 
                   let id = uuidv4();
-                  acc[params[0]].measures[id] = { ...newMeas, id, inst: params[0] };
+                  acc[index].measures[id] = { ...newMeas, id, inst: parseInt(inst_text[0], 10),
+                    schemas: {}, schemaIds: [], events: []};
+                  lastMeas = acc[index].measures[id];
+                  console.log(inst_text[1]);
+                  acc[index].name = inst_text[1];
                   return acc;
               }, []);
           logger.log(`Loaded ${numMeas} measures across ${numInst + 1} instruments.`);
