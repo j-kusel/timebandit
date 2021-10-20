@@ -1303,7 +1303,7 @@ export default function measure(p) {
             }
             instruments.forEach(inst => {
                 inst.ordered.forEach(meas => {
-                    meas.cache = Window.calculate_cache(('temp' in meas) ? meas.temp : meas)
+                    Object.assign(meas.cache, Window.calculate_cache(('temp' in meas) ? meas.temp : meas));
                     Window.event_system_cache(meas);
                 })
             });
@@ -1627,6 +1627,7 @@ export default function measure(p) {
                 let measure = Window.selected[meas.id];
                 Object.assign(measure.temp, meas);
                 measure.temp.invalid = {};
+                // should cache be assigned to here?
                 let cache = Window.calculate_cache(measure.temp);
                 Object.assign(measure, { cache });
             });
@@ -2230,75 +2231,70 @@ export default function measure(p) {
                     // sixth pass
                     if (Window.entry.mode) {
                         let note = Math.pow(2, Window.entry.duration);
-                        let basis = Math.max(note, meas.denom);
-                        let inc = meas.denom / basis;
                         let snaps = [];
-                        let ids = {};
-                        let count = 0;
-                        let PPB = Window.CONSTANTS.PPQ*(4/meas.denom);
-                        for (let i=0; i<meas.timesig; i+=inc) {
-                            snaps.push(i);
-                            let basis_ratio = basis / note;
-                            let meta = ids[i] = {
-                                schema: false, beat: [count+1, basis].join('/'),
-                                beat_start: i, beat_dur: inc * basis_ratio,
-                            }
-                            meta.nominal = [note + ': ' + meta.beat];
-                            meta.tick_start = meta.beat_start * PPB;
-                            meta.tick_dur = meta.beat_dur * PPB;
-                            count++;
-                        }
-                        if (meas.schemaIds.length) {
-                            let search = (schema, snaps) => {
-                                let s_snaps = [];
-                                let basis = Math.max(schema.basis, note);
-                                let ratio = schema.basis / basis;
-                                let dur_ratio = basis / note;
-                                inc = schema.beat_dur / schema.tuplet[0] * ratio;
-                                let count = 0;
-                                for (let i=0; lt(i, schema.beat_dur); i+=inc) {
-                                    let start = i+schema.beat_start;
-                                    s_snaps.push(start);
-                                    let meta = ids[start] = {
-                                        schema, beat: [count+1, basis].join('/'),
-                                        beat_start: start, beat_dur: inc * dur_ratio,
-                                    }
-                                    meta.nominal = [note + ': ' + meta.beat].concat(schema.nominal);
-                                    meta.tick_start = meta.beat_start * PPB;
-                                    meta.tick_dur = meta.beat_dur * PPB;
-                                    count++;
+                        let ids;
+                        if (!meas.cache.snaps)
+                            meas.cache.snaps = {}
+                        if (!(note in meas.cache.snaps)) {
+                            let basis = Math.max(note, meas.denom);
+                            let inc = meas.denom / basis;
+                            ids = {};
+                            let count = 0;
+                            let PPB = Window.CONSTANTS.PPQ*(4/meas.denom);
+                            for (let i=0; i<meas.timesig; i+=inc) {
+                                snaps.push(i);
+                                let basis_ratio = basis / note;
+                                let meta = ids[i] = {
+                                    schema: false, beat: [count+1, basis].join('/'),
+                                    beat_start: i, beat_dur: inc * basis_ratio,
                                 }
-                                if (schema.schemaIds && schema.schemaIds.length)
-                                    schema.schemaIds.forEach(id =>
-                                        search(schema.schemas[id], s_snaps)
+                                meta.nominal = [note + ': ' + meta.beat];
+                                meta.tick_start = meta.beat_start * PPB;
+                                meta.tick_dur = meta.beat_dur * PPB;
+                                count++;
+                            }
+                            if (meas.schemaIds.length) {
+                                let search = (schema, snaps) => {
+                                    let s_snaps = [];
+                                    let basis = Math.max(schema.basis, note);
+                                    let ratio = schema.basis / basis;
+                                    let dur_ratio = basis / note;
+                                    inc = schema.beat_dur / schema.tuplet[0] * ratio;
+                                    let count = 0;
+                                    for (let i=0; lt(i, schema.beat_dur); i+=inc) {
+                                        let start = i+schema.beat_start;
+                                        s_snaps.push(start);
+                                        let meta = ids[start] = {
+                                            schema, beat: [count+1, basis].join('/'),
+                                            beat_start: start, beat_dur: inc * dur_ratio,
+                                        }
+                                        meta.nominal = [note + ': ' + meta.beat].concat(schema.nominal);
+                                        meta.tick_start = meta.beat_start * PPB;
+                                        meta.tick_dur = meta.beat_dur * PPB;
+                                        count++;
+                                    }
+                                    if (schema.schemaIds && schema.schemaIds.length)
+                                        schema.schemaIds.forEach(id =>
+                                            search(schema.schemas[id], s_snaps)
+                                        );
+                                    let indices = [0,0];
+                                    snaps.some((s,i) =>
+                                        lte(schema.beat_start, s) && (indices[0] = i)
                                     );
-                                let indices = [0,0];
-                                let last = 0;
-                                snaps.some((s,i) => {
-                                    if (lte(schema.beat_start, s)) {
-                                        console.log(schema.beat_start, s);
-                                        return indices[0] = i;
-                                    }
-                                    last = i;
+                                    snaps.some((s,i) =>
+                                        lte(schema.beat_end, s) && (indices[1] = i)
+                                    );
+                                    snaps.splice(indices[0],indices[1]-indices[0], ...s_snaps);
+                                };
+                                meas.schemaIds.forEach(id => {
+                                    let schema = meas.schemas[id];
+                                    search(schema, snaps);
                                 });
-                                snaps.some((s,i) => {
-                                    if (lte(schema.beat_end, s)) {
-                                        console.log(schema.beat_end, s);
-                                        console.log(snaps[i-1],snaps[i],snaps[i+1]);
-                                        return indices[1] = i;
-                                    }
-                                    last = s;
-                                });
-                                let removed = snaps.splice(indices[0],indices[1]-indices[0], ...s_snaps);
-
-                                //removed.forEach(r => delete ids[r]);
-                            };
-                            meas.schemaIds.forEach(id => {
-                                let schema = meas.schemas[id];
-                                search(schema, snaps);
-                            });
+                            }
+                            meas.cache.snaps[note] = { snaps, ids };
                         }
-                        console.log(snaps);
+
+                        ({ snaps, ids } = meas.cache.snaps[note]);
 
                         let tick_perc = 1/meas.cache.ticks.length;
                         let perc;
@@ -2314,12 +2310,6 @@ export default function measure(p) {
                             }
                             last = tick;
                         });
-
-                        let in_schema = false;
-
-                        let beat = Math.round(frac/inc);
-
-
                         let beat_start;
                         last = 0;
                         snaps.some(s => {
@@ -2330,14 +2320,18 @@ export default function measure(p) {
                             }
                             last = s;
                         });
-                        console.log(beat_start);
                         let rollover = { meas, inst, type: 'entry', note }; 
+                        // remove conditional here?
                         if (beat_start in ids)
                             Object.assign(rollover, ids[beat_start]);
-                            //nominal, place, beat: (beat+1).toString(), note,
                             
                         Mouse.setRollover(rollover);
-                        Object.assign(Window.entry, Window.calculate_entry_cache(meas.cache, rollover.tick_start, rollover.tick_dur));
+                        Object.assign(Window.entry, 
+                            Window.calculate_entry_cache(
+                                meas.cache,
+                                rollover.tick_start,
+                                rollover.tick_dur
+                        ));
 
                         return true;
 
