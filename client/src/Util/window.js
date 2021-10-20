@@ -163,7 +163,7 @@ export default (p) => {
         toggle_entry() {
             this.entry = this.entry.mode ? {} : {
                 mode: true, duration: 2,
-                tuplet: [1,1]
+                tuplet: ["1","1"]
             };
         }
 
@@ -178,6 +178,7 @@ export default (p) => {
 
         toggle_entry_tuplet() {
             this.entry.tuplet_target ^= 1;
+            delete this.entry.timer;
         }
 
         initialize_menus(menus) {
@@ -187,21 +188,21 @@ export default (p) => {
         change_entry_tuplet(input) {
             let num = NUM.indexOf(input);
             if (num < 0) return;
-            this.entry.tuplet[this.entry.tuplet_target] = num;
-            this.recalc_entry_tuplet();
+            num = num.toString();
+            console.log(this.entry.timer);
+            if (this.entry.timer)
+                this.entry.tuplet[this.entry.tuplet_target] += num
+            else {
+                this.entry.tuplet[this.entry.tuplet_target] = num;
+                this.entry.timer = p.frameCount + 60;
+            }
+            console.log(this.entry.tuplet);
         }
 
         change_entry_duration(input) {
             let num = NUM.indexOf(input);
             if (num < 0) return;
             this.entry.duration = num;
-            this.recalc_entry_tuplet();
-        }
-
-        recalc_entry_tuplet() {
-            let quavers = 1 / Math.pow(2,this.entry.duration-2);
-            let original = this.CONSTANTS.PPQ * quavers;
-            original *= this.entry.tuplet[1] / this.entry.tuplet[0];
         }
 
         press_event(rollover) {
@@ -215,22 +216,21 @@ export default (p) => {
             console.log(event);
             Object.assign(this.entry, {
                 event, tuplet_target: 0,
-                tuplet: [1,1]
+                tuplet: ['1','1']
             });
-            event.tuplet = this.entry.tuplet;
+            //event.tuplet = this.entry.tuplet.map(t=>parseInt(t,10));;
         }
 
         confirm_event() {
             let event = this.entry.event;
+            event.tuplet = this.entry.tuplet.map(t=>parseInt(t,10));
             event.basis = Math.pow(2, this.entry.duration);
             let meas = event.meas;
 
             delete this.entry.event;
-            this.entry.tuplet = [1,1];
+            this.entry.tuplet = ["1","1"];
             this.entry.tuplet_target = 0;
-            this.recalc_entry_tuplet();
 
-            console.log(event);
             return event;
         }
 
@@ -1020,6 +1020,8 @@ export default (p) => {
         };
 
         drawEntryTuplet() {
+            if (this.entry.timer && this.entry.timer < p.frameCount)
+                delete this.entry.timer;
             p.push();
             p.translate(p.mouseX - c.PANES_WIDTH + 20, p.mouseY - 20);
             p.textAlign(p.CENTER, p.CENTER);
