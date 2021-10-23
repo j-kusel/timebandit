@@ -113,7 +113,7 @@ export default function measure(p) {
     var crowd_cache = false;
 
     // misc
-    var isPlaying = false;
+    //var isPlaying = false;
 
     // instantiate classes
     var Window = _Window(p);
@@ -300,6 +300,7 @@ export default function measure(p) {
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         console.log('REDRAWING');
+        console.log(props);
 
         instruments = props.instruments;
             
@@ -310,6 +311,7 @@ export default function measure(p) {
         Window.newInst = props.newInst;
         Window.mode = props.mode;
         Window.insts = props.instruments.length;
+        Window.markers = props.markers;
         Object.assign(API, props.API);
         Window.setUpdateViewCallback(API.reportWindow);
 
@@ -404,6 +406,12 @@ export default function measure(p) {
         // calculate insertMeas visual locations
         if ('beats' in Window.insertMeas)
             Window.insertMeas.cache = calculate_insertMeas_cache(Window.insertMeas);
+
+        // calculate marker caches
+        Object.keys(Window.markers).forEach(key => {
+            let marker = Window.markers[key];
+            marker.cache = Window.calculate_marker_cache(marker);
+        });
 
         // rewrite this
         logger.log('Recalculating snap divisions...');
@@ -875,7 +883,7 @@ export default function measure(p) {
         };
 
 
-        isPlaying = API.get('isPlaying');
+        Window.isPlaying = API.get('isPlaying');
 
         p.stroke(0);
         p.fill(0);
@@ -883,15 +891,15 @@ export default function measure(p) {
         p.textSize(12);
 
         
-        if (isPlaying) {
+        if (Window.isPlaying) {
             let tracking = API.exposeTracking().locator();
             // check for final measure here;
             if (tracking > Window.range.span[1] + 1000) {
-                isPlaying = false;
-                API.play(isPlaying, null);
+                Window.isPlaying = false;
+                API.play(Window.isPlaying, null);
             };
             let tracking_vis = tracking*Window.scale + Window.viewport;
-            p.line(tracking_vis, c.PLAYBACK_HEIGHT, tracking_vis, c.INST_HEIGHT*2 + c.PLAYBACK_HEIGHT);
+            p.line(tracking_vis, 0, tracking_vis, c.INST_HEIGHT*instruments.length);
         };
 
         Mouse.dragCursorUpdate();
@@ -921,8 +929,8 @@ export default function measure(p) {
         }
        
 
-        Window.drawPlayback();
-        Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc: Window.cursor_loc, isPlaying });
+        Window.drawPlayback(Mouse.rollover);
+        Window.drawTabs({ locator: API.exposeTracking().locator(), cursor_loc: Window.cursor_loc });
         Window.drawToolbar(Window.range);
 
         if (Window.newInst) {
@@ -1095,6 +1103,8 @@ export default function measure(p) {
                 return (Mouse.drag.mode === 'entry') ? 
                     Window.change_entry_tuplet(p.keyCode) : 
                     Window.change_entry_duration(p.keyCode);
+            } else if (Window.temp_marker.placed) {
+                return Window.name_marker(p.keyCode);
             } else if (NUM.indexOf(p.keyCode) > -1 && Window.modulation) {
                 e.preventDefault();
                 Window.change_modulation(p.keyCode);
@@ -1124,6 +1134,12 @@ export default function measure(p) {
             if (Window.insertMeas.confirmed) {
                 e.preventDefault();
                 return API.enterSelecting();
+            }
+            if (Window.temp_marker.placed) {
+                e.preventDefault();
+                let marker = _.pick(Window.temp_marker, ['start', 'end', 'name']);
+                Window.reset_marker();
+                API.updateMarker(marker);
             }
             if ('inst' in Window.instName) {
                 e.preventDefault();
@@ -1272,7 +1288,8 @@ export default function measure(p) {
         if (p.keyCode === SPACE) {
             (Window.mode === 1) ?
                 API.preview((p.mouseX - Window.viewport)/Window.scale) :
-                API.play((p.mouseX - Window.viewport)/Window.scale);
+                API.play((p.mouseX - Window.viewport)/Window.scale, 
+                    Window.loop.active && [Window.loop.start, Window.loop.end]);
             return;
         }
 
@@ -1314,7 +1331,14 @@ export default function measure(p) {
                 Object.assign(Window.entry, Window.calculate_entry_cache(meas.cache,
                     Mouse.rollover.tick_start, Mouse.rollover.tick_dur));
             }
+            
+            // calculate marker caches
+            Object.keys(Window.markers).forEach(key => {
+                let marker = Window.markers[key];
+                marker.cache = Window.calculate_marker_cache(marker);
+            });
 
+            Window.calculate_loop_cache();
         }
         if (API.pollSelecting('offset'))
             insertMeasSelecting();
@@ -1337,6 +1361,12 @@ export default function measure(p) {
 
         if (Mouse.cancel)
             return;
+
+        if (Mouse.rollover.type === 'marker')
+            return Mouse.markerMode();
+
+        if (Mouse.rollover.type === 'loop')
+            return Mouse.loopMode();
 
         if (Mouse.rollover.schema_info && Mouse.rollover.schema_info.schemaX)
             return API.deleteSchema(Mouse.rollover.meas, Mouse.rollover.schema);
@@ -1492,6 +1522,11 @@ export default function measure(p) {
 
         if (Mouse.drag.mode === 'menu')
             return;
+
+        if (Mouse.drag.mode === 'loop')
+            return Window.drag_loop(Mouse.rollover.side);
+        if (Mouse.drag.mode === 'marker')
+            return Window.drag_marker(Mouse.drag.x);
 
         // for metric modulation menu
         if (Window.modulation) {
@@ -2068,11 +2103,22 @@ export default function measure(p) {
             }
         }
 
+        if (Mouse.drag.mode === 'loop') {
+            if (Window.isPlaying && Window.loop.active)
+                API.changeLoop([Window.loop.start, Window.loop.end]);
+            return Mouse.resetDrag();
+        }
+
+        if (Mouse.drag.mode === 'marker') {
+            Window.release_marker();
+            Mouse.resetDrag();
+            return;
+        }
+
         if (Mouse.drag.mode === 'menu') {
-            console.log('menu clicked');
             Window.press_menu(Mouse.drag);
             Mouse.resetDrag();
-            console.log(Mouse.drag);
+            return;
         }
 
         if (Mouse.drag.mode === 'entry') {
@@ -2177,6 +2223,44 @@ export default function measure(p) {
             p.mouseY > 0 && p.mouseY < p.height
         )) {
             return false;
+        }
+
+
+        // marker rollover
+        if (p.mouseY < c.PLAYBACK_HEIGHT+6) {
+            let mouseX = p.mouseX - c.PANES_WIDTH - Window.viewport;
+            console.log(mouseX, Window.loop.cache.start, Window.loop.cache.end);
+            if (mouseX > Window.loop.cache.start-6 && mouseX < Window.loop.cache.end+6) {
+                let rollover = { type: 'loop' };
+                if (mouseX < Window.loop.cache.start + 6)
+                    rollover.side = 'start'
+                else if (mouseX > Window.loop.cache.end - 6)
+                    rollover.side = 'end';
+                Mouse.setRollover(rollover);
+                console.log(rollover);
+                return;
+            }
+            
+            // loop rollover
+            let rollover = { type: 'marker' };
+            Object.keys(Window.markers).some(key => {
+                let marker = Window.markers[key]; 
+                let cache = marker.cache;
+                let end = (cache.end || cache.start);
+                if (mouseX > cache.start-20 && mouseX < end+20) {
+                    rollover.marker = marker;
+                    //console.log(p.mouseY < 8 && p.mouseY > 2);
+                    //console.log((mouseX > end + 12) && (mouseX < end + 18));
+                    if (/*(p.mouseY < 8) &&
+                        (p.mouseY > 2) &&*/
+                        (mouseX > end + 12) &&
+                        (mouseX < end + 18)
+                    )
+                        rollover.X = true;
+                    return true;
+                }
+            });
+            return Mouse.setRollover(rollover);
         }
 
         Window.updateCursorLoc();

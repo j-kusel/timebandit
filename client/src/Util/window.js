@@ -49,6 +49,7 @@ export default (p) => {
             this.scroll = 0;
             this.span = [Infinity, -Infinity];
             this.cursor_loc = 0;
+            this.isPlaying = false;
 
             // modes: ESC, INS, EDITOR
             this.mode = 0;
@@ -77,6 +78,18 @@ export default (p) => {
             this.menu_open = false;
             this.menus = [];
 
+            this.markers = {};
+            this.temp_marker = {};
+
+            this.loop = {
+                start: 0,
+                end: 2000,
+                cache: {
+                    start: 0,
+                    end: 2000,
+                },
+                active: true
+            };
 
             // monkey patch selection color
             let sel_color = p.color(colors.contrast);
@@ -213,7 +226,6 @@ export default (p) => {
                 'tick_start', 'tick_dur', 'schema',
                 'nominal', 'place', 'beat', 'note'
             ]);
-            console.log(event);
             Object.assign(this.entry, {
                 event, tuplet_target: 0,
                 tuplet: ['1','1']
@@ -233,6 +245,80 @@ export default (p) => {
 
             return event;
         }
+
+        press_marker() {
+            let origin = this.x_to_ms(p.mouseX);
+            this.temp_marker = { origin, start: origin, placed: false };
+            this.temp_marker.cache = this.calculate_marker_cache(this.temp_marker);
+        }
+
+        drag_marker(dist) {
+            let dist_ms = dist / this.scale;
+            let m = this.temp_marker;
+            if (Math.abs(dist_ms) > c.MARKER_THRESHOLD) {
+                let final = m.origin + dist_ms;
+                m.start = Math.min(final, m.origin);
+                m.end = Math.max(final, m.origin);
+            } else {
+                delete m.end;
+                m.start = m.origin;
+            }
+            this.temp_marker.cache = this.calculate_marker_cache(this.temp_marker);
+        }
+
+        release_marker() {
+            this.temp_marker.placed = true;
+            this.temp_marker.name = '';
+            this.temp_marker.pointer = 0;
+        }
+
+        name_marker(input) {
+            let m = this.temp_marker;
+            let del = () =>
+                (m.pointer !== 0) &&
+                    (m.name =
+                        m.name.slice(0, m.pointer - 1)
+                        + m.name.slice(m.pointer--));
+            switch (input) {
+                case DEL:
+                    del();
+                    break;
+                case BACK:
+                    del();
+                    break;
+                case LEFT:
+                    (m.pointer !== 0) && m.pointer--;
+                    break;
+                case RIGHT:
+                    (m.pointer < m.name.length) && m.pointer++;
+                    break;
+                default:
+                    let char;
+                    if (input in LETTERS)
+                        char = LETTERS[input]
+                    else {
+                        let num = NUM.indexOf(input);
+                        if (num >= 0)
+                            char = num
+                    }
+                    m.name = m.name.slice(0, m.pointer) + char +
+                        m.name.slice(m.pointer++);
+            }
+        }
+
+        reset_marker() {
+            this.temp_marker = {};
+        }
+
+        drag_loop(side) {
+            let update = this.x_to_ms(p.mouseX - c.PANES_WIDTH);
+            // restrict loop change relative to other side
+            this.loop[side] = side === 'start' ?
+                Math.min(update, this.loop.end) :
+                Math.max(update, this.loop.start);
+            this.calculate_loop_cache();
+        }
+
 
         enter_instName(inst, oldName) {
             this.instName = {
@@ -735,6 +821,18 @@ export default (p) => {
                     event.cache = this.calculate_event_cache(meas.cache, event));
         }
 
+        calculate_marker_cache(marker) {
+            let cache = { start: marker.start * this.scale };
+            if (marker.end)
+                cache.end = marker.end * this.scale;
+            return cache;
+        }
+
+        calculate_loop_cache() {
+            this.loop.cache.start = this.loop.start * this.scale;
+            this.loop.cache.end = this.loop.end * this.scale;
+        }
+
         setRangeRefresh(refresh) {
             this.rangeRefresh = refresh;
         }
@@ -997,6 +1095,116 @@ export default (p) => {
             this.menus[this.menu_open].draw([p.mouseDown.x, p.mouseDown.y], hover);
         }
 
+        drawMarker(m, hover) {
+            p.push();
+            let start = this.viewport + m.cache.start;
+            p.translate(start, 0);
+            p.quad(0, 0, -20, 0, -20, 16, 0, c.PLAYBACK_HEIGHT);
+            if ('end' in m) {
+                p.push();
+                let light = p.color(colors.primary);
+                light.setAlpha(hover ? 200 : 100);
+                p.stroke(light);
+                p.fill(light);
+                let width = m.cache.end - m.cache.start;
+                p.rect(0, 0, width, c.PLAYBACK_HEIGHT);
+                p.pop();
+                p.translate(width, 0);
+            }
+            p.quad(0, 0, 20, 0, 20, 16, 0, c.PLAYBACK_HEIGHT);
+            // draw X
+            if (hover) {
+                p.stroke(colors.secondary); 
+                p.fill(colors.secondary); 
+                p.textAlign(p.LEFT, p.TOP);
+                p.text('X', 12, 2);
+            }
+            p.pop();
+            if (m.placed || m.name) {
+                p.push();
+                ('end' in m) ?
+                    p.textAlign(p.LEFT, p.TOP) :
+                    p.textAlign(p.CENTER, p.TOP);
+                p.translate(start + ('end' in m ? 4:0), 2);
+                p.stroke(colors.secondary);
+                p.fill(colors.secondary);
+                p.text(m.name, 0, 0);
+                if (m.placed && (p.millis() % 1000 > 500)) {
+                    let w = p.textWidth(m.name.slice(0, m.pointer));
+                    if (!m.cache.end)
+                        w -= p.textWidth(m.name) * 0.5;
+                    p.line(w, 0, w, 12);
+                }
+                p.pop();
+            }
+        }
+
+        drawMarkers(ro) {
+            p.push();
+            let col = p.color(colors.primary);
+            col.setAlpha(200);
+            p.stroke(col);
+            p.fill(col);
+            if ('start' in this.temp_marker)
+                this.drawMarker(this.temp_marker);
+            Object.keys(this.markers).forEach(key => {
+                let hover = ro.marker && ro.marker.start.toString() === key;
+                this.drawMarker(this.markers[key], hover);
+            });
+            p.pop();
+        }
+
+        drawLoop(ro) {
+            let cache = this.loop.cache;
+            if ((cache.start < 0 && cache.end < 0) ||
+                (cache.start > p.windowWidth && cache.end > p.windowWidth)
+            ) return;
+            p.push();
+            p.translate(c.PANES_WIDTH + cache.start + this.viewport, c.PLAYBACK_HEIGHT);
+            p.strokeWeight(4);
+            let col = p.color(colors.accent);
+            p.strokeCap(p.SQUARE);
+            p.stroke(col);
+            p.fill(col);
+            p.line(0, 0, cache.end - cache.start, 0);
+            p.strokeWeight(1);
+            if (this.isPlaying || ro.type === 'loop') {
+                p.push();
+                if (ro.side === 'start') {
+                    col.setAlpha(100);
+                    p.fill(col);
+                }
+                p.circle(0, 0, 8);
+                p.pop();
+                col.setAlpha(255);
+                p.push();
+                if (ro.side === 'end') {
+                    col.setAlpha(100);
+                    p.fill(col);
+                }
+                let last = cache.end - cache.start;
+                p.circle(last, 0, 8);
+                p.pop();
+                p.push();
+                let gradient_width = 24;
+                let start = p.color(colors.accent);
+                let end = p.color(colors.accent);
+                start.setAlpha(20);
+                end.setAlpha(0);
+                while (gradient_width--) {
+                    p.stroke(p.lerpColor(start, end, gradient_width/10))
+                    p.line(gradient_width, 0, gradient_width, p.windowHeight);
+                    p.line(last - gradient_width, 0, last - gradient_width, p.windowHeight);
+                }
+                end.setAlpha(10);
+                p.fill(end);
+                p.rect(gradient_width, 0, last - gradient_width*2, p.windowHeight);
+                p.pop();
+
+            }
+            p.pop();
+        }
+
         drawEvent(event, ro) {
             let position = event.cache.ms_start;
             let duration = event.cache.ms_dur;
@@ -1081,7 +1289,7 @@ export default (p) => {
             p.pop();
         }
 
-        drawPlayback() {
+        drawPlayback(ro) {
             // DRAW TOP BAR
             p.stroke(secondary);
             p.fill(secondary);
@@ -1162,6 +1370,9 @@ export default (p) => {
                 p.fill(s);
                 p.line(c.PANES_WIDTH, c.PLAYBACK_HEIGHT + depth + 1, p.width, c.PLAYBACK_HEIGHT + depth + 1);
             }
+
+            this.drawMarkers(ro);
+            this.drawLoop(ro);
         }
 
         drawPrinter(pages) {
@@ -1302,7 +1513,7 @@ export default (p) => {
 
         }
 
-        drawTabs({ locator, cursor_loc, isPlaying }) {
+        drawTabs({ locator, cursor_loc }) {
             
             p.push();
             // draw tabs
@@ -1321,7 +1532,7 @@ export default (p) => {
             p.fill(secondary);
             p.textAlign(p.LEFT, p.TOP);
             p.textSize(10);
-            p.text(isPlaying ? `LOCATION: ${Math.round(locator)}` : `CURSOR: ${cursor_loc}`,
+            p.text(this.isPlaying ? `LOCATION: ${Math.round(locator)}` : `CURSOR: ${cursor_loc}`,
                 c.TRACKING_PADDING.X, c.TRACKING_PADDING.Y);
             // right
             p.textAlign(p.RIGHT, p.TOP);

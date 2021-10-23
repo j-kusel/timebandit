@@ -155,6 +155,15 @@ export default (p, Window) => {
             return false;
         };
 
+        markerMode() {
+            this.drag.mode = 'marker';
+            Window.press_marker();
+        }
+
+        loopMode() {
+            this.drag.mode = 'loop';
+        }
+
         pasteMode(breaks) {
             this.move.type = 'paste';
             this.move.center = (breaks.span[1] - breaks.span[0]) * 0.5;

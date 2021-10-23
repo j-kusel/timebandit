@@ -30,6 +30,8 @@ for (let i=0; i < 5; i++) {
 };
 */
 
+
+
 const WAVES = ['sine', 'square', 'sawtooth', 'triangle'];
 
 class _AudioInst {
@@ -155,6 +157,7 @@ var PARAMS = {
     adsr: [50, 200, 0.5, 10],
     lookahead: 25.0, // scheduling buffer frequency in ms
     scheduleAheadTime: 0.1, // scheduling buffer length in seconds
+    loop: false
 };
 
 var timerIDs = [];
@@ -177,27 +180,58 @@ var trigger = (event, params) => {
 
 // time handled in seconds
 function scheduler(start, node, audioIds) {
+    // if looping is active, "shift" start time
+    // by the length of the loop
+
+    // schedule upcoming buffer
     let b_start = aC.currentTime*1000 - start;
     let b_end = b_start + PARAMS.scheduleAheadTime * 1000.0;
+    let new_start, new_end;
+    let excess;
+    if (PARAMS.loop) {
+        let loop = PARAMS.loop[1] - PARAMS.loop[0];
+        if (b_start > PARAMS.loop[1]) {
+            start += loop;
+            b_start -= loop;
+            b_end -= loop;
+            PARAMS.loop_counter++;
+        } else if (b_end > PARAMS.loop[1]) {
+            // how long until we reach the loop end? 
+            excess = b_end - PARAMS.loop[1];
+            b_end -= excess;
+            new_start = b_start - (loop);
+            new_end = new_start +PARAMS.scheduleAheadTime * 1000.0;
+        }
+    }
+
     let candidates = [];
-    console.log(node);
+
+    let s_start, s_end;
+    [s_start, s_end] = [b_start, b_end];
 
     let search = (n) => {
         if (n === undefined)
             return;
         let next = [];
-        if (n.loc > b_start && n.loc < b_end) {
-            candidates.push({ time: n.loc - b_start, inst: n.meas.map(m => audioIds[m.inst]) });
+        if (n.loc > s_start && n.loc < s_end) {
+            candidates.push({ time: n.loc - s_start, inst: n.meas.map(m => audioIds[m.inst]) });
             next.push(n.left);
             next.push(n.right);
-        } else if (n.loc > b_end)
+        } else if (n.loc > s_end)
             next.push(n.left)
-        else if (n.loc < b_start)
+        else if (n.loc < s_start)
             next.push(n.right);
         next.forEach(nx => search(nx));
     }
 
+    // search through once for remaining buffer
     search(node);
+    if (PARAMS.loop && excess) {
+        // update starts and search again at loop beginning
+        s_start = new_start;
+        s_end = new_end;
+        search(node);
+    }
         
     timerIDs.forEach(id => clearTimeout(id));
     timerIDs = [];
@@ -212,16 +246,21 @@ function scheduler(start, node, audioIds) {
     timerIDs.push(new_id);
 };
 
-var playback = (isPlaying, score, tracking, audioIds) => {
-    console.log(audioIds);
+var playback = (isPlaying, score, tracking, audioIds, loop) => {
     tracking = tracking || 0;
     if (isPlaying) {
         locator = {
             origin: tracking/1000.0,
             start: aC.currentTime
         };
+        console.log(locator);
         if (aC.state === 'suspended')
             aC.resume();
+        if (loop && tracking <= loop[1]) {
+            PARAMS.loop = loop;
+            PARAMS.loop_counter = 0;
+        } else
+            PARAMS.loop = false;
         //score.map((inst, ind) => scheduler(aC.currentTime - (tracking/1000.0), ind, inst[1].map(x => x*0.001)));
         scheduler(aC.currentTime*1000 - tracking, score, audioIds);
     } else {
@@ -239,6 +278,12 @@ var playback = (isPlaying, score, tracking, audioIds) => {
     volumes[target].gain.cancelScheduledValues(aC.currentTime);
     volumes[target].gain.linearRampToValueAtTime(vol, aC.currentTime + 0.1);
 }*/
+
+var loop = (range) => {
+    if (!range)
+        return PARAMS.loop = false;
+    PARAMS.loop = range;
+};
 
 var mute = (target, bool) => {
     insts[target].mute.gain.cancelScheduledValues(aC.currentTime);
@@ -268,6 +313,7 @@ var audio = {
     setType,
     getFrequency,
     setFrequency,
+    loop,
     mute,
     solo,
     set: (param, val) => {
@@ -277,7 +323,13 @@ var audio = {
     triggerHook: (func) => trigger_hooks.push(func),
     schedulerHook: (func) => scheduler_hooks.push(func),
     context: aC,
-    locator: () => (aC.currentTime - locator.start + locator.origin)*1000.0,
+    locator: () => {
+        let seconds = aC.currentTime - locator.start + locator.origin;
+        let ms = seconds * 1000.0;
+        if (PARAMS.loop && PARAMS.loop_counter)
+            ms -= PARAMS.loop_counter * (PARAMS.loop.[1]-PARAMS.loop.[0]);
+        return ms;
+    },
     WAVES
 }
 

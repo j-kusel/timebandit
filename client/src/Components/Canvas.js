@@ -29,6 +29,7 @@ class UI extends Component {
         */
         if (nextProps.mode !== this.props.mode ||
             nextProps.newInst !== this.props.newInst ||
+            nextProps.markers !== this.props.markers ||
             !_.isEqual(nextProps.insertMeas, this.props.insertMeas) ||
             !_.isEqual(nextProps.editMeas, this.props.editMeas) ||
             // does registerTuts work here?
@@ -85,7 +86,7 @@ class UI extends Component {
         return (
             <div>
                 <P5Container>
-                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} editMeas={this.props.editMeas} insertMeas={this.props.insertMeas} newInst={this.props.newInst} mode={this.props.mode} locks={this.props.locks} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
+                    <P5Wrapper key={1} className="p5" sketch={measure} instruments={this.props.instruments} editMeas={this.props.editMeas} insertMeas={this.props.insertMeas} newInst={this.props.newInst} mode={this.props.mode} locks={this.props.locks} markers={this.props.markers} API={this.props.API} CONSTANTS={this.props.CONSTANTS} />
                 </P5Container>
             </div>
         );

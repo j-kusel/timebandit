@@ -84,6 +84,7 @@ class App extends Component {
               name: 'default',
               measures: {}
           }*/],
+          markers: {},
           ordered: {},
           cursor: 0.0,
           start: '',
@@ -316,6 +317,22 @@ class App extends Component {
           });
       }
 
+      var updateMarker = (marker) => {
+          self.setStateHistory(oldState => {
+            let markers = Object.assign({}, oldState.markers);
+            markers[marker.start] = marker;
+            return ({ markers });
+          });
+      }
+
+      var deleteMarker = (marker) => {
+          self.setStateHistory(oldState => {
+            let markers = Object.assign({}, oldState.markers);
+            delete markers[marker.start];
+            return ({ markers });
+          });
+      }
+
       var deleteEvent = (measure, event) => {
           self.setStateHistory(oldState => {
               let instruments = oldState.instruments;
@@ -534,10 +551,14 @@ class App extends Component {
           });
       };
 
-      var play = (cursor) => {
+      var play = (cursor, loop) => {
           logger.log(`Starting playback at ${cursor}ms.`);
-          this.play(!this.state.isPlaying, cursor ? cursor : 0);
+          this.play(!this.state.isPlaying, cursor ? cursor : 0, loop);
       };
+
+      var changeLoop = (loop) => {
+          // add this later!
+      }
 
       var preview = (cursor) => {
           this.preview(!this.state.isPreviewing);
@@ -661,7 +682,7 @@ class App extends Component {
           //return measure;
       };
 
-      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, deleteSchema, updateInst, updateMeasure, updateEvent, deleteEvent, newCursor, displaySelected, exportSelected, paste, play, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
+      return { undo, redo, printoutSet, printoutCheck, registerTuts, registerPollingFlag, modalCheck, newFile, newInstrument, newMeasure, toggleInst, pollSelecting, confirmPoll, confirmSelecting, enterSelecting, get, deleteMeasure, deleteSchema, updateInst, updateMeasure, updateMarker, deleteMarker, updateEvent, deleteEvent, newCursor, displaySelected, exportSelected, paste, play, changeLoop, preview, exposeTracking, updateMode, reportWindow, disableKeys, updateEdit, checkFocus };
   }
 
   /**
@@ -760,7 +781,12 @@ class App extends Component {
       this.setStateHistory(oldState => {
           let instruments = oldState.instruments;
           let id = uuidv4();
-          instruments[inst].measures[id] = { ...calc, id, inst };
+          instruments[inst].measures[id] = { 
+              ...calc, 
+              id, inst, schemas: {},
+              schemaIds: [], events: [],
+          };
+
           let [start, end, timesig, denom, offset] = ['', '', '', '', ''];
           let temp_start = false;
           let temp_end = false;
@@ -1105,7 +1131,7 @@ class App extends Component {
 
   };
 
-  play(isPlaying, cursor) {
+  play(isPlaying, cursor, loop) {
       if (this.state.mouseBlocker())
           return;
 
@@ -1118,16 +1144,17 @@ class App extends Component {
           var root;
           this.state.instruments.forEach((inst, i_ind) =>
               Object.keys(inst.measures).forEach((key) => {
-                inst.measures[key].beats.forEach((beat) =>
+                  let meas = inst.measures[key];
+                meas.beats.forEach((beat) =>
                     root = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], root)
                 );
               })
           );
 
-          audio.play(isPlaying, root, cursor, audioIds);
+          audio.play(isPlaying, root, cursor, audioIds, loop);
           newState.ordered = root;
       } else
-          audio.play(isPlaying, this.state.ordered, cursor, audioIds);
+          audio.play(isPlaying, this.state.ordered, cursor, audioIds, loop);
 
       document.activeElement.blur();
       newState.isPlaying = isPlaying;
@@ -1177,6 +1204,10 @@ class App extends Component {
         ['inst', 'start', 'end', 'timesig', 'denom', 'offset']
       ];
 
+      Object.keys(this.state.markers).forEach(key => {
+        let marker = this.state.markers[key];
+        rows.push(['marker-' + marker.name, marker.start, marker.end]);
+      });
       Object.keys(insts).forEach((inst) => 
           Object.keys(insts[inst].measures).forEach((measure) => {
               let meas = insts[inst].measures[measure];
@@ -1305,10 +1336,20 @@ class App extends Component {
             return { current, params, frac };
           }
           let schema_cache = {};
+          let markers = {};
           let instruments = rows
               .slice(2) // remove headers
               .reduce((acc, line) => {
                   let param = line.split(',');
+
+                  // add markers
+                  if (param.length && param[0].indexOf('marker') === 0) {
+                    let name = param[0].split('-')[1];
+                    markers[param[1]] = { name, start: param[1] };
+                    if (param[2])
+                      markers[param[1]].end = param[2];
+                    return acc;  
+                  }
 
                   // add events
                   if (param.length && !param[0]) {
@@ -1363,7 +1404,6 @@ class App extends Component {
                         (event.tick_start < n.tick_start) && lastMeas.events.splice(i, 0, event)
                     ))
                         lastMeas.events.push(event);
-                    console.log(lastMeas.events);
                     
                     return acc;
                   }
@@ -1513,6 +1553,7 @@ class App extends Component {
 			measures: Object.assign({}, inst.measures), 
 			name: inst.name
 		})),
+        markers: this.state.markers,
 		newInst: this.state.newInst,
 	  editMeas: this.state.editMeas,
 	  insertMeas: this.state.insertMeas,
