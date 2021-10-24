@@ -422,15 +422,14 @@ export default function measure(p) {
                 inst.ordered.forEach((measure) => {
                     let divisor = measure.denom / 4;
                     let div_mod = div / divisor;
-                    for (let i=0; i < measure.ticks.length; i += div_mod) {
+                    for (let i=0; lte(i, measure.ticks.length); i += div_mod) {
                         let tick = Math.round(i);
                         let target = (tick >= measure.ticks.length) ?
                             measure.ms : measure.ticks[tick];
                         let loc = (target + measure.offset).toString();
                         let obj = { inst: i_ind, meas: measure.id };
-                        if (loc in add_snaps)
-                            add_snaps[loc].push(obj)
-                        else
+                        loc in add_snaps ?
+                            add_snaps[loc].push(obj) :
                             add_snaps[loc] = [obj];
                     };
                 }) , {});
