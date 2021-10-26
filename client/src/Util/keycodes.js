@@ -1,7 +1,7 @@
 const [SHIFT, ALT, SPACE, DEL, BACK, ESC, PERIOD] = [16, 18, 32, 46, 8, 27, 190];
 const [TAB, ENTER] = [9, 13];
 let mac = window.navigator.platform.indexOf('Mac') >= 0;
-let chrome = window.navigator.userAgent.indexOf('Chrome') >= 0;
+//let chrome = window.navigator.userAgent.indexOf('Chrome') >= 0;
 let firefox = window.navigator.userAgent.indexOf('Firefox') >= 0;
 
 

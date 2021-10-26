@@ -3,7 +3,7 @@
  * @module sketch
  */
 
-import { order_by_key, check_proximity_by_key, parse_bits, crowding, initial_gap, anticipate_gap, calc_gaps, global_gaps, abs_location } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, crowding, calc_gaps, global_gaps } from '../Util/index.js';
 import { lt, lte, gt, gte } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
@@ -19,9 +19,9 @@ import { Debugger } from '../Util/debugger.js';
 import Printer from '../Util/printer.js';
 import keycodes from '../Util/keycodes.js';
 import { NUM, LETTERS } from '../Util/keycodes.js';
-import { CTRL, MOD, SHIFT, LEFT, UP, RIGHT, DOWN, PERIOD } from '../Util/keycodes.js';
+import { CTRL, MOD, LEFT, RIGHT, PERIOD } from '../Util/keycodes.js';
 import { SPACE, DEL, BACK, ESC } from '../Util/keycodes.js';
-import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, KeyC, KeyV, KeyZ } from '../Util/keycodes.js';
+import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, /*KeyC, KeyV, KeyZ*/ } from '../Util/keycodes.js';
 import tutorials from '../Util/tutorials/index.js';
 import { MenuComposer } from '../Util/menus.js';
 
@@ -29,7 +29,6 @@ const DEBUG = process.env.NODE_ENV === 'development';
 const SLOW = process.env.NODE_ENV === 'development';
 
 var API = {};
-var input;
 
 var conflict = [Infinity, -Infinity];
 var obstacles = [Infinity, -Infinity];
@@ -186,7 +185,7 @@ export default function measure(p) {
                     Window.insertMeas.temp_offset = crowd_end - Window.insertMeas.ms
                 else
                     Window.insertMeas.temp_offset = x_loc;
-                Window.insertMeas.cache.offset = Window.ms_to_x(Window.insertMeas.temp_offset);
+                Window.insertMeas.cache.offset = Window.insertMeas.temp_offset * Window.scale;
 
             }
         }
@@ -300,7 +299,6 @@ export default function measure(p) {
 
     p.myCustomRedrawAccordingToNewPropsHandler = function (props) { 
         console.log('REDRAWING');
-        console.log(props);
 
         instruments = props.instruments;
             
@@ -352,15 +350,6 @@ export default function measure(p) {
             } else
                 return false;
         });
-        */
-
-        // I have NO idea what beat lock does here... some kind of insurance against the main react app shifting a measure?
-        var beat_lock = {};
-        /*if (Window.selected.meas && 'locks' in Window.selected.meas) {
-            let lock_candidates = Object.keys(Window.selected.meas.locks);
-            if (lock_candidates.length)
-                beat_lock = { beat: lock_candidates[0], type: Window.selected.meas.locks[lock_candidates[0]] };
-        }
         */
 
         // redraw simply clears temp?
@@ -864,7 +853,7 @@ export default function measure(p) {
         // INSERT MODE
         if (Window.mode === 1 && 'beats' in Window.insertMeas) {
             p.push();
-            p.translate(Window.insertMeas.cache.offset, Window.insertMeas.inst*c.INST_HEIGHT);
+            p.translate(Window.insertMeas.cache.offset+Window.viewport, Window.insertMeas.inst*c.INST_HEIGHT);
             p.rect(0, 0, Window.insertMeas.cache.ms, c.INST_HEIGHT);
             p.stroke(255, 0, 0);
             Window.insertMeas.cache.beats.forEach(beat => p.line(beat, 0, beat, c.INST_HEIGHT));
@@ -1323,13 +1312,14 @@ export default function measure(p) {
                     Window.event_system_cache(meas);
                 })
             });
-            if (Mouse.rollover && Mouse.rollover.type === 'entry') {
-                let meas = Mouse.rollover.meas;
-                let PPQ_adjust = Window.CONSTANTS.PPQ*(4/meas.denom);
+            if (Mouse.rollover && Mouse.rollover.type === 'entry')
                 // WHY IS DURATION STORED AS TICKS BUT BEAT ISN'T??
-                Object.assign(Window.entry, Window.calculate_entry_cache(meas.cache,
-                    Mouse.rollover.tick_start, Mouse.rollover.tick_dur));
-            }
+                Object.assign(Window.entry,
+                    Window.calculate_entry_cache(
+                        Mouse.rollover.meas.cache,
+                        Mouse.rollover.tick_start,
+                        Mouse.rollover.tick_dur
+                    ));
             
             // calculate marker caches
             Object.keys(Window.markers).forEach(key => {
@@ -2258,6 +2248,7 @@ export default function measure(p) {
                         rollover.X = true;
                     return true;
                 }
+                return false;
             });
             return Mouse.setRollover(rollover);
         }
@@ -2268,6 +2259,7 @@ export default function measure(p) {
             return Mouse.move.filter_move();
 
         if (API.pollSelecting('offset')) {
+            console.log(Window.insertMeas);
             insertMeasSelecting();
             API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale, { insertMeas: Window.insertMeas.temp_offset });
             // return without changing rollover??
@@ -2392,6 +2384,7 @@ export default function measure(p) {
                                 return true;
                             }
                             last = tick;
+                            return false;
                         });
                         let beat_start;
                         last = 0;
@@ -2402,6 +2395,7 @@ export default function measure(p) {
                                 return true;
                             }
                             last = s;
+                            return false;
                         });
                         let rollover = { meas, inst, type: 'entry', note }; 
                         // remove conditional here?
@@ -2440,6 +2434,7 @@ export default function measure(p) {
                                 return true;
                             }
                             last = tick;
+                            return false;
                         });
 
                         let in_schema = false;
@@ -2451,7 +2446,6 @@ export default function measure(p) {
                             place.join('/')
                         ];
                         let beat_start = beat * inc;
-                        let stack = [];
                         let traverse = (frac, child) => {
                             if (!child.schemas)
                                 return child;
@@ -2460,6 +2454,7 @@ export default function measure(p) {
                                 let schema = child.schemas[id];
                                 if (gte(frac, schema.beat_start) && lt(frac, schema.beat_end))
                                     return in_schema = traverse(frac, schema);
+                                return false;
                             }))
                                 return in_schema;
                             return child;
@@ -2544,7 +2539,6 @@ export default function measure(p) {
                     }
 
                     // check markings
-                    let bounds = meas.cache.bounding;
                     if (['start_tempo_marking', 'end_tempo_marking', 'timesig_marking'].some((type, ind) => {
                         let bounds = meas.cache.bounding[ind];
                         if (frameXmeas > bounds[0] && frameXmeas < bounds[2] && 
@@ -2599,6 +2593,7 @@ export default function measure(p) {
                             Mouse.setRollover({ type: 'event', inst, meas, schema, schema_info, event });
                             return true;
                         }
+                        return false;
                     })) return true;
 
                     // check for beat rollover

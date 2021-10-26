@@ -10,7 +10,6 @@ let selected_obj = {
 };
 
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
-    let old_slope = oldMeas.end - oldMeas.start;
     let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
     let lock_percent = beat_lock.beat / oldMeas.timesig;
     if (type === 'start')
@@ -20,26 +19,6 @@ let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     return newMeas;
 
 }
-
-// generates measure.gaps in 'measure' drag mode
-var calcGaps = (measures, id) => {
-    var last = false;
-    // ASSUMES MEASURES ARE IN ORDER
-    return measures.reduce((acc, meas, i) => {
-        // skip measure in question
-        if (id && (meas.id === id))
-            return acc;
-        acc = [...acc, [
-            (last) ? last.offset + last.ms : -Infinity,
-            meas.offset
-        ]];
-        last = meas;
-        return acc;
-    }, [])
-        .concat([[ last.offset + last.ms, Infinity ]]);
-};
-
-
 
 export default (p) => {
     class _Window {
@@ -237,7 +216,6 @@ export default (p) => {
             let event = this.entry.event;
             event.tuplet = this.entry.tuplet.map(t=>parseInt(t,10));
             event.basis = Math.pow(2, this.entry.duration);
-            let meas = event.meas;
 
             delete this.entry.event;
             this.entry.tuplet = ["1","1"];
@@ -695,8 +673,6 @@ export default (p) => {
                 last = next;
             });
 
-            let bounding = [];
-
             // calculate tempo marking placement
             let sigfig = this.scale > 0.05 ? 2 : 0;
             let start_fixed = start.toFixed(sigfig);
@@ -1024,7 +1000,6 @@ export default (p) => {
                 let schema = measure.schemas[id];
                 let start = schema.cache.ms_start;
                 let end = schema.cache.ms_end;
-                let halfway = (start + end) * 0.5;
 
                 p.push();
                 let col = p.color(colors.contrast_lighter);
@@ -1394,8 +1369,6 @@ export default (p) => {
             p.fill(100);
 
             let text = [];
-            let blink = false;
-            let next;
             if (this.scale > 0.03) {
                 p.translate(c.TIMESIG_PADDING, 0);
                 p.textSize(c.INST_HEIGHT*0.25);
@@ -1621,11 +1594,6 @@ export default (p) => {
                 delete mod.timerRight;
             }
             p.push();
-            let tempo = mod.next || mod.base;
-            let x = ('tick' in mod ? 
-                    mod.meas.cache.ticks[mod.tick] :
-                    mod.meas.cache.beats[mod.beat])
-                + mod.meas.cache.offset + this.viewport;
 
             p.translate(mod.origin.x(), mod.origin.y());
 
@@ -1671,7 +1639,6 @@ export default (p) => {
             }
             p.textAlign(p.CENTER, p.CENTER);
             let pow2 = [32,16,8,4,2];
-            let [l, r] = [mod.divLeft, mod.divRight];
             let text = [
                 /*(l && l>2) ? pow(l) :*/ pow2,
                 /*(r && r>2) ? pow(r) :*/ pow2

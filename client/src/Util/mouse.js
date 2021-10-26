@@ -1,7 +1,5 @@
 //import _ from 'lodash';
 import c from '../config/CONFIG.json';
-import { bit_toggle, parse_bits } from './index.js';
-import _ from 'lodash';
 
 /*var drag_cursors = {
     'tempo': 'ns-resize',
@@ -10,16 +8,6 @@ import _ from 'lodash';
     'beat': 'text'
 };
 */
-
-var cursors = {
-    'tempo': (__) => 'ns-resize',
-    'inst': (__) => 'default',
-    'printerDelete': (__) => 'pointer',
-    'measure': (mods) => 
-        mods.shift ? 'ew-resize' : 'default',
-    'beat': (mods) =>
-        mods.ctrl ? (mods.shift ? 'text' : 'pointer') : 'default'
-};
 
 var DRAG_DEFAULT = { x: 0, y: 0, mode: '' };
 var MOVE_DEFAULT = { x: 0, y: 0, mode: '' };
@@ -136,7 +124,6 @@ export default (p, Window) => {
                 return true;
             }
 
-            let inst = Math.floor((p.mouseY-c.PLAYBACK_HEIGHT)/c.INST_HEIGHT);
             // check for editor menus
             /*if (Window.mode === 2 && Window.selected.meas) {
                 let selStart = c.PANES_WIDTH + Window.selected.meas.offset*Window.scale + Window.viewport;
@@ -167,9 +154,6 @@ export default (p, Window) => {
         pasteMode(breaks) {
             this.move.type = 'paste';
             this.move.center = (breaks.span[1] - breaks.span[0]) * 0.5;
-            console.log(breaks);
-            let mouse_start = Window.x_to_ms(p.mouseX - c.PANES_WIDTH);
-            let origin = breaks.span;
             // search takes mouse drag and breaks
             let search_l = (x, b) => {
                 if (!b)

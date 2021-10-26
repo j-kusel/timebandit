@@ -8,7 +8,6 @@ import audio from './Audio/audio';
 // logos
 import github from './static/GitHub-Mark-32px.png';
 import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
-import styled from 'styled-components';
 
 import { MeasureCalc, SchemaCalc, EventCalc, order_by_key } from './Util/index';
 import ordered from './Util/ordered';
@@ -17,17 +16,15 @@ import { Parser } from './Util/parser';
 import UI from './Components/Canvas';
 import Server from './Components/Server';
 import Mixer from './Components/Mixer';
-import { InputGroup, FormControl, Container, Row, Col } from 'react-bootstrap';
-import { TBButton, Splash, FormInput, Module, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Ext, Footer, Upload, Submit, Playback, AudioButton, Lock } from 'bandit-lib';
+import { InputGroup, Container, Row, Col } from 'react-bootstrap';
+import { TBButton, Splash, FormInput, PlusButton, ArrowButton, NewInst, StyledInputGroup, TrackingBar, Insert, Ext, Footer, Upload } from 'bandit-lib';
 import { ExportModal, SettingsModal, WarningModal, NewFileModal, TutorialsModal, WelcomeModal } from './Components/Modals';
 
 import CONFIG from './config/CONFIG.json';
 import debug from './Util/debug.json';
 
 const DEBUG = process.env.NODE_ENV === 'development';
-var counter = 0;
 var socket;
-var redo = [];
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
 // later do custom PPQs
@@ -78,7 +75,7 @@ class App extends Component {
   constructor(props, context) {
       super(props, context);
 
-      this.state = {
+      let state = {
           filename: 'untitled',
           instruments: [/*{
               name: 'default',
@@ -122,17 +119,28 @@ class App extends Component {
         'newInst', 'newFile',
         'exportsOpen', 'printoutExport',
         'partialExport'
-      ].forEach(key => this.state.key = false);
-
+      // I THINK THIS WAS AN ERROR?
+      //].forEach(key => this.state.key = false);
+      ].forEach(key => state[key] = false);
       [
         'insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'insertSubmitFocus',
         'instNameFocus',
         'editFocusStart', 'editFocusEnd', 'editFocusTimesig'
       ].forEach(ref => this[ref] = React.createRef());
+      /*
+      this.insertFocusStart = React.createRef();
+      this.insertFocusEnd = React.createRef();
+      this.insertFocusTimesig = React.createRef();
+      this.insertSubmitFocus = React.createRef();
+      this.instNameFocus = React.createRef();
+      this.editFocusStart = React.createRef();
+      this.editFocusEnd = React.createRef();
+      this.editFocusTimesig = React.createRef();
+      */
 
-      Object.assign(this.state, PPQ_OPTIONS[1]);
-      this.state.reservePPQ = this.state.PPQ;
-      this.state.reservePPQ_tempo = this.state.PPQ_tempo;
+      Object.assign(state, PPQ_OPTIONS[1]);
+      state.reservePPQ = state.PPQ;
+      state.reservePPQ_tempo = state.PPQ_tempo;
 
       // subscribe to audio updates
       audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
@@ -140,24 +148,23 @@ class App extends Component {
       audio.schedulerHook((data) => {
       });
       audio.triggerHook((instIds) => {
-          let targets = this.state.instruments.reduce((acc, inst, i) => {
-              if (instIds.indexOf(i) >= 0)
-                  acc |= (1 << i)
-          }, 0b00000000);
-          if (targets)
-              console.log(targets);
+          let targets = this.state.instruments.reduce((acc, inst, i) =>
+              (instIds.indexOf(i) >= 0) ?
+                  acc |= (1 << i) : acc
+          , 0b00000000);
           if (socket && targets)
               socket.emit('trigger', targets);
       });
 
-      this.state.PPQ_mod = this.state.PPQ / this.state.PPQ_tempo;
+      state.PPQ_mod = state.PPQ / state.PPQ_tempo;
 
-      let ids = [uuidv4(), uuidv4(), uuidv4(), uuidv4(), uuidv4()];
-      let parser = new Parser(this.state.PPQ, this.state.PPQ_tempo);
+      let parser = new Parser(state.PPQ, state.PPQ_tempo);
 
       // load DEBUG script
-      this.state.instruments = DEBUG ? parser.parse(debug) : [{ name: 'default', measures: {}, audioId: uuidv4() }];
-      this.state.instruments.forEach((inst, ind) => audio.newInst(inst.audioId, { type: 'sine', frequency: 440*(ind + 1) }));
+      state.instruments = DEBUG ? parser.parse(debug) : [{ name: 'default', measures: {}, audioId: uuidv4() }];
+      state.instruments.forEach((inst, ind) => audio.newInst(inst.audioId, { type: 'sine', frequency: 440*(ind + 1) }));
+
+      this.state = state;
       
       this.location = 0.0;
 
@@ -288,7 +295,6 @@ class App extends Component {
                 !(event.beat_start >= schema.beat_start && event.beat_start + event.beat_dur < schema.beat_end));
               console.log(meas.events);
 
-              let chain = [];
               let s = schema;
               if (s.parent) {
                   delete s.parent.schemas[s.beat_start];
@@ -304,16 +310,6 @@ class App extends Component {
                             
               instruments[meas.inst].measures[meas.id] = meas;
               return ({ instruments });
-          });
-      }
-
-      var updateSchema = (selected) => {
-          self.setStateHistory(oldState => {
-              let inst = oldState.instruments[selected.inst];
-              let meas = inst.measures[selected.meas.id];
-              let event = Array.isArray(selected.event) ?
-                  selected.event : [selected.event];
-                
           });
       }
 
@@ -580,7 +576,7 @@ class App extends Component {
 
       var toggleInst = (open) => this.instToggle(!open);
               
-      var updateMode = (mode, options) => {
+      var updateMode = (mode) => {
           logger.log(`Entering mode ${mode}.`);
           let newState = { mode };
           if (mode === 1) {
@@ -593,7 +589,7 @@ class App extends Component {
               }
               else {
               */
-                  ['start', 'end', 'timesig', 'offset'].forEach(x => {
+                  ['start', 'end', 'timesig', 'denom', 'offset'].forEach(x => {
                       newState[x] = '';
                       newState['edit_'.concat(x)] = '';
                   });
@@ -980,21 +976,9 @@ class App extends Component {
           // this works so well it should be adapted to the independent export!
           let tick_perc = this.state.PPQ / (60000.0 / 300); // Parts-Per-Quarter (per beat) / 1000ms per beat
 
-          let extremes = instruments.reduce((acc, inst) => {
-              Object.keys(inst.measures).forEach(key => {
-                  acc.min = Math.min(inst.measures[key].offset, acc.min);
-                  acc.max = Math.max(inst.measures[key].offset + inst.measures[key].ms, acc.max);
-              });
-              return acc;
-          }, { max: -Infinity, min: 0 });
-
-          // total ticks in the score at 60 BPM
-          let tick_total = parseInt((extremes.max - extremes.min) * tick_perc, 10);
-
           let tracks = instruments.map((inst, i_ind) => {
               let tick_accum = 0;
               // iterate through measures, adding offsets
-              let last = 0; 
               let beats = [];
               let tempi = [{ tempo: 300, timesig: 4 }];
 
@@ -1003,31 +987,15 @@ class App extends Component {
                   let absolute = parseInt(meas.offset * tick_perc, 10);
                   let delta = Math.max(absolute - tick_accum, 0);
 
-                  //let delta = parseInt((meas.offset - last) * tick_perc, 10);
-                  // after the first measure, account for T1 note.
-                  /*if (m_ind)
-                      delta -= 1;
-                  */
                   beats.push({ wait: `T${delta}`, duration: 'T1', pitch: ['C4'] });
                   tick_accum += delta + 1;
-                  let last_beat = 0;
                   for (let b = 1; b < meas.beats.length - 1; b++) {
                       let beat = meas.beats[b];
                       absolute = parseInt((beat + meas.offset) * tick_perc, 10);
                       delta = Math.max(absolute - tick_accum, 0); 
                       beats.push({ wait: `T${delta}`, duration: 'T1', pitch: ['C4'] });
                       tick_accum += delta + 1; // +1 to account for actual T1 note.
-                      //last_beat = beat;
                   };
-                  /*meas.beats.forEach((beat, b_ind) => {
-                      if (b_ind)
-                          // convert each gap/beat into ticks
-                          delta = parseInt((beat - last_beat) * tick_perc, 10) - 1; // -1 to account for actual T1 note.
-                      beats.push({ wait: `T${Math.max(delta, 0)}`, duration: 'T1', pitch: ['C4'] });
-                      last_beat = beat;
-                  });
-                  */
-                  //last = meas.ms + meas.offset;
               });
 
               // return track object
@@ -1054,7 +1022,6 @@ class App extends Component {
           let tpm = 60000.0 / this.state.PPQ;
 
 
-          let events = [];
           let clicks = [];
           let rest = `T${this.state.PPQ - 1}`;
           let tempi = order_by_key(inst.measures, 'offset').reduce((acc, meas, ind) => {
@@ -1085,16 +1052,14 @@ class App extends Component {
                   acc.push({ delta, tempo: 300 });
               };
 
-              let wait = `T${delta}`;
               last = meas;
 
               let slope = (meas.end - meas.start)/meas.ticks.length;
 
-              let new_beat = { duration: 'T1', pitch: ['C4'] };
+              //let new_beat = { duration: 'T1', pitch: ['C4'] };
 
 
               let ev_ptr = 0;
-              let beat_ptr = 0;
               let event_ticks = meas.events.map(e => Math.round(e.tick_start));
 
               let last_tick = -delta-1;
@@ -1335,7 +1300,6 @@ class App extends Component {
             let frac = params[1].split('/').map(s => parseInt(s,10));
             return { current, params, frac };
           }
-          let schema_cache = {};
           let markers = {};
           let instruments = rows
               .slice(2) // remove headers
@@ -1357,8 +1321,8 @@ class App extends Component {
                       console.log(param, param.length);
                     if (param[2]) {
                         let schema_list = [...param[2].matchAll(/\((.[^\)]*)\)/g)].map(s=>s[1]);
-                        let current, params, frac;
-                        ({ current, params, frac } = parse(schema_list.pop()));
+                        let params, frac;
+                        ({ params, frac } = parse(schema_list.pop()));
                         let beat_start = frac[0]/frac[1] * lastMeas.denom;
                         if (!(beat_start in lastMeas.schemas)) {
                             schema = SchemaCalc(params, null, lastMeas.denom, meta.PPQ);
@@ -1374,7 +1338,7 @@ class App extends Component {
                         let lastSchema = schema;
                         while (schema_list && schema_list.length) {
                             let schema_text = schema_list.pop();
-                            ({ current, params, frac } = parse(schema_text));
+                            ({ params, frac } = parse(schema_text));
                             let ratio = lastSchema.basis / frac[1];
                             let div = lastSchema.beat_dur / lastSchema.tuplet[0] * ratio;
                             beat_start = div * frac[0] + lastSchema.beat_start;

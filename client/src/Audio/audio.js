@@ -6,32 +6,7 @@ var subscriptions = [];
 var scheduler_hooks = [];
 var trigger_hooks = [];
 
-/*navigator.requestMIDIAccess()
-    .then((midiAccess) => console.log(midiAccess.inputs));
-    */
-
 var insts = {};
-var gains = {};
-var volumes = {};
-var mutes = {};
-/*var gains = [];
-var volumes = [];
-var mutes = [];
-for (let i=0; i < 5; i++) {
-    let gain = aC.createGain();
-    let muter = aC.createGain();
-    let vol = aC.createGain();
-    gain.gain.setValueAtTime(0.0, aC.currentTime);
-    muter.gain.setValueAtTime(1.0, aC.currentTime);
-    vol.gain.setValueAtTime(0.8, aC.currentTime);
-    mutes.push(muter);
-    gains.push(gain);
-    volumes.push(vol);
-};
-*/
-
-
-
 const WAVES = ['sine', 'square', 'sawtooth', 'triangle'];
 
 class _AudioInst {

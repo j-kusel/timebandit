@@ -55,37 +55,6 @@ let download = (zip) => {
         }, (err) => console.log(err));
 }
 
-let event_track = (tracks, PPQ, PPQ_tempo) => {
-    MidiWriter.Constants.HEADER_CHUNK_DIVISION = [0x00, PPQ];
-    var zip = new JSZip();
-    var score = zip.folder('score');
-    let PPQ_mod = PPQ / PPQ_tempo;
-
-    tracks.forEach((track) => {
-        var new_track = [new MidiWriter.Track(), new MidiWriter.Track()];
-        // handle initial gap, if any
-        let offset = track.tempi.slice(0, 1);
-        new_track[0].setTempo(offset[0].tempo);
-
-        let delta = offset[0].delta;
-        track.tempi.slice(1).forEach((tick) => {
-            new_track[0].addEvent(new _TempoEvent(delta, tick.tempo));
-            if ('timesig' in tick)
-                new_track[0].addEvent(new _TimeSignatureEvent(tick.timesig, tick.denom, PPQ));
-            delta = ('delta' in tick) ?
-                tick.delta : PPQ_mod;
-        });
-       
-        console.log(track.beats);
-        track.beats.forEach((beat) => new_track[1].addEvent(new MidiWriter.NoteEvent(beat)));
-        
-        var write = new MidiWriter.Writer(new_track);
-        let blob = new Blob([write.buildFile()], {type: "audio/midi"});
-        score.file(track.name + '.mid', blob);
-    });
-
-    download(zip);
-};
 
 
 let click_track = (tracks, PPQ, PPQ_tempo) => {

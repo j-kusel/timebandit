@@ -1,4 +1,3 @@
-
 import c from '../config/CONFIG.json';
 import { primary } from '../config/CONFIG.json';
 //import { secondary } from '../config/CONFIG.json';
@@ -7,10 +6,6 @@ import { SHIFT, ALT, CTRL, MOD } from './keycodes.js';
 import { KeyC, KeyV, } from './keycodes.js';
 //import { KeyI, KeyH, KeyJ, KeyK, KeyL, KeyZ } from './keycodes.js';
 import { NUM } from './keycodes.js';
-
-
-import uuidv4 from 'uuid/v4';
-import { MeasureCalc } from './index';
 
 var p;
 

@@ -1,9 +1,8 @@
 import React, { Component } from 'react';
 import styled from 'styled-components';
-import { Popover, Overlay, Container, Row, Col } from 'react-bootstrap';
+import { Overlay, Container, Row, Col } from 'react-bootstrap';
 import { FormInput, FormLabel, MixerRow, MixerArrow, MixerButton, TBDropdown, Slider, colors } from 'bandit-lib';
 import { Module, PanelHeader } from 'bandit-lib';
-import _ from 'underscore';
 
 const sine = (
     <svg width="80%" height="100%" viewBox="0 0 190 160" version="1.1" xmlns="http://www.w3.org/2000/svg">
@@ -97,7 +96,6 @@ class Mixer extends Component {
         let newState = Object.assign({}, state);
         //newState.popShows = {};
         props.insts.forEach((inst, ind) => {
-            let ref = 'pop' + ind;
             //newState.popShows[ref] = false;
             let id = inst.audioId;
             Object.keys(defaults).forEach(key => {
@@ -220,24 +218,6 @@ class Mixer extends Component {
     }
 
     render() {
-        /*this.popRefs = {};
-        this.popShows = {};
-        this.props.insts.forEach((__, i) => {
-            let ref = 'pop' + i;
-            this.popRefs[ref] = React.createRef();
-            this.popShows[ref] = false;
-            console.log(this.popRefs['pop' + i]);
-        });
-        */
-
-
-        let popover = (props) => (
-            <Popover id="synth">
-                <Popover.Content>
-                    <p>hello world {props.index}</p>
-                </Popover.Content>
-            </Popover>
-        );
         let insts = this.props.insts.map((inst, i) => {
             return (
             <MixerRow key={i} style={{ fontSize: '8px' }}>
@@ -255,8 +235,6 @@ class Mixer extends Component {
                     <SynthButton ref={this.popRefs['pop' + i]} onClick={() => this.handleShow('pop' + i, !this.state.popShows['pop' + i])}>{sine}</SynthButton>
                     <Overlay target={this.popRefs['pop' + i].current} show={this.state.popShows['pop' + i]} placement="right">
                     
-            {/*<Popover id="synth">
-                            <Popover.Content>*/}
                         {({ placement, arrowProps, show: _show, popper, ...props }) => (
                             <Synth {...props}>
                                 <Row>
