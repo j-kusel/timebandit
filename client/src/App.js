@@ -9,7 +9,7 @@ import audio from './Audio/audio';
 import github from './static/GitHub-Mark-32px.png';
 import twitter from './static/Twitter_Logo_WhiteOnImage.svg';
 
-import { MeasureCalc, SchemaCalc, EventCalc, order_by_key } from './Util/index';
+import { MeasureCalc, SchemaCalc, EventCalc, order_by_key, abs_location } from './Util/index';
 import ordered from './Util/ordered';
 import logger from './Util/logger';
 import { Parser } from './Util/parser';
@@ -87,9 +87,11 @@ class App extends Component {
           start: '',
           end: '',
           timesig: '',
+          denom: '',
           edit_start: '',
           edit_end: '',
           edit_timesig: '',
+          edit_denom: '',
           offset: '',
           instName: '',
           temp_offset: false, /*'',*/
@@ -401,6 +403,9 @@ class App extends Component {
                   event.nominal.unshift(event.note + ": 1/" + schema.basis, schema.nominal);
                   
               }
+
+              event.ms_start = abs_location(meas.ticks, meas.ms, event.tick_start);
+              event.ms_end = abs_location(meas.ticks, meas.ms, event.tick_start + event.tick_dur);
               
               if (!(meas.events && meas.events.length))
                   meas.events = [event]
@@ -541,7 +546,7 @@ class App extends Component {
               let instruments = oldState.instruments;
               let id = uuidv4();
 
-              instruments[inst].measures[id] = { ...calc, id, inst, beat_nodes: [], locks: {} };
+              instruments[inst].measures[id] = { ...calc, id, inst, beat_nodes: [], locks: {}, schemas: {}, schemaIds: [] };
               logger.log(`New measure ${id} created in instrument ${inst}.`);
               return { instruments };
           });
@@ -842,6 +847,7 @@ class App extends Component {
               start: this.state.start,
               end: this.state.end,
               timesig: this.state.timesig,
+              denom: this.state.denom,
               offset: this.state.offset || offset
           };
           Object.assign(newMeas, { [e.target.name]: intVal });
@@ -861,6 +867,7 @@ class App extends Component {
               && (!this.state.end || this.state.start === this.state.end)
           )
               newState.end = intVal;
+          console.log(newState);
 
           this.setState(newState);
       };
@@ -1105,21 +1112,32 @@ class App extends Component {
       if (!isPlaying) {
           audio.kill();
       }
-      else if (_.isEqual(this.state.ordered, {})) {
+      //else if (_.isEqual(this.state.ordered, {})) {
           var root;
           this.state.instruments.forEach((inst, i_ind) =>
               Object.keys(inst.measures).forEach((key) => {
                   let meas = inst.measures[key];
-                meas.beats.forEach((beat) =>
-                    root = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], root)
-                );
+                  // events
+                  meas.events.forEach(event => {
+                      console.log(event);
+                      root = ordered.tree.insert(event.ms_start + meas.offset, meas, root)
+                  });
+
+                  // metronome
+                  /*
+                  meas.beats.forEach((beat) =>
+                      root = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], root)
+                  );
+                  */
               })
           );
+          console.log(root);
 
           audio.play(isPlaying, root, cursor, audioIds, loop);
-          newState.ordered = root;
-      } else
+          //newState.ordered = root;
+      /*} else
           audio.play(isPlaying, this.state.ordered, cursor, audioIds, loop);
+          */
 
       document.activeElement.blur();
       newState.isPlaying = isPlaying;

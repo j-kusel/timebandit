@@ -24,6 +24,19 @@ var abs_location = (ticks, ms, tick_loc) => {
         ((ticks[s_tick+1] || ms) - ticks[s_tick]) * s_remainder;
 };
 
+// tweaks learning rate for nudge algorithms
+var monitor = (gap, new_gap, alpha) => {
+    let progress = Math.abs(gap) - Math.abs(new_gap);
+    if (gap + new_gap === 0 || progress === 0)
+        return alpha;
+
+    let perc = Math.abs(progress)/Math.abs(gap);
+    if (progress < 0)
+        alpha *= -1;
+
+    return alpha * (1-perc)/perc;
+};
+
 
 // generates measure.gaps in 'measure' drag mode
 var calc_gaps = (measures, id) => {
@@ -579,7 +592,8 @@ var parse_bits = (n) => {
 export { MeasureCalc, SchemaCalc, EventCalc, order_by_key, check_proximity_by_key,
     bit_toggle, parse_bits, crowding, anticipate_gap, initial_gap, calc_gaps, global_gaps,
     lt, lte, gt, gte,
-    abs_location
+    abs_location,
+    monitor
 };
 
 

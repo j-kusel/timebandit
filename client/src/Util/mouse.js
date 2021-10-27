@@ -328,6 +328,13 @@ export default (p, Window) => {
 
         eval_cursor() {
             this.cursor = 'default';
+            if (this.rollover.type === 'loop' && this.rollover.side)
+                this.cursor = 'ew-resize'
+            else if (this.rollover.type === 'marker') {
+                this.cursor = 'ew-resize';
+                if (this.rollover.X)
+                    this.cursor = 'pointer';
+            }
             if (Window.selected.meas) {
                 // if selected measure is in rollover
                 if ('meas' in this.rollover && Window.getSelection().indexOf(this.rollover.meas.id) > -1) {

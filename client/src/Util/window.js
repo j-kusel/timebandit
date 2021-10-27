@@ -225,7 +225,7 @@ export default (p) => {
         }
 
         press_marker() {
-            let origin = this.x_to_ms(p.mouseX);
+            let origin = this.x_to_ms(p.mouseX-c.PANES_WIDTH);
             this.temp_marker = { origin, start: origin, placed: false };
             this.temp_marker.cache = this.calculate_marker_cache(this.temp_marker);
         }
@@ -860,8 +860,7 @@ export default (p) => {
                     sib_color.setAlpha(0.25 * 255);
                     p.fill(sib_color);
                     p.rect(0, 0, this.ms_to_x(this.printTemp.end) - this.ms_to_x(this.printTemp.start), instHeight);
-                    p.stroke(colors.secondary);
-                    p.fill(colors.secondary);
+                    p.both(colors.secondary);
                     p.push();
                         p.strokeWeight(4);
                         p.line(2, 2, 10, 10);
@@ -880,8 +879,7 @@ export default (p) => {
                     sib_color.setAlpha(0.50 * 255);
                     p.fill(sib_color);
                     p.rect(0, 0, this.ms_to_x(frame.end) - this.ms_to_x(frame.start), instHeight);
-                    p.stroke(colors.secondary);
-                    p.fill(colors.secondary);
+                    p.both(colors.secondary);
                     p.push();
                         p.strokeWeight(4);
                         p.line(2, 2, 10, 10);
@@ -899,8 +897,7 @@ export default (p) => {
                 sib_color.setAlpha(0.50 * 255);
                 p.fill(sib_color);
                 p.rect(0, 0, 300, c.INST_HEIGHT);
-                p.stroke(colors.secondary);
-                p.fill(colors.secondary);
+                p.both(colors.secondary);
                 p.push();
                     p.translate(14, 14);
                     p.textAlign(p.LEFT, p.TOP);
@@ -916,8 +913,7 @@ export default (p) => {
                     p.translate(0, 14 + 12);
                     p.rect(0, 0, 50, 20);
                     p.rect(60, 0, 50, 20);
-                    p.stroke(colors.primary);
-                    p.fill(colors.primary);
+                    p.both(colors.primary);
                     p.textAlign(p.CENTER, p.CENTER);
                     p.text('confirm', 25, 10);
                     p.text('clear', 85, 10);
@@ -1007,16 +1003,13 @@ export default (p) => {
                     col = p.color(colors.accent);
                     // draw X
                     p.push();
-                    p.stroke(colors.primary);
-                    p.fill(colors.primary);
+                    p.both(colors.primary);
                     p.textAlign(p.CENTER, p.CENTER);
                     // offset X to avoid tempo indicators
                     if (rollover.schema_info) {
                         let ro = rollover.schema_info;
-                        if (ro.schemaX) {
-                            p.stroke(colors.accent);
-                            p.fill(colors.accent);
-                        }
+                        if (ro.schemaX)
+                            p.both(colors.accent);
                         let x = ro.schema_pos === 'left' ?
                             schema.cache.ms_start + 8 : schema.cache.ms_end - 8;
                         p.text('X', x, 8);
@@ -1024,13 +1017,11 @@ export default (p) => {
                     p.pop();
                 }
                 col.setAlpha(100);
-                p.stroke(col);
-                p.fill(col);
+                p.both(col);
                 p.rect(start, 0, end-start, c.INST_HEIGHT);
                 // draw text
                 let tuplet = schema.tuplet.join(':');
-                p.stroke(colors.primary);
-                p.fill(colors.primary);
+                p.both(colors.primary);
                 p.textStyle(p.ITALIC);
                 p.textSize(12);
                 
@@ -1041,8 +1032,7 @@ export default (p) => {
                     (this.scale > 0.15) ?
                         col2.setAlpha(255 * (this.scale-0.15)/0.15) :
                         col2.setAlpha(0);
-                p.stroke(col2);
-                p.fill(col2);
+                p.both(col2);
                 p.translate(0, c.INST_HEIGHT - (depth)*8)
                 p.text(tuplet, start+4, -4);
                 schema.cache.ms_beats.forEach(b =>
@@ -1079,8 +1069,7 @@ export default (p) => {
                 p.push();
                 let light = p.color(colors.primary);
                 light.setAlpha(hover ? 200 : 100);
-                p.stroke(light);
-                p.fill(light);
+                p.both(light);
                 let width = m.cache.end - m.cache.start;
                 p.rect(0, 0, width, c.PLAYBACK_HEIGHT);
                 p.pop();
@@ -1089,10 +1078,14 @@ export default (p) => {
             p.quad(0, 0, 20, 0, 20, 16, 0, c.PLAYBACK_HEIGHT);
             // draw X
             if (hover) {
-                p.stroke(colors.secondary); 
-                p.fill(colors.secondary); 
-                p.textAlign(p.LEFT, p.TOP);
-                p.text('X', 12, 2);
+                p.both(colors.secondary); 
+                p.push();
+                p.translate(-6, 6);
+                p.rotate(p.PI * 0.25);
+                p.textAlign(p.CENTER, p.CENTER);
+                //p.textAlign(p.LEFT, p.TOP);
+                p.text('+', 0, 0);
+                p.pop();
             }
             p.pop();
             if (m.placed || m.name) {
@@ -1101,8 +1094,7 @@ export default (p) => {
                     p.textAlign(p.LEFT, p.TOP) :
                     p.textAlign(p.CENTER, p.TOP);
                 p.translate(start + ('end' in m ? 4:0), 2);
-                p.stroke(colors.secondary);
-                p.fill(colors.secondary);
+                p.both(colors.secondary);
                 p.text(m.name, 0, 0);
                 if (m.placed && (p.millis() % 1000 > 500)) {
                     let w = p.textWidth(m.name.slice(0, m.pointer));
@@ -1118,8 +1110,7 @@ export default (p) => {
             p.push();
             let col = p.color(colors.primary);
             col.setAlpha(200);
-            p.stroke(col);
-            p.fill(col);
+            p.both(col);
             if ('start' in this.temp_marker)
                 this.drawMarker(this.temp_marker);
             Object.keys(this.markers).forEach(key => {
@@ -1135,12 +1126,11 @@ export default (p) => {
                 (cache.start > p.windowWidth && cache.end > p.windowWidth)
             ) return;
             p.push();
-            p.translate(c.PANES_WIDTH + cache.start + this.viewport, c.PLAYBACK_HEIGHT);
+            p.translate(cache.start + this.viewport, c.PLAYBACK_HEIGHT);
             p.strokeWeight(4);
             let col = p.color(colors.accent);
             p.strokeCap(p.SQUARE);
-            p.stroke(col);
-            p.fill(col);
+            p.both(col);
             p.line(0, 0, cache.end - cache.start, 0);
             p.strokeWeight(1);
             if (this.isPlaying || ro.type === 'loop') {
@@ -1191,13 +1181,11 @@ export default (p) => {
                 col.setAlpha(200);
 
                     
-            p.stroke(col);
-            p.fill(col);
+            p.both(col);
             let height = c.INST_HEIGHT / 3;
             p.rect(position, -height*0.2, duration, height*0.4);
             col.setAlpha(200);
-            p.stroke(col);
-            p.fill(col);
+            p.both(col);
             p.rect(position-2, -height*0.5, 4, height);
             p.pop();
         };
@@ -1208,22 +1196,19 @@ export default (p) => {
             p.push();
             p.translate(p.mouseX - c.PANES_WIDTH + 20, p.mouseY - 20);
             p.textAlign(p.CENTER, p.CENTER);
-            p.stroke(primary);
-            p.fill(primary);
+            p.both(primary);
             p.text(':', 0, 0);
             p.textAlign(p.LEFT, p.CENTER);
             let width = [0,1].map(i => p.textWidth(this.entry.tuplet[i]));
             if (this.entry.tuplet_target === 0) {
                 p.rect((-width[0])-3, -7, width[0]+1, 14); 
-                p.stroke(secondary);
-                p.fill(secondary);
+                p.both(secondary);
             } else {
                 p.rect(4, -7, width[1]+1, 14); 
             }
             p.text(this.entry.tuplet[0], (-width[0]-2), 0);
             let col = (this.entry.tuplet_target === 0) ? primary : secondary;
-            p.stroke(col);
-            p.fill(col);
+            p.both(col);
             p.text(this.entry.tuplet[1], 4, 0);
             p.pop();
         }
@@ -1232,13 +1217,11 @@ export default (p) => {
             p.push();
             p.translate(p.mouseDown.x, p.mouseDown.y);
 
-            p.fill(primary);
-            p.stroke(primary);
+            p.both(primary);
             p.rect(-45, -10, 35, 20);
             p.rect(10, -10, 35, 20);
             p.rect(-17, -20, 35, 20);
-            p.stroke(secondary)
-            p.fill(secondary)
+            p.both(secondary)
             p.textSize(10);
             p.textAlign(p.CENTER, p.CENTER);
             p.text('loc', -27, 0);
@@ -1266,8 +1249,7 @@ export default (p) => {
 
         drawPlayback(ro) {
             // DRAW TOP BAR
-            p.stroke(secondary);
-            p.fill(secondary);
+            p.both(secondary);
             p.rect(0, 0, p.width, c.PLAYBACK_HEIGHT);
 
             p.push();
@@ -1292,8 +1274,7 @@ export default (p) => {
                 p.textAlign(p.LEFT, p.TOP);
                 p.textSize(10);
                 while (loc < p.width) {
-                    p.stroke(120);
-                    p.fill(60);
+                    p.both(120);
                     loc = inc*val + bias;
                     inc += 1;
                     
@@ -1341,13 +1322,15 @@ export default (p) => {
             let depth = 5;
             while (depth--) {
                 let s = p.lerpColor(shadow_start, shadow_end, depth/5);
-                p.stroke(s);
-                p.fill(s);
+                p.both(s);
                 p.line(c.PANES_WIDTH, c.PLAYBACK_HEIGHT + depth + 1, p.width, c.PLAYBACK_HEIGHT + depth + 1);
             }
 
+            p.push();
+            p.translate(c.PANES_WIDTH, 0);
             this.drawMarkers(ro);
             this.drawLoop(ro);
+            p.pop();
         }
 
         drawPrinter(pages) {
@@ -1471,14 +1454,12 @@ export default (p) => {
      
         drawFrame() {
             // DRAW BACKGROUND
-            p.stroke(secondary_light);
-            p.fill(secondary_light);
+            p.both(secondary_light);
             p.rect(0, 0, p.width, p.height);
            
         
             // DRAW BOTTOM BAR
-            p.stroke(secondary);
-            p.fill(secondary);
+            p.both(secondary);
             p.rect(0, p.height - c.TRACKING_HEIGHT, p.width, c.TRACKING_HEIGHT);
 
             // DRAW SIDEBAR
@@ -1490,8 +1471,7 @@ export default (p) => {
             
             p.push();
             // draw tabs
-            p.stroke(primary);
-            p.fill(primary);
+            p.both(primary);
 
             p.translate(0, p.height - c.TRACKING_HEIGHT);
             p.rect(0, 0, p.width, c.TRACKING_HEIGHT);
@@ -1501,8 +1481,7 @@ export default (p) => {
             // left    
 
             p.push();
-            p.stroke(secondary);
-            p.fill(secondary);
+            p.both(secondary);
             p.textAlign(p.LEFT, p.TOP);
             p.textSize(10);
             p.text(this.isPlaying ? `LOCATION: ${Math.round(locator)}` : `CURSOR: ${cursor_loc}`,
@@ -1517,8 +1496,7 @@ export default (p) => {
             p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, 0);
             p.textSize(8);
             p.textAlign(p.LEFT, p.CENTER);
-            p.stroke(secondary);
-            p.fill(secondary);
+            p.both(secondary);
 
             p.line(0, 0, 0, c.TRACKING_HEIGHT);
             p.line(c.INSERT_WIDTH, 0, c.INSERT_WIDTH, c.TRACKING_HEIGHT);
@@ -1561,18 +1539,14 @@ export default (p) => {
             p.translate(x, (ro.inst + 0.5)*c.INST_HEIGHT);
 
             // base tempo button
-            p.fill(primary);
-            p.stroke(primary);
+            p.both(primary);
             if (this.modulation)
                 p.fill(colors.accent);
             let tempo_width = p.textWidth(tempo) + 4;
             p.rect(-tempo_width*0.5 - 4, -10, tempo_width + 8, 20);
-            p.fill(secondary);
-            p.stroke(secondary);
-            if (this.modulation) {
-                p.fill(primary);
-                p.stroke(primary);
-            }
+            p.both(secondary);
+            if (this.modulation)
+                p.both(primary);
 
             p.textAlign(p.CENTER, p.CENTER);
             p.text(tempo, 0, 0);
@@ -1647,8 +1621,7 @@ export default (p) => {
                 //let text = Math.pow(2, 5-segment).toString();
                 p.push();
                 p.strokeWeight(1);
-                p.stroke(primary);
-                p.fill(primary);
+                p.both(primary);
                 p.translate(-20, 0);
                 let angle_x = 40 * p.cos(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
                 let angle_y = 40 * p.sin(FIFTH_PI * segment + p.HALF_PI + FIFTH_PI/2);
@@ -1658,8 +1631,7 @@ export default (p) => {
             }
             p.push();
             p.strokeWeight(1);
-            p.stroke(primary);
-            p.fill(primary);
+            p.both(primary);
             p.textStyle(p.ITALIC);
             if (mod.menuLeft) 
                 p.text(mod.divLeft.join(':'), -26, 0);
@@ -1711,8 +1683,7 @@ export default (p) => {
            
         drawToolbar(tempoRange) { 
             p.push();
-            p.stroke(primary);
-            p.fill(primary);
+            p.both(primary);
 
             p.translate((p.width - c.TOOLBAR_WIDTH) / 3.0, p.height - c.TRACKING_HEIGHT - c.INSERT_HEIGHT);
 
@@ -1724,8 +1695,7 @@ export default (p) => {
                 p.line(c.INSERT_WIDTH, c.EDITOR_HEIGHT, c.EDITOR_WIDTH, c.EDITOR_HEIGHT); 
 
                 if ('beats' in this.insertMeas) {
-                    p.stroke(secondary);
-                    p.fill(secondary);
+                    p.both(secondary);
 
                     // draw beats
                     // push into padding
@@ -1781,8 +1751,7 @@ export default (p) => {
             p.push();
             let opac = p.color(primary);
             opac.setAlpha(180);
-            p.stroke(opac);
-            p.fill(opac);
+            p.both(opac);
             p.translate(...coords);
             if (handle)
                 p.ellipse(...handle);
@@ -1800,8 +1769,7 @@ export default (p) => {
             p.translate(0, c.INST_HEIGHT);
             p.rect(-PANES_THIN, 0, PANES_THIN*2 + this.selected.meas.ms*this.scale, c.LOCK_HEIGHT);
 
-            p.stroke(secondary);
-            p.fill(secondary);
+            p.both(secondary);
             p.textSize(10);
             p.textAlign(p.LEFT, p.CENTER);
             //p.text(`${select.start} -> ${select.end} / ${select.timesig}`, 5, c.PANES_WIDTH);

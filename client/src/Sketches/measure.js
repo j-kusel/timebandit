@@ -3,7 +3,7 @@
  * @module sketch
  */
 
-import { order_by_key, check_proximity_by_key, crowding, calc_gaps, global_gaps } from '../Util/index.js';
+import { order_by_key, check_proximity_by_key, crowding, calc_gaps, global_gaps, monitor } from '../Util/index.js';
 import { lt, lte, gt, gte } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
@@ -35,18 +35,6 @@ var obstacles = [Infinity, -Infinity];
 
 window.addEventListener("contextmenu", e => e.preventDefault());
 
-// tweaks learning rate for nudge algorithms
-var monitor = (gap, new_gap, alpha) => {
-    let progress = Math.abs(gap) - Math.abs(new_gap);
-    if (gap + new_gap === 0 || progress === 0)
-        return alpha;
-
-    let perc = Math.abs(progress)/Math.abs(gap);
-    if (progress < 0)
-        alpha *= -1;
-
-    return alpha * (1-perc)/perc;
-};
 
 /* THIS SYSTEM MAY WORK BETTER FOR FRACTIONAL BEATS
 var insert = (list, item) => {
@@ -73,8 +61,14 @@ var insert = (list, item) => {
 
 
 export default function measure(p) {
-    // monkey-patching Processing for a p.mouseDown function
+    // monkey-patching Processing
+    // - p.mouseDown function
+    // - p.both function sets stroke and fill in one line
     p.mouseDown = false;
+    p.both = (col) => {
+        p.stroke(col);
+        p.fill(col);
+    };
 
     var instruments = [];
 
@@ -447,8 +441,7 @@ export default function measure(p) {
         p.push();
 
         p.translate(0, c.PLAYBACK_HEIGHT);
-        p.stroke(primary);
-        p.fill(primary);
+        p.both(primary);
         p.rect(0, 0, c.PANES_WIDTH, p.height);
         p.translate(c.PANES_WIDTH, 0);
 
@@ -568,8 +561,7 @@ export default function measure(p) {
                                 p.push();
                                 let c_color = p.color(colors.contrast);
                                 c_color.setAlpha(100);
-                                p.stroke(c_color);
-                                p.fill(c_color);
+                                p.both(c_color);
                                 let width = p.textWidth(text[0]);
                                 let align_x = m.textAlign[0] === p.LEFT ?
                                     0 : -width;
@@ -648,8 +640,7 @@ export default function measure(p) {
                     p.translate(origin, 0);
                     let box_color = p.color(colors.accent);
                     box_color.setAlpha(100);
-                    p.stroke(box_color);
-                    p.fill(box_color);
+                    p.both(box_color);
                     /*let crowd = measure.temp.crowd;
                     if (crowd.start[1] < 0) {
                         let start = Math.min(-(crowd.start[1] * Window.scale), measure.cache.ms);
@@ -700,7 +691,7 @@ export default function measure(p) {
                 p.stroke(200, 240, 200);
                 let x = snaps.snapped_inst.target * Window.scale + Window.viewport;
                 p.line(x, Math.min(snaps.snapped_inst.origin, snaps.snapped_inst.inst)*c.INST_HEIGHT,
-                    x, (Math.max(snaps.snapped_inst.origin, snaps.snapped_inst.inst) + 1)*c.INST_HEIGHT);
+                    x, Math.max(snaps.snapped_inst.origin, snaps.snapped_inst.inst) * c.INST_HEIGHT);
             };
 
             p.push();
@@ -723,16 +714,14 @@ export default function measure(p) {
                 textWidth = p.textWidth(name_text.slice(0, Window.instName.pointer));
                 let boxColor = p.color(colors.accent);
                 boxColor.setAlpha(100);
-                p.stroke(boxColor);
-                p.fill(boxColor);
+                p.both(boxColor);
                 p.rect(-3, -3, textWidth + 8, 17);
             }
 
             let nameColor = (SAME_INST || MOUSE_OVER) ?
                 p.color(colors.accent) :
                 p.color('rgba(0,0,0,0.25)');
-            p.stroke(nameColor);
-            p.fill(nameColor);
+            p.both(nameColor);
             p.textAlign(p.LEFT, p.TOP);
             p.text(name_text, 0, 0);
             if (blink)
@@ -781,8 +770,7 @@ export default function measure(p) {
                 p.push();
                 let rollover_color = p.color(colors.primary);
                 rollover_color.setAlpha(100);
-                p.stroke(rollover_color);
-                p.fill(rollover_color);
+                p.both(rollover_color);
 
                 // these are identical for now, but text should adapt
                 // to avoid collisions with tempo line in the future
@@ -873,8 +861,7 @@ export default function measure(p) {
 
         Window.isPlaying = API.get('isPlaying');
 
-        p.stroke(0);
-        p.fill(0);
+        p.both(0);
         p.textAlign(p.LEFT, p.TOP);
         p.textSize(12);
 
@@ -993,8 +980,7 @@ export default function measure(p) {
         // mouse timer animation
         if (Window.editor.timer) {
             p.push();
-            p.stroke(0);
-            p.fill(0);
+            p.both(0);
             p.translate(p.mouseX, p.mouseY);
             p.arc(0, 0, 12, 12, 0, p.TWO_PI * ((Window.editor.timer - p.frameCount) / 120));
 
@@ -1014,6 +1000,9 @@ export default function measure(p) {
     p.keyReleased = function(e) {
         let mods = ['CTRL', 'SHIFT', 'MOD', 'ALT'];
         let mod_change_flag = false;
+        let num = NUM.indexOf(e.keyCode);
+        if (num >= 0 && num === snaps.div_index)
+            return (snaps.div_index = 0);
         mods.forEach(k => {
             if (e.keyCode === keycodes[k]) {
                 Window.mods[k.toLowerCase()] = false;
@@ -1048,7 +1037,6 @@ export default function measure(p) {
 
         snaps.div_index = (Keyboard.num_counter) ?
             Keyboard.held_nums[Keyboard.held_nums.length-1] - 1 : 0;
-
 
         if (p.keyCode === ESC) {
             if (API.printoutCheck()) {
@@ -1105,6 +1093,11 @@ export default function measure(p) {
                 e.preventDefault();
                 Window.change_instName(p.keyCode);
                 return;
+            } else if (Mouse.drag.mode === 'measure') {
+                e.preventDefault();
+                let num = NUM.indexOf(p.keyCode);
+                if (num >= 0)
+                    snaps.div_index = num;
             }
         }
 
@@ -1265,6 +1258,7 @@ export default function measure(p) {
         };
 
         if ((p.keyCode === DEL || p.keyCode === BACK)) {
+            e.preventDefault();
             if (!API.checkFocus() && Window.selected.meas) {
                 let to_delete = Window.getSelection().map(key => Window.selected[key]);
                 Window.selected = Window.resetSelection();
@@ -1351,8 +1345,13 @@ export default function measure(p) {
         if (Mouse.cancel)
             return;
 
-        if (Mouse.rollover.type === 'marker')
+        if (Mouse.rollover.type === 'marker') {
+            if (Mouse.rollover.X) {
+                API.deleteMarker(Mouse.rollover.marker);
+                return Mouse.rollover = { type: 'marker' };
+            }
             return Mouse.markerMode();
+        }
 
         if (Mouse.rollover.type === 'loop')
             return Mouse.loopMode();
@@ -1813,7 +1812,6 @@ export default function measure(p) {
                 ms = calc.ms;
                 
                 let new_gap = snapped + offset - target;
-                console.log(gap, new_gap, snapped + offset, target);
                 alpha = monitor(gap, new_gap, alpha);
                 return nudge(new_gap, alpha, depth + 1, even);
             }
@@ -2218,39 +2216,38 @@ export default function measure(p) {
         // marker rollover
         if (p.mouseY < c.PLAYBACK_HEIGHT+6) {
             let mouseX = p.mouseX - c.PANES_WIDTH - Window.viewport;
-            console.log(mouseX, Window.loop.cache.start, Window.loop.cache.end);
+            let rollover = {};
             if (mouseX > Window.loop.cache.start-6 && mouseX < Window.loop.cache.end+6) {
-                let rollover = { type: 'loop' };
+                rollover.type = 'loop';
                 if (mouseX < Window.loop.cache.start + 6)
                     rollover.side = 'start'
                 else if (mouseX > Window.loop.cache.end - 6)
                     rollover.side = 'end';
-                Mouse.setRollover(rollover);
-                console.log(rollover);
-                return;
+            } else {
+                // loop rollover
+                rollover.type = 'marker';
+                Object.keys(Window.markers).some(key => {
+                    let marker = Window.markers[key]; 
+                    let cache = marker.cache;
+                    let end = (cache.end || cache.start);
+                    if (mouseX > cache.start-20 && mouseX < end+20) {
+                        rollover.marker = marker;
+                        //console.log(p.mouseY < 8 && p.mouseY > 2);
+                        //console.log((mouseX > end + 12) && (mouseX < end + 18));
+                        if ((p.mouseY < 10) &&
+                            (p.mouseY > 2) &&
+                            (mouseX > end - 10) &&
+                            (mouseX < end - 2)
+                        )
+                            rollover.X = true;
+                        return true;
+                    }
+                    return false;
+                });
             }
-            
-            // loop rollover
-            let rollover = { type: 'marker' };
-            Object.keys(Window.markers).some(key => {
-                let marker = Window.markers[key]; 
-                let cache = marker.cache;
-                let end = (cache.end || cache.start);
-                if (mouseX > cache.start-20 && mouseX < end+20) {
-                    rollover.marker = marker;
-                    //console.log(p.mouseY < 8 && p.mouseY > 2);
-                    //console.log((mouseX > end + 12) && (mouseX < end + 18));
-                    if (/*(p.mouseY < 8) &&
-                        (p.mouseY > 2) &&*/
-                        (mouseX > end + 12) &&
-                        (mouseX < end + 18)
-                    )
-                        rollover.X = true;
-                    return true;
-                }
-                return false;
-            });
-            return Mouse.setRollover(rollover);
+            Mouse.setRollover(rollover);
+            Mouse.eval_cursor();
+            return;
         }
 
         Window.updateCursorLoc();
@@ -2259,7 +2256,6 @@ export default function measure(p) {
             return Mouse.move.filter_move();
 
         if (API.pollSelecting('offset')) {
-            console.log(Window.insertMeas);
             insertMeasSelecting();
             API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale, { insertMeas: Window.insertMeas.temp_offset });
             // return without changing rollover??
@@ -2491,8 +2487,6 @@ export default function measure(p) {
                                 last_beat = [end, frac[1]].map(s=>s.toString());
                             }
                             
-                            //console.log(last_beat);
-
                             // search again for duration
                             meas.schemaIds.some(search(beat_start));
                             if (in_schema) {
@@ -2506,7 +2500,6 @@ export default function measure(p) {
                                 }
 
                                 place = [(beat+1), Math.max(note, basis)].map(p=>p.toString());
-                                //console.log(place);
                                 nominal = [note + ': ' + place.join('/')];
                                 let dur_relation = in_schema.basis / note;
                                 beat_dur = inc * dur_relation;
@@ -2515,15 +2508,12 @@ export default function measure(p) {
                                     beat_dur = in_schema.beat_end - beat_start;
                                 let sschema = in_schema;
                                 while (sschema) {
-                                    //nominal.push(`(${sschema.nominal}, ${sschema.beat})`);
                                     nominal.push(sschema.nominal);
                                     sschema = sschema.parent;
                                 }
-                            } else if (old_schema && last_beat) {
-                                place = last_beat;//[(beat+1), Math.max(note, basis)].map(p=>p.toString());
-                            }
+                            } else if (old_schema && last_beat)
+                                place = last_beat;
                         } 
-                        console.log(place);
                         let PPB = Window.CONSTANTS.PPQ*(4/meas.denom);
 
                         let rollover = { meas, inst, type: 'entry', 
