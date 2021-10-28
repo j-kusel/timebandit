@@ -509,7 +509,6 @@ class App extends Component {
       };
 
       var exportSelected = (selected) => {
-          console.log(selected);
           let instruments = this.state.instruments.map(
               (inst,i) => ({ measures: {}, name: inst.name })
           );
@@ -519,7 +518,6 @@ class App extends Component {
           /*instruments.forEach(inst =>
               inst.ordered = order_by_key(inst.measures, 'offset')
           );*/
-          console.log(instruments);
           this.setState({ partialExport: instruments, exportsOpen: true });
       }
 

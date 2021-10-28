@@ -2212,43 +2212,9 @@ export default function measure(p) {
             return false;
         }
 
-
-        // marker rollover
-        if (p.mouseY < c.PLAYBACK_HEIGHT+6) {
-            let mouseX = p.mouseX - c.PANES_WIDTH - Window.viewport;
-            let rollover = {};
-            if (mouseX > Window.loop.cache.start-6 && mouseX < Window.loop.cache.end+6) {
-                rollover.type = 'loop';
-                if (mouseX < Window.loop.cache.start + 6)
-                    rollover.side = 'start'
-                else if (mouseX > Window.loop.cache.end - 6)
-                    rollover.side = 'end';
-            } else {
-                // loop rollover
-                rollover.type = 'marker';
-                Object.keys(Window.markers).some(key => {
-                    let marker = Window.markers[key]; 
-                    let cache = marker.cache;
-                    let end = (cache.end || cache.start);
-                    if (mouseX > cache.start-20 && mouseX < end+20) {
-                        rollover.marker = marker;
-                        //console.log(p.mouseY < 8 && p.mouseY > 2);
-                        //console.log((mouseX > end + 12) && (mouseX < end + 18));
-                        if ((p.mouseY < 10) &&
-                            (p.mouseY > 2) &&
-                            (mouseX > end - 10) &&
-                            (mouseX < end - 2)
-                        )
-                            rollover.X = true;
-                        return true;
-                    }
-                    return false;
-                });
-            }
-            Mouse.setRollover(rollover);
-            Mouse.eval_cursor();
-            return;
-        }
+        // loop/marker
+        if (Mouse.rolloverLoop()) return;
+        if (Mouse.rolloverMarker()) return;
 
         Window.updateCursorLoc();
 
@@ -2258,10 +2224,11 @@ export default function measure(p) {
         if (API.pollSelecting('offset')) {
             insertMeasSelecting();
             API.newCursor((p.mouseX - Window.viewport - c.PANES_WIDTH)/Window.scale, { insertMeas: Window.insertMeas.temp_offset });
-            // return without changing rollover??
             return false;
         }
 
+        if (Mouse.rolloverLoop() || Mouse.rolloverMarker())
+            return;
 
         // if editor is open, reset any hover selection
         if (Window.editor.type)
@@ -2270,6 +2237,8 @@ export default function measure(p) {
 
         // checking for rollover.
         // which instrument?
+        Mouse.rolloverInstruments(instruments);
+/*
         let y_loc = p.mouseY - c.PLAYBACK_HEIGHT + Window.scroll;
         let inst = Math.floor(y_loc/c.INST_HEIGHT);
         if (inst < instruments.length && inst >= 0) {
@@ -2637,6 +2606,7 @@ export default function measure(p) {
         Mouse.eval_cursor();
 
         return false;
+        */
     };
     
 }
