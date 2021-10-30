@@ -4,7 +4,7 @@
  */
 
 import { order_by_key, check_proximity_by_key, crowding, calc_gaps, global_gaps, monitor } from '../Util/index.js';
-import { lt, lte, gt, gte } from '../Util/index.js';
+import { lte, /*lt, gte, gt*/ } from '../Util/index.js';
 //import { bit_toggle } from '../Util/index.js';
 import logger from '../Util/logger.js';
 import c from '../config/CONFIG.json';
@@ -25,8 +25,8 @@ import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, /*KeyC, KeyV, KeyZ*/ } from '../Uti
 import tutorials from '../Util/tutorials/index.js';
 import { MenuComposer } from '../Util/menus.js';
 
-const DEBUG = process.env.NODE_ENV === 'development';
-const SLOW = process.env.NODE_ENV === 'development';
+const DEBUG = false; //process.env.NODE_ENV === 'development';
+const SLOW = false; //process.env.NODE_ENV === 'development';
 
 var API = {};
 
@@ -1332,6 +1332,10 @@ export default function measure(p) {
         // PUT THIS ELSEWHERE
         Object.keys(Window.menus).forEach(k => Window.menus[k].calc_all());
 
+        // only handle canvas clicks
+        if (e.target.className !== 'p5Canvas')
+            return;
+
         let checks = [
             { name: 'API.modalCheck', func: API.modalCheck, },
             { name: 'tuts._mouseBlocker', func: tuts._mouseBlocker, },
@@ -1417,6 +1421,7 @@ export default function measure(p) {
         // handle editor markings
         if (Mouse.rollover.type.indexOf('marking') > -1) {
             let type = Mouse.rollover.type.split('_')[0];
+            console.log(type);
             if (type === 'instName')
                 Window.enter_instName(Mouse.rollover.inst, instruments[Mouse.rollover.inst].name)
             else if (Window.editor.type && Window.editor.type !== type) {

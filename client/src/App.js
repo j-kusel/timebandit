@@ -23,7 +23,7 @@ import { ExportModal, SettingsModal, WarningModal, NewFileModal, TutorialsModal,
 import CONFIG from './config/CONFIG.json';
 import debug from './Util/debug.json';
 
-const DEBUG = process.env.NODE_ENV === 'development';
+const DEBUG = false; //process.env.NODE_ENV === 'development';
 var socket;
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
@@ -525,7 +525,7 @@ class App extends Component {
           // clear history here
           self.setState({
               selected: { inst: -1, meas: undefined },
-              instruments: [],
+              instruments: [{ name: 'default', measures: {}, audioId: uuidv4() }],
               ordered: {}
           });
       }
@@ -1112,26 +1112,24 @@ class App extends Component {
       }
       //else if (_.isEqual(this.state.ordered, {})) {
           var root;
+          var metro;
           this.state.instruments.forEach((inst, i_ind) =>
               Object.keys(inst.measures).forEach((key) => {
                   let meas = inst.measures[key];
                   // events
                   meas.events.forEach(event => {
-                      console.log(event);
                       root = ordered.tree.insert(event.ms_start + meas.offset, meas, root)
                   });
 
                   // metronome
-                  /*
                   meas.beats.forEach((beat) =>
-                      root = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], root)
+                      metro = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], metro)
                   );
-                  */
               })
           );
-          console.log(root);
 
-          audio.play(isPlaying, root, cursor, audioIds, loop);
+          //audio.play(isPlaying, root, cursor, audioIds, loop);
+          audio.play(isPlaying, metro, cursor, audioIds, loop);
           //newState.ordered = root;
       /*} else
           audio.play(isPlaying, this.state.ordered, cursor, audioIds, loop);

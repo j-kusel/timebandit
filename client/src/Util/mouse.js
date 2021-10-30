@@ -241,7 +241,7 @@ export default (p, Window) => {
                     return search(drag, breaks.right[0]);
                 }
             } else
-                this.drag.filter_drag = (d) => d;
+                this.drag.filter_drag = (d) => [d, -Infinity, Infinity];
             
             this.drag.mode = 'measure';
         }
@@ -337,7 +337,6 @@ export default (p, Window) => {
                     rollover.type = 'instName_marking';
                 else // check for measure rollover
                     rollover = this.rolloverMeasures(rollover, instrument, frameX, frameY);
-                console.log(rollover);
                 this.setRollover(rollover);
                 this.eval_cursor();
                 return true;
@@ -486,6 +485,7 @@ export default (p, Window) => {
                     if (beat_ro)
                         return (rollover = beat_ro);
                 }
+                return false;
             });
             return rollover;
         }
