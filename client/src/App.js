@@ -23,7 +23,7 @@ import { ExportModal, SettingsModal, WarningModal, NewFileModal, TutorialsModal,
 import CONFIG from './config/CONFIG.json';
 import debug from './Util/debug.json';
 
-const DEBUG = false; //process.env.NODE_ENV === 'development';
+const DEBUG = process.env.NODE_ENV === 'development';
 var socket;
 
 const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[1] }));
@@ -1129,6 +1129,7 @@ class App extends Component {
           );
 
           //audio.play(isPlaying, root, cursor, audioIds, loop);
+          console.log(audioIds);
           audio.play(isPlaying, metro, cursor, audioIds, loop);
           //newState.ordered = root;
       /*} else
