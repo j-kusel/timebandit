@@ -144,11 +144,8 @@ class App extends Component {
       state.reservePPQ = state.PPQ;
       state.reservePPQ_tempo = state.PPQ_tempo;
 
-      // subscribe to audio updates
-      audio.subscribe((e) => this.setState(oldState => ({ tracking: e.tracking })));
-      // hook into buzzer
-      audio.schedulerHook((data) => {
-      });
+      // trigger subscription for server
+      // BUNDLE INSTRUMENT TRIGGERS LATER
       audio.triggerHook((instIds) => {
           let targets = this.state.instruments.reduce((acc, inst, i) =>
               (instIds.indexOf(i) >= 0) ?
@@ -1129,7 +1126,6 @@ class App extends Component {
           );
 
           //audio.play(isPlaying, root, cursor, audioIds, loop);
-          console.log(audioIds);
           audio.play(isPlaying, metro, cursor, audioIds, loop);
           //newState.ordered = root;
       /*} else

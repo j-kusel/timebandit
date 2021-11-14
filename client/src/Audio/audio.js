@@ -54,22 +54,35 @@ class Clock {
 
     clear_queue() {
         this.queue = [];
+        this.playing = false;
     }
 
     run() {
+        console.log('running');
+        locator.current = this.aC.currentTime - this.start;
+
+
+        // if all events are done:
+        //  - is there loop left? keep run()ing.
+        //  - past the loop? start backing the pointer up and finish below.
+        //  - not looping? we're done!
         if (this.pointer >= this.queue.length) {
-            this.playing = false;
+            if (PARAMS.loop) {
+                if (locator.current < PARAMS.loop[1])
+                    return setTimeout(this.run, 0)
+                else
+                    this.pointer = this.queue.length - 1;
+            } else
+                return this.playing = false;
         }
 
-        locator.current = this.aC.currentTime - this.start;
 
         // CAN'T CHANGE LOOP ON THE FLY WITH THIS
         if (PARAMS.loop && locator.current >= PARAMS.loop[1]) {
             while (this.pointer > 0 && this.queue[this.pointer] > PARAMS.loop[0])
                 this.pointer--;
-            let loop_len = PARAMS.loop[1] - PARAMS.loop[0];
-            this.start += loop_len;
-            locator.current -= loop_len;
+            this.start += PARAMS.loop[1] - PARAMS.loop[0];
+            locator.current = this.aC.currentTime - this.start;
             PARAMS.loop_counter++;
         }
         
@@ -145,6 +158,11 @@ class _AudioInst {
             });
             var timing = offset || aC.currentTime;
             //gain.gain.cancelScheduledValues(aC.currentTime);
+
+            // triggers should be bundled between instruments... which means clocks should be bundled.
+            // this isn't ideal yet.
+            trigger_hooks.forEach(hook => hook(this.id));
+
             this.gain.gain.setValueAtTime(0.0, timing);
             this.gain.gain.linearRampToValueAtTime(0.7, timing += 0.005);
             this.gain.gain.linearRampToValueAtTime(0.0, timing + 0.015);
@@ -230,41 +248,39 @@ const setFrequency = (id, freq) => {
 
 
 var playback = (isPlaying, score, tracking, audioIds, loop) => {
-
-    if (isPlaying) {
-        locator = {
-            current: tracking,
-            origin: tracking/1000.0,
-            start: aC.currentTime
-        };
-        if (aC.state === 'suspended')
-            aC.resume();
-        if (loop && tracking <= loop[1]) {
-            PARAMS.loop = loop.map(l => l / 1000);
-            PARAMS.loop_counter = 0;
-        } else
-            PARAMS.loop = false;
-        tracking = tracking || 0;
-        let queues = audioIds.map(__ => []);
-        var search = (node) => {
-            if (!node)
-                return;
-            search(node.left);
-            node.meas.forEach(meas => {
-                var id = audioIds[meas.inst];
-                let inst = insts[id];
-                queues[meas.inst].push(node.loc);
-                inst.clock.add_events(node.loc);
-            })
-            search(node.right);
-        }    
-        search(score);
-
-        Object.keys(insts).forEach(key => insts[key].clock.play(true));
-    } else
-        Object.keys(insts).forEach(inst =>
+    if (!isPlaying)
+        return Object.keys(insts).forEach(inst =>
             insts[inst].clock.clear_queue()
         );
+    locator = {
+        current: tracking,
+        origin: tracking/1000.0,
+        start: aC.currentTime
+    };
+    if (aC.state === 'suspended')
+        aC.resume();
+    if (loop && tracking <= loop[1]) {
+        PARAMS.loop = loop.map(l => l / 1000);
+        PARAMS.loop_counter = 0;
+    } else
+        PARAMS.loop = false;
+    tracking = tracking || 0;
+    let queues = audioIds.map(__ => []);
+    var search = (node) => {
+        if (!node)
+            return;
+        search(node.left);
+        node.meas.forEach(meas => {
+            var id = audioIds[meas.inst];
+            let inst = insts[id];
+            queues[meas.inst].push(node.loc);
+            inst.clock.add_events(node.loc);
+        })
+        search(node.right);
+    }    
+    search(score);
+
+    Object.keys(insts).forEach(key => insts[key].clock.play(true));
 }
 
 var loop = (range) => {
@@ -310,14 +326,7 @@ var audio = {
     triggerHook: (func) => trigger_hooks.push(func),
     schedulerHook: (func) => scheduler_hooks.push(func),
     context: aC,
-    locator: () => {
-        /*let seconds = aC.currentTime - locator.start + locator.origin;
-        let ms = seconds * 1000.0;
-        if (PARAMS.loop && PARAMS.loop_counter)
-            seconds -= PARAMS.loop_counter * (PARAMS.loop[1]-PARAMS.loop[0]);
-            */
-        return locator.current*1000; //seconds * 1000.0;
-    },
+    locator: () => locator.current*1000,
     WAVES
 }
 
