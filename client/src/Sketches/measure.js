@@ -100,6 +100,17 @@ export default function measure(p) {
         snapped_inst: {}
     };
 
+    // find snap point closest to a position in other instruments
+    var closest = (position, inst, div) =>
+        Object.keys(snaps.divs[div]).reduce((acc, key, ind, keys) => {
+            if (snaps.divs[div][key][0].inst === inst)
+                return acc;
+            let gap = parseFloat(key, 10) - position;
+            return (Math.abs(gap) < Math.abs(acc.gap) ? 
+                { target: parseFloat(key, 10), gap, inst: snaps.divs[div][key][0].inst } :
+                acc);
+        }, { target: -1, gap: Infinity, inst: -1 });
+
     // cached from nudge algorithm as { start, slope, offset, ms }
     var nudge_cache = false;
     // { start: [location, distance-from-location], end: [location, distance-from-location], gap: []}
@@ -1517,7 +1528,10 @@ export default function measure(p) {
             return;
 
         if (Mouse.drag.mode === 'loop')
-            return Window.drag_loop(Mouse.rollover.side);
+            return Window.drag_loop(Mouse.rollover.side, 
+                (position) => closest(position, null, snaps.div_index)
+            );
+
         if (Mouse.drag.mode === 'marker')
             return Window.drag_marker(Mouse.drag.x);
 
@@ -1606,16 +1620,6 @@ export default function measure(p) {
 
 
 
-        // find snap point closest to a position in other instruments
-        var closest = (position, inst, div) =>
-            Object.keys(snaps.divs[div]).reduce((acc, key, ind, keys) => {
-                if (snaps.divs[div][key][0].inst === inst)
-                    return acc;
-                let gap = parseFloat(key, 10) - position;
-                return (Math.abs(gap) < Math.abs(acc.gap) ? 
-                    { target: parseFloat(key, 10), gap, inst: snaps.divs[div][key][0].inst } :
-                    acc);
-            }, { target: -1, gap: Infinity, inst: -1 });
 
         // wrapper for closest() that takes an array of beat candidates for snapping
         var snap_eval = (position, candidates, exempt) =>

@@ -288,8 +288,12 @@ export default (p) => {
             this.temp_marker = {};
         }
 
-        drag_loop(side) {
+        drag_loop(side, closest) {
             let update = this.x_to_ms(p.mouseX - c.PANES_WIDTH);
+            let close = closest(update);
+            if (Math.abs(close.gap*this.scale) <= 20)
+                update = close.target;
+
             // restrict loop change relative to other side
             this.loop[side] = side === 'start' ?
                 Math.min(update, this.loop.end) :

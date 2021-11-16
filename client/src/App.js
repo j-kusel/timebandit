@@ -130,7 +130,7 @@ class App extends Component {
       //].forEach(key => this.state.key = false);
       ].forEach(key => state[key] = false);
 
-      state.welcomeOpen = true; //(!window.localStorage.getItem('returning'));
+      state.welcomeOpen = (!window.localStorage.getItem('returning'));
 
       [
         'insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'insertSubmitFocus',
