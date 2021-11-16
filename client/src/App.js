@@ -129,6 +129,9 @@ class App extends Component {
       // I THINK THIS WAS AN ERROR?
       //].forEach(key => this.state.key = false);
       ].forEach(key => state[key] = false);
+
+      state.welcomeOpen = true; //(!window.localStorage.getItem('returning'));
+
       [
         'insertFocusStart', 'insertFocusEnd', 'insertFocusTimesig', 'insertSubmitFocus',
         'instNameFocus',
@@ -262,7 +265,7 @@ class App extends Component {
       };
 
       var modalCheck = () => 
-          ['warningNew', 'warningOpen', 'settingsOpen', 'tutorialsOpen', 'exportsOpen'].some(o => this.state[o]);
+          ['warningNew', 'warningOpen', 'settingsOpen', 'tutorialsOpen', 'exportsOpen', 'welcomeOpen'].some(o => this.state[o]);
 
       var printoutCheck = () => this.state.printoutExport;
       var printoutSet = (bool) => this.setState({ printoutExport: bool });
@@ -524,14 +527,6 @@ class App extends Component {
           this.setState({ partialExport: instruments, exportsOpen: true });
       }
 
-      var newFile = () => {
-          // clear history here
-          self.setState({
-              selected: { inst: -1, meas: undefined },
-              instruments: [{ name: 'default', measures: {}, audioId: uuidv4() }],
-              ordered: {}
-          });
-      }
 
       var newCursor = (loc, meta) => {
           let newState = { cursor: loc };
@@ -643,16 +638,33 @@ class App extends Component {
           edit_timesig: ts,
       });
 
-      var newInstrument = (name) =>
+      var newInstrument = (name, freq, returning) => {
+          let instruments = this.state.instruments;
+          let audioId = uuidv4();
+          let frequency = freq ||
+              audio.getFrequency(instruments[instruments.length-1].audioId) * 2;
+          audio.newInst(audioId, { type: 'sine', frequency });
+          let newInst = { name, measures: {}, audioId }
+          if (returning)
+              return newInst;
+
           this.setStateHistory(oldState => {
               let instruments = oldState.instruments;
-              let audioId = uuidv4();
-              let frequency = instruments.length ?
-                  audio.getFrequency(instruments[instruments.length-1].audioId) * 2 : 440;
-              audio.newInst(audioId, { type: 'sine', frequency })
-              instruments.push({ name, measures: {}, audioId });
+              instruments.push(newInst);
               return ({ instruments });
           });
+      }
+
+      var newFile = () => {
+          console.log('making new file');
+          audio.clear();
+          // clear history here
+          self.setState({
+              selected: { inst: -1, meas: undefined },
+              instruments: [newInstrument('default', 440, true)],
+              ordered: {}
+          });
+      }
 
 
       var newMeasure = (measures) => { //inst, start, end, timesig, offset) => {
@@ -1529,10 +1541,6 @@ class App extends Component {
       </Metadata>);
       */
 
-    let welcome = false;
-
-    if (!window.localStorage.getItem('returning'))
-        welcome = true;
     let newInstHeight = this.state.instruments.length*CONFIG.INST_HEIGHT + CONFIG.PLAYBACK_HEIGHT - this.state.scrollY;
 
 	let propsUI = {
@@ -1759,12 +1767,16 @@ class App extends Component {
             beginTut={this.handleTut}
         />
         <WelcomeModal
-            show={welcome}
-            onHide={() => window.localStorage.setItem('returning', 'true')}
+            show={this.state.welcomeOpen}
+            onHide={() => {
+                window.localStorage.setItem('returning', 'true')
+                this.setState({ welcomeOpen: false});
+            }}
             quickstart={(e) => {
                 e.preventDefault();
                 window.localStorage.setItem('returning', 'true')
                 this.handleTut('quickstart');
+                this.setState({ welcomeOpen: false});
             }}
         />
       </div>

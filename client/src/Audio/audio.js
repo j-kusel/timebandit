@@ -238,6 +238,8 @@ const setType = (id, type) => {
 
 
 const getFrequency = (id) => {
+    console.log(id);
+    console.log(insts);
     return insts[id].frequency();
 }
 
@@ -300,6 +302,13 @@ var solo = (target, bool) => {
         inst.mute.gain.linearRampToValueAtTime(vol, aC.currentTime + 0.05);
     });
 }
+
+var clear = () => {
+    Object.keys(insts).forEach(key => {
+        deleteInst(key);
+    });
+}
+
 var audio = {
     init: () => aC.resume().then(() => console.log('resumed')),
     newInst,
@@ -310,6 +319,7 @@ var audio = {
         Object.keys(insts).forEach(inst =>
             insts[inst].clock.clear_queue()
         ),
+    clear,
     setVolume,
     getType,
     setType,

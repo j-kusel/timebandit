@@ -216,7 +216,7 @@ var WelcomeModal = (props) =>
         centered
       >
         <ModalBody>
-            <p style={{color: 'black'}}>Bandit is a software/hardware ecosystem for managing complex time in music and sound design. If this is your first time, consider trying a brief tutorial on basic functions available <a style={{color: 'red'}} onClick={props.quickstart}>here</a>. This and other tutorials can be launched from the menu at the bottom of the screen.</p>
+            <p style={{color: 'black'}}>Bandit is a software/hardware ecosystem for managing complex time in music and sound design. Hang tight, tutorials are on the way!{/*If this is your first time, consider trying a brief tutorial on basic functions available <a style={{color: 'red'}} onClick={props.quickstart}>here</a>. This and other tutorials can be launched from the menu at the bottom of the screen.*/}</p>
         </ModalBody>
       </Modal.Dialog>
     </StyledModal>);

@@ -16,7 +16,7 @@ export default (p, registration, API, Window, blockerSet) => {
         coords: { x: () => p.width/3, y: () => p.height/3, x2: () => p.width*2/3, y2: () => p.height*2/3 },
         preparation: () => {
             API.newFile();
-            API.newInstrument('default');
+            //API.newInstrument('default');
         },
         criteria: [],
         text: [

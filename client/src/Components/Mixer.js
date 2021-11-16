@@ -275,7 +275,6 @@ class Mixer extends Component {
                 </td>
             </MixerRow>
         )});
-        console.log(colors);
             
         return (
             <div>
