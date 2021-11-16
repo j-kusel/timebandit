@@ -82,7 +82,12 @@ class App extends Component {
               measures: {}
           }*/],
           markers: {},
-          ordered: {},
+
+          score: null, // uses ordered utility
+          metro: null, // uses ordered utility
+          playType: 'metro',
+
+          ordered: {}, // may be deprecated by score, metro
           cursor: 0.0,
           start: '',
           end: '',
@@ -193,8 +198,9 @@ class App extends Component {
           'focusInsertSubmit',
           'setStateHistory',
           'undoStateHistory',
-          'redoStateHistory'
-
+          'redoStateHistory',
+          'cache_audio',
+          'toggle_metro',
 	  ].forEach(func => self[func] = self[func].bind(this));
 
       this.history = [];
@@ -1098,45 +1104,58 @@ class App extends Component {
 
   };
 
+  toggle_metro() {
+      let playType = this.state.playType === 'metro' ?
+          'score' : 'metro';
+      this.setState({ playType });
+  }
+
+  cache_audio(type) {
+      let returned = {};
+      this.state.instruments.forEach(inst => {
+          Object.keys(inst.measures).forEach(key => {
+              let meas = inst.measures[key];
+              if (type === 'metro')
+                  meas.beats.forEach(beat =>
+                      returned = ordered.tree.insert(beat + meas.offset, meas, returned)
+                  );
+              else if (type === 'score')
+                  meas.events.forEach(event => {
+                      returned = ordered.tree.insert(event.ms_start + meas.offset, meas, returned)
+                  });
+          });
+      })
+      return returned;
+  }
+
   play(isPlaying, cursor, loop) {
       if (this.state.mouseBlocker())
           return;
 
-      let newState = {};
-      let audioIds = this.state.instruments.map(i => i.audioId);
       if (!isPlaying) {
           audio.kill();
+          return this.setState({ isPlaying });
       }
-      //else if (_.isEqual(this.state.ordered, {})) {
-          var root;
-          var metro;
-          this.state.instruments.forEach((inst, i_ind) =>
-              Object.keys(inst.measures).forEach((key) => {
-                  let meas = inst.measures[key];
-                  // events
-                  meas.events.forEach(event => {
-                      root = ordered.tree.insert(event.ms_start + meas.offset, meas, root)
-                  });
 
-                  // metronome
-                  meas.beats.forEach((beat) =>
-                      metro = ordered.tree.insert(beat + inst.measures[key].offset, inst.measures[key], metro)
-                  );
-              })
-          );
+      let audioIds = this.state.instruments.map(i => i.audioId);
+      let type = this.state.playType;
+      let target = this.state[type];
 
-          //audio.play(isPlaying, root, cursor, audioIds, loop);
-          audio.play(isPlaying, metro, cursor, audioIds, loop);
-          //newState.ordered = root;
-      /*} else
-          audio.play(isPlaying, this.state.ordered, cursor, audioIds, loop);
-          */
+      let newState = { isPlaying };
+      // calculate cache if empty
+      if (!target) {
+          target = this.cache_audio(type);
+          newState[type] = target;
+      }
+      if (!target.meas)
+        return;     
+      audio.play(target, cursor, audioIds, loop);
 
       document.activeElement.blur();
-      newState.isPlaying = isPlaying;
       this.setState(newState);
   }
 
+  // DEPRECATED FOR NOW
   preview(isPreviewing) {
       if (this.state.mouseBlocker())
           return;
@@ -1194,7 +1213,6 @@ class App extends Component {
               // events
               if (meas.events)
                   meas.events.forEach(e => {
-                      console.log(e.nominal);
                       rows.push(
                         [''].concat(e.nominal.shift())
                             .concat(e.nominal.join(' ')));
@@ -1487,9 +1505,6 @@ class App extends Component {
 			</StyledInputGroup>
 		</form>
         
-    //tempo_ppqs.forEach((p) => console.log(p));
-      //
-
     //let modalButtons = ['Close', 'Save changes'].map((name, ind) => (<Upload key={ind}>{name}</Upload>));
 
     let selected = this.state.selected;
@@ -1646,7 +1661,7 @@ class App extends Component {
 
                     {/*<span style={{ position: 'relative', float: 'right' }}>{this.state.filename}</span>*/}
             <Server registerSocket={this.registerSocket}/>
-            <Mixer audio={audio} insts={this.state.instruments} instMove={this.handleInstMove}/>
+            <Mixer audio={audio} insts={this.state.instruments} instMove={this.handleInstMove} toggleMetro={this.toggle_metro} metro={this.state.playType==='metro'}/>
         {/*<Logger>*/}
           </Footer>
         </div>

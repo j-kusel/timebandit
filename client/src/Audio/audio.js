@@ -247,11 +247,7 @@ const setFrequency = (id, freq) => {
 
 
 
-var playback = (isPlaying, score, tracking, audioIds, loop) => {
-    if (!isPlaying)
-        return Object.keys(insts).forEach(inst =>
-            insts[inst].clock.clear_queue()
-        );
+var playback = (score, tracking, audioIds, loop) => {
     locator = {
         current: tracking,
         origin: tracking/1000.0,
@@ -310,7 +306,10 @@ var audio = {
     deleteInst,
     play: playback, //compile(score), //score.forEach((inst, ind) =>
         //inst[1].forEach((beat) => trigger(ind, beat, adsr))),
-    kill: () => playback(false),
+    kill: () => 
+        Object.keys(insts).forEach(inst =>
+            insts[inst].clock.clear_queue()
+        ),
     setVolume,
     getType,
     setType,

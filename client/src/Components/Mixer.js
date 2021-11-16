@@ -275,11 +275,12 @@ class Mixer extends Component {
                 </td>
             </MixerRow>
         )});
+        console.log(colors);
             
         return (
             <div>
             <Module style={this.props.style}>
-                <PanelHeader>Mixer</PanelHeader>
+                <PanelHeader>Mixer <MixerButton style={{color: this.props.metro ? colors.accent : colors.primary}} onClick={this.props.toggleMetro}>V</MixerButton></PanelHeader>
                 <div style={{ overflow: 'auto', scrollbarWidth: 'none', height: '60px' }}>
                     <table>
                         {insts}
