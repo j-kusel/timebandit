@@ -58,6 +58,7 @@
   },
   "main": "index.js",
   "devDependencies": {
+    "gif.js": "^0.2.0",
     "gulp": "^4.0.2",
     "gulp-jsdoc3": "^3.0.0"
   },

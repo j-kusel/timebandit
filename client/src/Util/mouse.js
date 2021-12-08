@@ -1,6 +1,13 @@
 //import _ from 'lodash';
 import c from '../config/CONFIG.json';
 import { lt, lte } from './index';
+import { colors } from 'bandit-lib';
+import pointer from './../static/pointers/pointer.svg';
+import text from './../static/pointers/text.svg';
+import ew_resize from './../static/pointers/ew-resize.svg';
+import def from './../static/pointers/default.svg';
+
+let loadCursors = { pointer, text, 'ew-resize': ew_resize, def };
 
 /*var drag_cursors = {
     'tempo': 'ns-resize',
@@ -25,7 +32,42 @@ export default (p, Window) => {
             this.rollover = { type: '' };
             this._rollover = {};
             this.lock_type = null;
-            this.cursor = 'default';
+            this.cursor = 'def';
+            this.press = 0;
+
+            this.cursors = { 'def': {}, 'ew-resize': {}, 
+                'pointer': {}, 'text': {} };
+            let icon_dims = {
+                'def': [0, 0, 20, 20, 7, 3],
+                'ew-resize': [-8, -8, 20, 20, 0, 0],
+                'pointer': [-6, 0, 20, 20, 0, 0],
+                'text': [-8, -11, 20, 20, 2, 2]
+            };
+
+            Object.keys(this.cursors).forEach(icon =>
+                p.loadImage(loadCursors[icon], img => {
+                    console.log(img);
+                    this.cursors[icon].icon = img;
+                    this.cursors[icon].draw = () => 
+                        p.image(img, ...icon_dims[icon]);
+                })
+            );
+        }
+
+        draw() {
+            p.push();
+            p.translate(p.mouseX, p.mouseY);
+            if (this.press) {
+                let col = p.color(colors.primary);
+                if (this.press <= 10)
+                    col.setAlpha(255/10*this.press);
+                p.both(col);
+                p.circle(0, 0, 16-(this.press--));
+            }
+            if (this.cursors[this.cursor].draw)
+                this.cursors[this.cursor].draw();
+
+            p.pop();
         }
 
         checkLock() {
@@ -661,7 +703,7 @@ export default (p, Window) => {
         }
 
         eval_cursor() {
-            this.cursor = 'default';
+            this.cursor = 'def';
             if (this.rollover.type === 'loop' && this.rollover.side)
                 this.cursor = 'ew-resize'
             else if (this.rollover.type === 'marker') {

@@ -25,8 +25,11 @@ import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, /*KeyC, KeyV, KeyZ*/ } from '../Uti
 import tutorials from '../Util/tutorials/index.js';
 import { MenuComposer } from '../Util/menus.js';
 
+import CCapture from 'ccapture.js-npmfixed';
+
 const DEBUG = false; //process.env.NODE_ENV === 'development';
 const SLOW = false; //process.env.NODE_ENV === 'development';
+const GIF = true;
 
 var API = {};
 
@@ -59,6 +62,18 @@ var insert = (list, item) => {
     return insert(left, item).concat(right);
 }; */
 
+var capturer;
+var cap_start;
+var cap_end;
+var capturing = false;
+var key_stack = [];
+if (GIF) {
+    capturer = new CCapture( {
+        framerate: 60,
+        verbose: true,
+        format: 'gif'
+    } );
+}
 
 export default function measure(p) {
     // monkey-patching Processing
@@ -294,6 +309,22 @@ export default function measure(p) {
 
     p.setup = function () {
         p.createCanvas(p.windowWidth - c.CANVAS_PADDING * 2, p.windowHeight - c.FOOTER_HEIGHT);
+        if (GIF) {
+            cap_start = p.createButton('start');
+            cap_start.position(p.width - 100, p.height - 100);
+            cap_start.mousePressed(() => {
+                capturing = true;
+                capturer.start();
+            });
+            cap_end = p.createButton('end');
+            cap_end.position(p.width - 50, p.height - 100);
+            cap_end.mousePressed(() => {
+                capturing = false;
+                capturer.stop();
+                capturer.save();
+            });
+            document.getElementById('defaultCanvas0').style.cursor = 'none';
+        }
     };
 
     p.windowResized = function () {
@@ -443,7 +474,7 @@ export default function measure(p) {
     }
 
     p.draw = function () {
-        if (SLOW)
+        if (SLOW && (!GIF))
             p.frameRate(10);
 
         Window.drawFrame();
@@ -1004,8 +1035,24 @@ export default function measure(p) {
             p.pop();
         }
 
+        if (GIF) {
+            Mouse.draw();
+            p.push();
+            p.translate(20, p.height - 50);
+            key_stack.forEach(k => {
+                p.both(colors.primary);
+                let w = p.textWidth(k);
+                p.rect(0, 0, w+8, 22, 6, 6);
+                p.textAlign(p.CENTER, p.CENTER);
+                p.both(colors.secondary);
+                p.text(k, w*0.5+4, 12);
+                p.translate(w + 12, 0);
+            });
+            p.pop();
+        }
             
-
+        if (GIF && capturing)
+            capturer.capture(document.getElementById('defaultCanvas0'));
     }
 
     p.keyReleased = function(e) {
@@ -1014,11 +1061,18 @@ export default function measure(p) {
         let num = NUM.indexOf(e.keyCode);
         if (num >= 0 && num === snaps.div_index)
             return (snaps.div_index = 0);
-        mods.forEach(k => {
+        mods.some(k => {
             if (e.keyCode === keycodes[k]) {
                 Window.mods[k.toLowerCase()] = false;
+                if (GIF) {
+                    let ind = key_stack.indexOf(k);
+                    if (ind > -1)
+                        key_stack.splice(ind, 1);
+                }
                 mod_change_flag = true;
+                return true;
             }
+            return false;
         })
         if (mod_change_flag)
             Mouse.eval_cursor(Window.mods, Window.selected.meas);
@@ -1037,9 +1091,20 @@ export default function measure(p) {
         mods.forEach(k => {
             if (e.keyCode === keycodes[k]) {
                 Window.mods[k.toLowerCase()] = true;
+                if (GIF)
+                    key_stack.push(k);
                 mod_change_flag = true;
             }
         });
+
+        if (GIF && p.keyCode === 188) {
+            if (capturing) {
+                capturer.stop();
+                capturer.save();
+            } else
+                capturer.start();
+            capturer = !capturer;
+        }
 
         // this updates the mouse cursor when turning mod keys on and off
         // (otherwise the cursor would only refresh on movement!)
@@ -1346,6 +1411,10 @@ export default function measure(p) {
         // only handle canvas clicks
         if (e.target.className !== 'p5Canvas')
             return;
+
+        // 
+        if (GIF)
+            Mouse.press = 16;
 
         let checks = [
             { name: 'API.modalCheck', func: API.modalCheck, },
