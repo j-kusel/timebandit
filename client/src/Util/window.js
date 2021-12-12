@@ -969,7 +969,9 @@ export default (p) => {
 
         updateView(event, { zoom }) {
             if (zoom) {
-                let change = 1.0-event.delta/c.SCROLL_SENSITIVITY;
+                let dabs = Math.abs(event.delta);
+                let delta = dabs >= 100 ? dabs/event.delta*10 : event.delta;
+                let change = 1.0-delta/c.SCROLL_SENSITIVITY;
                 this.scale *= change;
                 this.viewport = p.mouseX - change*(p.mouseX - this.viewport);
             };

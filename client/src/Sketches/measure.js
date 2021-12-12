@@ -25,11 +25,21 @@ import { KeyE, KeyR, KeyU, KeyY, KeyP, KeyI, /*KeyC, KeyV, KeyZ*/ } from '../Uti
 import tutorials from '../Util/tutorials/index.js';
 import { MenuComposer } from '../Util/menus.js';
 
-import CCapture from 'ccapture.js-npmfixed';
+//import CCapture from 'ccapture.js-npmfixed';
 
 const DEBUG = false; //process.env.NODE_ENV === 'development';
 const SLOW = false; //process.env.NODE_ENV === 'development';
-const GIF = true;
+const GIF = process.env.REACT_APP_DEMOS === 'true';
+var capturer;
+if (GIF)
+    import('ccapture.js-npmfixed').then(m => {
+        var CCapture = m.default;
+        capturer = new CCapture( {
+            framerate: 60,
+            verbose: true,
+            format: 'gif'
+        } );
+    });
 
 var API = {};
 
@@ -62,18 +72,11 @@ var insert = (list, item) => {
     return insert(left, item).concat(right);
 }; */
 
-var capturer;
 var cap_start;
 var cap_end;
 var capturing = false;
+var mod_stack = [];
 var key_stack = [];
-if (GIF) {
-    capturer = new CCapture( {
-        framerate: 60,
-        verbose: true,
-        format: 'gif'
-    } );
-}
 
 export default function measure(p) {
     // monkey-patching Processing
@@ -1039,15 +1042,17 @@ export default function measure(p) {
             Mouse.draw();
             p.push();
             p.translate(20, p.height - 50);
-            key_stack.forEach(k => {
-                p.both(colors.primary);
-                let w = p.textWidth(k);
-                p.rect(0, 0, w+8, 22, 6, 6);
-                p.textAlign(p.CENTER, p.CENTER);
-                p.both(colors.secondary);
-                p.text(k, w*0.5+4, 12);
-                p.translate(w + 12, 0);
-            });
+            [mod_stack, key_stack].forEach(stack =>
+                stack.forEach(k => {
+                    p.both(colors.primary);
+                    let w = p.textWidth(k);
+                    p.rect(0, 0, w+8, 22, 6, 6);
+                    p.textAlign(p.CENTER, p.CENTER);
+                    p.both(colors.secondary);
+                    p.text(k, w*0.5+4, 12);
+                    p.translate(w + 12, 0);
+                })
+            );
             p.pop();
         }
             
@@ -1065,15 +1070,24 @@ export default function measure(p) {
             if (e.keyCode === keycodes[k]) {
                 Window.mods[k.toLowerCase()] = false;
                 if (GIF) {
-                    let ind = key_stack.indexOf(k);
+                    let ind = mod_stack.indexOf(k);
                     if (ind > -1)
-                        key_stack.splice(ind, 1);
+                        mod_stack.splice(ind, 1);
                 }
                 mod_change_flag = true;
                 return true;
             }
             return false;
         })
+
+        if (GIF) {
+            if (e.keyCode in LETTERS) {
+                let ind = key_stack.indexOf(LETTERS[e.keyCode]);
+                if (ind > -1)
+                    key_stack.splice(ind, 1);
+            }
+        }
+
         if (mod_change_flag)
             Mouse.eval_cursor(Window.mods, Window.selected.meas);
 
@@ -1092,19 +1106,28 @@ export default function measure(p) {
             if (e.keyCode === keycodes[k]) {
                 Window.mods[k.toLowerCase()] = true;
                 if (GIF)
-                    key_stack.push(k);
+                    mod_stack.push(k);
                 mod_change_flag = true;
             }
         });
 
-        if (GIF && p.keyCode === 188) {
-            if (capturing) {
-                capturer.stop();
-                capturer.save();
-            } else
-                capturer.start();
-            capturer = !capturer;
+        if (GIF) {
+            let names = {};
+            ['SPACE', 'ESC', 'TAB', 'DEL'].forEach(n => names[keycodes[n]] = n);
+            if (p.keyCode in LETTERS)
+                key_stack.push(LETTERS[p.keyCode])
+            else if (p.keyCode in names)
+                key_stack.push(names[p.keyCode]);
+            else if (p.keyCode === 188) {
+                if (capturing) {
+                    capturer.stop();
+                    capturer.save();
+                } else
+                    capturer.start();
+                capturer = !capturer;
+            }
         }
+        
 
         // this updates the mouse cursor when turning mod keys on and off
         // (otherwise the cursor would only refresh on movement!)
@@ -1366,6 +1389,7 @@ export default function measure(p) {
         
         Window.updateCursorLoc();
         Window.updateView(event, { zoom });
+
         tick_zoom();
 
         // if zooming, recalculate location cache
