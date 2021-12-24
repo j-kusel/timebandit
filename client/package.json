@@ -11,7 +11,7 @@
     "jquery": "^1.12.4",
     "jsdoc": "^3.6.5",
     "jszip": "^3.5.0",
-    "lodash": "^4.17.19",
+    "lodash": "^4.17.21",
     "midi-writer-js": "^1.7.4",
     "morgan": "^1.10.0",
     "node-sass-chokidar": "^1.5.0",
