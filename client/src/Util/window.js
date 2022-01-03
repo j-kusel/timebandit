@@ -1554,7 +1554,6 @@ export default (p) => {
             p.line(c.INSERT_WIDTH, 0, c.INSERT_WIDTH, c.TRACKING_HEIGHT);
             p.translate(c.INSERT_PADDING, 0);
             p.text('- INSERT', 0, c.TRACKING_HEIGHT/2);
-            p.text('- EDITOR', c.INSERT_WIDTH, c.TRACKING_HEIGHT/2);
             p.pop();
         }
 
@@ -1772,62 +1771,8 @@ export default (p) => {
                 }
                 p.pop();
             };
-
-            /*if (this.mode === 2) {
-                p.rect(0, 0, c.EDITOR_WIDTH, c.EDITOR_HEIGHT);
-                p.stroke(secondary);
-                p.line(0, c.EDITOR_HEIGHT, c.INSERT_WIDTH, c.EDITOR_HEIGHT); 
-                if (this.selected.meas) {
-                    // push into padding
-                    p.push();
-                    p.stroke(secondary);
-                    p.translate(c.INSERT_PADDING, c.INSERT_PADDING);
-                    let last = c.EDITOR_WIDTH - c.INSERT_PADDING*2;
-                    let meas = this.selected.meas;
-                    meas.beats.forEach((beat) => {
-                        let x = (beat/meas.ms)*last;
-                        p.line(x, 0, x, c.PREVIEW_HEIGHT);
-                    });
-                    // draw tempo
-                    let ystart = this._scaleY(meas.start, c.PREVIEW_HEIGHT, tempoRange);
-                    let yend = this._scaleY(meas.end, c.PREVIEW_HEIGHT, tempoRange);
-                    p.line(0, ystart, last, yend);
-                    p.pop();
-                }
-            }
-            */
             p.pop();
         }
-
-        /*drawEditorFrame(coords, handle) {
-            p.push();
-            let opac = p.color(primary);
-            opac.setAlpha(180);
-            p.both(opac);
-            p.translate(...coords);
-            if (handle)
-                p.ellipse(...handle);
-
-            let PANES_THIN = c.PANES_WIDTH/4;
-            let inc = 180.0 / c.INST_HEIGHT;
-            let op = p.color(primary)
-            let end = this.selected.meas.ms*this.scale;
-            for (let i=0; i <= c.INST_HEIGHT; i++) {
-                op.setAlpha(i*inc);
-                p.stroke(op);
-                p.line(-PANES_THIN, i, 0, i);
-                p.line(end, i, end + PANES_THIN, i);
-            }
-            p.translate(0, c.INST_HEIGHT);
-            p.rect(-PANES_THIN, 0, PANES_THIN*2 + this.selected.meas.ms*this.scale, c.LOCK_HEIGHT);
-
-            p.both(secondary);
-            p.textSize(10);
-            p.textAlign(p.LEFT, p.CENTER);
-            //p.text(`${select.start} -> ${select.end} / ${select.timesig}`, 5, c.PANES_WIDTH);
-                
-            p.pop();
-        }*/
     };
     return new Window();
 

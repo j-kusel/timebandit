@@ -584,21 +584,15 @@ class App extends Component {
             this.insertFocusStart.current.focus();
           } else {
               newState.insertMeas = {};
-              /*if (mode === 2) {
-                //['start', 'end', 'timesig'].forEach(x => newState['edit_'.concat(x)] = this.selected.meas[x]);
-              }
-              else {
-              */
-                  ['start', 'end', 'timesig', 'denom', 'offset'].forEach(x => {
-                      newState[x] = '';
-                      newState['edit_'.concat(x)] = '';
-                  });
+              ['start', 'end', 'timesig', 'denom', 'offset'].forEach(x => {
+                  newState[x] = '';
+                  newState['edit_'.concat(x)] = '';
+              });
 
-                  newState.temp_start = false;
-                  newState.temp_end = false;
-                  newState.temp_offset = false;
-                  newState.editMeas = {};
-              //}
+              newState.temp_start = false;
+              newState.temp_end = false;
+              newState.temp_offset = false;
+              newState.editMeas = {};
               this.setState(newState);
           };
       };
@@ -1578,32 +1572,6 @@ class App extends Component {
               }
           </div>
           
-          { /*(this.state.mode === 2 && this.state.selected.meas) &&
-              <Edit left={CONFIG.PANES_WIDTH + CONFIG.CANVAS_PADDING + this.state.viewport + this.state.scale* this.state.selected.meas.offset}
-                top={CONFIG.PLAYBACK_HEIGHT + (this.state.selected.inst + 1)*CONFIG.INST_HEIGHT}
-                width={this.state.selected.meas.ms * this.state.scale}
-              >
-                <form onSubmit={this.confirmEdit} className="measure-form" autoComplete="off">
-                    <StyledInputGroup style={{ maxWidth: '150px', float: 'left', marginTop: '0px' }}>
-                      { edit_inputs }
-                      <InputGroup.Append>
-                        <ArrowButton type="submit" disabled={this.state.selected.inst === -1}>&#x25BA;</ArrowButton>
-                      </InputGroup.Append>
-                    </StyledInputGroup>
-                    <div style={{ float: 'right' }}>
-                        { ['s', 'e', 'd', 'sl', 'l'].map((button, index) =>
-                            <Lock 
-                                type="button"
-                                key={button}
-                                value={index + 1}
-                                onClick={(e) => this.handleLock(index + 1, e)}
-                                checked={this.state.locks.indexOf(index + 1) >= 0}
-                            >{button}</Lock>) }
-                    </div>
-                </form>
-              </Edit>
-          */}
-
 		  {/* PROCESSING COMPONENT */}
           <UI {...propsUI} />
 
@@ -1643,11 +1611,6 @@ class App extends Component {
             }
         <TrackingBar className="tracking" left={(window.innerWidth - CONFIG.CANVAS_PADDING*2 - CONFIG.TOOLBAR_WIDTH) / 3.0 + CONFIG.CANVAS_PADDING}>
         </TrackingBar>
-
-        { this.state.mode === 2 &&
-            <Insert left={(window.innerWidth - CONFIG.TOOLBAR_WIDTH + CONFIG.CANVAS_PADDING) / 3 }/>
-        }
-
 
           {/* footer with modules */}
           <Footer style={{ width: `${window.innerWidth - CONFIG.TOOLBAR_WIDTH - CONFIG.FOOTER_PADDING*2}px`, height: '100px' }}>
