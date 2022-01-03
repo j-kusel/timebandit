@@ -4,7 +4,7 @@
         "dictionaries": ["jsdoc", "closure"]
     },
     "source": {
-        "include": ["src"],
+        "include": [],
         "includePattern": ".+\\.js(doc|x)?$",
         "excludePattern": "(^|\\/|\\\\)_"
     },
@@ -17,7 +17,7 @@
     },
     "opts": {
         "destination": "docs",
-        "recurse": true,
+        "recurse": false,
         "readme": "README.md"
     }
 }

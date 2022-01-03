@@ -30,7 +30,7 @@ const PPQ_OPTIONS = CONFIG.PPQ_OPTIONS.map(o => ({ PPQ_tempo: o[0], PPQ_desc: o[
 // later do custom PPQs
 
 /**
- * calculates range
+ * calculates ranges
  */
 var calcRange = (measures) => {
     let tempo = [];
@@ -68,7 +68,6 @@ if (process.env.NODE_ENV !== 'development')
 
 /**
  * Main React app component
- *
  * @component
  */
 class App extends Component {
@@ -700,7 +699,7 @@ class App extends Component {
   }
 
   /**
-   * Focuses instName input when new instrument tab is opened
+   * Focuses instName input when new instrument tab is opened.
    *
    */
   instToggle(open) {

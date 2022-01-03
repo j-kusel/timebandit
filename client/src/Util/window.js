@@ -1,3 +1,9 @@
+/**
+ * @fileOverview    Code for the Window class
+ * @author          J Kusel
+ * @requires        ../config/CONFIG.json
+ */
+
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
@@ -8,7 +14,7 @@ import _ from 'lodash';
 let selected_obj = {
     inst: -1, meas: false,
 };
-
+// TODO: move to Util/index.js
 let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
     let lock_percent = beat_lock.beat / oldMeas.timesig;
@@ -17,16 +23,37 @@ let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
     else if (type === 'end')
         newMeas.start = newMeas.end - (newMeas.end - lock_tempo)/(1 - lock_percent);
     return newMeas;
-
 }
 
+/**
+ * Window class dependency injection for p5js
+ * @param {Object}  p   p5js Object
+ *
+ * @function
+ * @returns {Object}    {@link Window}
+ */
 export default (p) => {
-    class _Window {
+    /** Class containing p5js state info, display info, and draw methods. */
+    class Window {
+        /** Initialize the Window */
         constructor() {
+            /** Zoom ratio 
+             *  @type {number} 
+             */
             this.scale = 1.0;
+            /** Location of the left bound of the window in milliseconds
+             * @type {number}
+             */
             this.viewport = 0;
+            /** Y-axis scroll location in pixels
+             * @type {number}
+             */
             this.scroll = 0;
+
             this.span = [Infinity, -Infinity];
+            /** Location of the mouse cursor in milliseconds
+             * @type {number}
+             */
             this.cursor_loc = 0;
             this.isPlaying = false;
 
@@ -53,6 +80,9 @@ export default (p) => {
             this.modulation = null;
 
             this.editor = {};
+            /** Info for instrument name input
+             * @type {Object}
+             */
             this.instName = {};
             this.menu_open = false;
             this.menus = [];
@@ -84,6 +114,13 @@ export default (p) => {
          * }
          */
 
+        /** Calculates complete measure information
+         * @param {number}  start   Measure starting tempo
+         * @param {number}  slope   Measure tempo slope
+         * @param {number}  timesig Measure time signature numerator
+         * @param {number}  denom   Measure time signature denominator
+         * @returns {Object}        Calculated beats/ticks/length in ms
+         */
         completeCalc(start, slope, timesig, denom) {
             let divisor = denom/4;
             let tick_total = timesig * this.CONSTANTS.PPQ / divisor;
@@ -106,6 +143,7 @@ export default (p) => {
             return { beats, ticks, ms }
         }
 
+        // TODO
         change_modulation(keyCode, released) {
             let target = 'div' + this.modulation.zone;
             /*if (released) {
@@ -115,13 +153,13 @@ export default (p) => {
             let index = 'tuplet_zone' in this.modulation ?
                 this.modulation.tuplet_zone : 0;
             let num = NUM.indexOf(p.keyCode);
-            console.log(target);
             if (!(target in this.modulation))
                 this.modulation[target] = [0, 0];
             this.modulation[target][index] = num;
             this.calc_metric_modulation();
         }
 
+        // TODO
         calc_metric_modulation() {
             let mod = this.modulation;
             if (this.modulation && 'indexLeft' in this.modulation && 'indexRight' in this.modulation) {
@@ -130,8 +168,6 @@ export default (p) => {
                     'menuLeft' in mod ? mod.divLeft[0] / mod.divLeft[1] : 1,
                     'menuRight' in mod ? mod.divRight[0] / mod.divRight[1] : 1,
                 ];
-                console.log(mod.indexLeft, mod.indexRight);
-                console.log(Math.pow(2, this.modulation.indexLeft-1), Math.pow(2, this.modulation.indexRight-1));
                 this.modulation.next = 
                     (base * 
                         Math.pow(2, this.modulation.indexLeft-1) * 
@@ -152,6 +188,7 @@ export default (p) => {
             return null;
         }
 
+        // TODO
         toggle_entry() {
             this.entry = this.entry.mode ? {} : {
                 mode: true, duration: 2,
@@ -159,10 +196,12 @@ export default (p) => {
             };
         }
 
+        // TODO
         toggle_menu(target) {
             this.menu_open = target || false;
         }
 
+        // TODO
         press_menu(drag) {
             this.menus[this.menu_open].press(drag);
             this.toggle_menu();
@@ -181,14 +220,12 @@ export default (p) => {
             let num = NUM.indexOf(input);
             if (num < 0) return;
             num = num.toString();
-            console.log(this.entry.timer);
             if (this.entry.timer)
                 this.entry.tuplet[this.entry.tuplet_target] += num
             else {
                 this.entry.tuplet[this.entry.tuplet_target] = num;
                 this.entry.timer = p.frameCount + 60;
             }
-            console.log(this.entry.tuplet);
         }
 
         change_entry_duration(input) {
@@ -301,7 +338,11 @@ export default (p) => {
             this.calculate_loop_cache();
         }
 
-
+        /**
+         * Initialize instrument name input Object ([instName]{@link Window#instName}).
+         * @param {number}  inst    Target instrument index
+         * @param {string}  oldName Former instrument name (for reversion)
+         */
         enter_instName(inst, oldName) {
             this.instName = {
                 inst,
@@ -311,6 +352,9 @@ export default (p) => {
             };
         }
 
+        /**
+         * Perform callback for instrument name change and reset [instName]{@link Window#instName}
+         */
         exit_instName(cb) {
             if (cb)
                 cb(this.instName);
@@ -378,7 +422,6 @@ export default (p) => {
 
         copy() {
             this.copied = this.getSelection().map(key => this.selected[key]);
-            console.log(this.copied);
         }
 
         enter_paste_mode() {
@@ -413,6 +456,9 @@ export default (p) => {
             this.POLL_FLAG = type || null;
         }
 
+        /** Handle a keystroke when instrument name input is focused. Modifies [instName]{@link Window#instName}.
+         * @param {number}  input   Numerical keyCode of the keyboard event
+         */
         change_instName(input) {
             let num = NUM.indexOf(p.keyCode);
             let letter = LETTERS[p.keyCode];
@@ -1783,7 +1829,7 @@ export default (p) => {
             p.pop();
         }*/
     };
-    return new _Window();
+    return new Window();
 
 }
 

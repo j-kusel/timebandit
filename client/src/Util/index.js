@@ -1,31 +1,89 @@
+/**
+ * @fileOverview    General purpose calculation methods.
+ * @author          J Kusel
+ * @requires        ../config/CONFIG.json:config
+ */
+
 import c from '../config/CONFIG.json';
+
+/**
+ * @module Util
+ */
 
 const FLOAT_MUL = Math.pow(10, 8);
 const MUL = (x) => Math.round(x*FLOAT_MUL)/FLOAT_MUL;
 
-var lt = (x, y) =>
+/**
+ * Less-than comparison operator with a 10^-8 float threshold.
+ * @param {number} x    first term
+ * @param {number} y    second term
+ * 
+ * @returns {boolean}   comparison truthiness
+ * @function
+ */
+export const lt = (x, y) =>
     (isFinite(x) ? MUL(x):x) //x.toFixed(FLOAT):x)
         < (isFinite(y) ? MUL(y):y)//y.toFixed(FLOAT):y);
-var lte = (x, y) =>
+/**
+ * Less-than comparison operator with a 10^-8 float threshold.
+ * @param {number} x    first term
+ * @param {number} y    second term
+ * 
+ * @returns {boolean}   comparison truthiness
+ * @function
+ */
+export const lte = (x, y) =>
     (isFinite(x) ? MUL(x):x)
         <= (isFinite(y) ? MUL(y):y);
-var gt = (x, y) =>
+/**
+ * Less-than comparison operator with a 10^-8 float threshold.
+ * @param {number} x    first term
+ * @param {number} y    second term
+ * 
+ * @function
+ * @returns {boolean}   comparison truthiness
+ */
+export const gt = (x, y) =>
     (isFinite(x) ? MUL(x):x)
         > (isFinite(y) ? MUL(y):y);
-var gte = (x, y) =>
+/**
+ * Less-than comparison operator with a 10^-8 float threshold.
+ * @param {number} x    first term
+ * @param {number} y    second term
+ * 
+ * @function
+ * @returns {boolean}   comparison truthiness
+ */
+export const gte = (x, y) =>
     (isFinite(x) ? MUL(x):x)
         >= (isFinite(y) ? MUL(y):y);
 
-// returns ms from float tick values
-var abs_location = (ticks, ms, tick_loc) => {
+/**
+ * Returns milliseconds from float tick values
+ * @param {Array.<number>}  ticks       Measure tick array
+ * @param {number}          ms          Measure length in milliseconds
+ * @param {number}          tick_loc    Tick index
+ * 
+ * @function
+ * @returns {number}        Location of specified tick in milliseconds
+ */
+export const abs_location = (ticks, ms, tick_loc) => {
     let s_tick = Math.floor(tick_loc);
     let s_remainder = tick_loc - s_tick;
     return ticks[s_tick] + 
         ((ticks[s_tick+1] || ms) - ticks[s_tick]) * s_remainder;
 };
 
-// tweaks learning rate for nudge algorithms
-var monitor = (gap, new_gap, alpha) => {
+/**
+ * Calculate new learning rate for nudge algorithms based on change in gap.
+ * @param {number}  gap     Previous gap in milliseconds
+ * @param {number}  new_gap New gap in milliseconds
+ * @param {number}  alpha   Previous learning rate
+ * 
+ * @function
+ * @returns {number}        Updated learning rate
+ */
+export const monitor = (gap, new_gap, alpha) => {
     let progress = Math.abs(gap) - Math.abs(new_gap);
     if (gap + new_gap === 0 || progress === 0)
         return alpha;
@@ -37,9 +95,20 @@ var monitor = (gap, new_gap, alpha) => {
     return alpha * (1-perc)/perc;
 };
 
+/**
+ * @typedef {Object} Gap            A numerical description of the left and right bounds of open space.
+ * @property {Array<number>} gaps   A two-element array with left and right bounds, in milliseconds.
+ */
 
-// generates measure.gaps in 'measure' drag mode
-var calc_gaps = (measures, id) => {
+/**
+ * Generates measure.gaps for a target Measure in 'measure' drag mode
+ * @param {Array<Measure>}  measures    Previous gap in milliseconds
+ * @param {string}          id          Id of target measure
+ * 
+ * @function
+ * @returns {{gaps: Array<Gap>, obstacles: Array<Measures>}} Open gaps and Measure obstacles
+ */
+export const calc_gaps = (measures, id) => {
     var last = false;
     if (!(typeof id === 'object'))
         id = [id];
@@ -61,7 +130,8 @@ var calc_gaps = (measures, id) => {
     return { gaps, obstacles };
 };
 
-var global_gaps = (inst_ordereds, selections, addition) => {
+// document this when it's less of a mess
+export const global_gaps = (inst_ordereds, selections, addition) => {
     
     // 'measure' mode
     // i want this elsewhere but there are so many dependencies
@@ -298,8 +368,19 @@ var global_gaps = (inst_ordereds, selections, addition) => {
     return breaks;
 }
 
-// finds adjacent measures and returns their location and distance
-var crowding = (gaps, position, ms, { center=false, strict=false, context=false, impossible=false } = {}) => {
+    
+/**
+ * Finds adjacent measures and returns their location and distance
+ * @param {Array<module:Util~Gap>}  gaps        Array of Gaps in the instrument
+ * @param {number}                  position    Left bound of candidate Measure in milliseconds
+ * @param {number}                  ms          Right bound of candidate Measure in milliseconds
+ * @param {{center: boolean, strict: boolean, context: boolean, impossible: boolean}}
+ *                                  options     Calculation options
+ * 
+ * @function
+ * @returns {Object} Representation of "breathing room" of the Measure-like object in the relevant indexed gap. 
+ */
+export const crowding = (gaps, position, ms, { center=false, strict=false, context=false, impossible=false } = {}) => {
     let final = position + ms;
     let context_final = context ?
         context.position + context.ms : final;
@@ -356,7 +437,16 @@ var crowding = (gaps, position, ms, { center=false, strict=false, context=false,
         }, { start: [0, Infinity], end: [0, Infinity], gap: -1 });
 }
 
-var initial_gap = (gaps, offset, ms, /*current*/) => {
+/**
+ * Finds initial "wiggle room" of the Measure-like object when beginning a selection's 'measure' drag.
+ * @param {Array<module:Util~Gap>}  gaps        Array of Gaps in the instrument
+ * @param {number}                  offset      Left bound of candidate Measure in milliseconds
+ * @param {number}                  ms          Right bound of candidate Measure in milliseconds
+ * 
+ * @function
+ * @returns {Object}                            Representation of "wiggle room" 
+ */
+export const initial_gap = (gaps, offset, ms) => {
     // right now this starts by finding the first 
     let current = -1;
     gaps.some((gap, i) => {
@@ -398,10 +488,13 @@ var initial_gap = (gaps, offset, ms, /*current*/) => {
         ]
     }
     // something here about return false or recurse if negative
-
 }
 
-var anticipate_gap = (gaps, offset, ms, /*current*/) => {
+/**
+ * TODO
+ * @function
+ */
+export const anticipate_gap = (gaps, offset, ms, /*current*/) => {
     let [left, current, right] = [null, null, null];
     let end = offset+ms;
     let valid = gaps.some((gap, i) => {
@@ -437,7 +530,16 @@ var anticipate_gap = (gaps, offset, ms, /*current*/) => {
     return obj;
 }
 
-var MeasureCalc = (features, options) => {
+/**
+ * Finds initial "wiggle room" of the Measure-like object when beginning a selection's 'measure' drag.
+ * @param {Array<module:Util~Gap>}  gaps        Array of Gaps in the instrument
+ * @param {number}                  offset      Left bound of candidate Measure in milliseconds
+ * @param {number}                  ms          Right bound of candidate Measure in milliseconds
+ * 
+ * @function
+ * @returns {Object}                            Representation of "wiggle room" 
+ */
+export const MeasureCalc = (features, options) => {
     let start, end, timesig, denom;
     let PPQ, PPQ_tempo;
     ({ start, end, timesig, denom } = features);
@@ -469,7 +571,15 @@ var MeasureCalc = (features, options) => {
     return {start, end, timesig, denom, beats, ms, ticks, offset: features.offset};
 }
 
-var EventCalc = (meas, param, schema, PPQ) => {
+//TODO
+/**
+ * @param {Measure}         meas        
+ * @param {Array<string>}   param 
+ * @param {Object}          schema          
+ * @function
+ * @returns {Object}                            Event object 
+ */
+export const EventCalc = (meas, param, schema, PPQ) => {
     let data = param[1].replace(/ /g, '').split(':');
     let frac = data[1].split('/').map(n=>parseInt(n,10));
     let event = {
@@ -503,7 +613,15 @@ var EventCalc = (meas, param, schema, PPQ) => {
     return event;
 }
 
-var SchemaCalc = (nominal, parent, denom, PPQ) => {
+/**
+ * @param {string}      nominal        
+ * @param {Object}      parent 
+ * @param {number}      denom          
+ * @param {number}      PPQ
+ * @function
+ * @returns {Object}    Schema object 
+ */
+export const SchemaCalc = (nominal, parent, denom, PPQ) => {
     let schema = {};
 
     console.log(nominal);
@@ -535,15 +653,17 @@ var SchemaCalc = (nominal, parent, denom, PPQ) => {
     schema.tick_beats = Array.from({length: schema.tuplet[0]}, 
         (__,i) => schema.tick_start + i*div);
 
-    console.log(schema);
-
     return schema;
 }
 
-
-
-
-var order_by_key = (obj, key) => {
+/**
+ * Sort a given Object by one of its orderable keys.
+ * @param {Object}      obj     The object to be sorted 
+ * @param {string}      key     The key to sort by
+ * @function
+ * @returns {Array<number>}     An array of sorted values for the given key     
+ */
+export const order_by_key = (obj, key) => {
     var merge = (arrL, arrR) => {
         let lI = 0, rI = 0, sorted=[];
         while (lI < arrL.length && rI < arrR.length)
@@ -562,7 +682,15 @@ var order_by_key = (obj, key) => {
     return sort(Object.keys(obj).map(key => obj[key]));
 };
 
-var check_proximity_by_key = (obj, arr, key) => {
+/**
+ * Determine the closest proximity element of an array by key.
+ * @param {Object}          obj     The candidate object 
+ * @param {Array<Object>}   arr     The array for comparison
+ * @param {string}          key     The key used to measure distance
+ * @function
+ * @returns {number}        The index of the closest object      
+ */
+export const check_proximity_by_key = (obj, arr, key) => {
     let gap = [-1, Infinity];
     let last_gap = [-1, Infinity];
     arr.some((candidate, ind) => {
@@ -574,10 +702,23 @@ var check_proximity_by_key = (obj, arr, key) => {
     });
     return last_gap[0];
 };
-        
-var bit_toggle = (list, item) => list ^ (1 << item);
 
-var parse_bits = (n) => {
+/**
+ * Toggle a bit on and off.
+ * @param {number}      num     The original number 
+ * @param {number}      item    The target bit 
+ * @function
+ * @returns {number}    The modified number
+ */
+export const bit_toggle = (num, item) => num ^ (1 << item);
+
+/**
+ * Count the positive bits in a number.
+ * @param {number}      n   The number 
+ * @function
+ * @returns {number}    The number of positive bits in n
+ */
+export const parse_bits = (n) => {
     let bits = [];
     let counter = 0;
     while(n) {
@@ -588,12 +729,4 @@ var parse_bits = (n) => {
     };
     return bits;
 };
-
-export { MeasureCalc, SchemaCalc, EventCalc, order_by_key, check_proximity_by_key,
-    bit_toggle, parse_bits, crowding, anticipate_gap, initial_gap, calc_gaps, global_gaps,
-    lt, lte, gt, gte,
-    abs_location,
-    monitor
-};
-
 
