@@ -115,11 +115,6 @@ export default (p, Window) => {
         // might need to separate this later but it works for now
         resetDrag() {
             this.drag = Object.assign({}, DRAG_DEFAULT);
-            /*delete this.drag.filter_drag;
-            delete this.move.filter_move;
-            Object.assign(this.drag, { x: 0, y: 0, mode: '' });
-            Object.assign(this.drag, { x: 0, y: 0, mode: '' });
-            */
         }
 
         resetMove() {
@@ -275,6 +270,8 @@ export default (p, Window) => {
                 };
 
                 this.drag.filter_drag = (drag) => {
+                    if (drag === 0)
+                        return [drag, -Infinity, Infinity];
                     if (drag < 0) {
                         let left = search(-drag, breaks.left[0]);
                         if (left[0]) left[0] *= -1;
@@ -293,7 +290,6 @@ export default (p, Window) => {
         }
 
         beatLock() {
-            console.log('locking');
             if (Window.locking(this.rollover.meas, this.rollover.beat))
                 this.drag.mode = 'lock';
         }

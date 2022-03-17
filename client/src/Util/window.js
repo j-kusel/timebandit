@@ -7,23 +7,9 @@
 import c from '../config/CONFIG.json';
 import { primary, secondary, secondary_light, secondary_light2 } from '../config/CONFIG.json';
 import { colors } from 'bandit-lib';
-import { crowding, abs_location } from '../Util/index.js';
+import { crowding, abs_location, tempo_edit } from '../Util/index.js';
 import { NUM, LETTERS, LEFT, RIGHT, DEL, BACK, PERIOD } from './keycodes';
 import _ from 'lodash';
-
-let selected_obj = {
-    inst: -1, meas: false,
-};
-// TODO: move to Util/index.js
-let tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
-    let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
-    let lock_percent = beat_lock.beat / oldMeas.timesig;
-    if (type === 'start')
-        newMeas.end = (lock_tempo - newMeas.start)/lock_percent + newMeas.start
-    else if (type === 'end')
-        newMeas.start = newMeas.end - (newMeas.end - lock_tempo)/(1 - lock_percent);
-    return newMeas;
-}
 
 /**
  * Window class dependency injection for p5js
@@ -60,7 +46,8 @@ export default (p) => {
             // modes: ESC, INS, EDITOR
             this.mode = 0;
             this.panels = false;
-            this.selected = Object.assign({}, selected_obj);
+            this.selected = Object.assign({}, {inst: -1, meas: false});
+    
             this.insts = 0;
             this.mods = {};
 
@@ -1454,7 +1441,7 @@ export default (p) => {
         }
 
         resetSelection() {
-            return Object.assign({}, selected_obj);
+            return Object.assign({}, {inst: -1, meas: false});
         }
 
         getSelection() {

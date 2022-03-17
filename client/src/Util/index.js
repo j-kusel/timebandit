@@ -67,6 +67,25 @@ export const gte = (x, y) =>
  * @function
  * @returns {number}        Location of specified tick in milliseconds
  */
+export const tempo_edit = (oldMeas, newMeas, beat_lock, type) => {
+    let lock_tempo = (oldMeas.end - oldMeas.start)/oldMeas.timesig * beat_lock.beat + oldMeas.start;
+    let lock_percent = beat_lock.beat / oldMeas.timesig;
+    if (type === 'start')
+        newMeas.end = (lock_tempo - newMeas.start)/lock_percent + newMeas.start
+    else if (type === 'end')
+        newMeas.start = newMeas.end - (newMeas.end - lock_tempo)/(1 - lock_percent);
+    return newMeas;
+}
+
+/**
+ * Returns milliseconds from float tick values
+ * @param {Array.<number>}  ticks       Measure tick array
+ * @param {number}          ms          Measure length in milliseconds
+ * @param {number}          tick_loc    Tick index
+ * 
+ * @function
+ * @returns {number}        Location of specified tick in milliseconds
+ */
 export const abs_location = (ticks, ms, tick_loc) => {
     let s_tick = Math.floor(tick_loc);
     let s_remainder = tick_loc - s_tick;
