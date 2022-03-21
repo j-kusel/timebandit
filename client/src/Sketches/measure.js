@@ -49,29 +49,6 @@ var obstacles = [Infinity, -Infinity];
 window.addEventListener("contextmenu", e => e.preventDefault());
 
 
-/* THIS SYSTEM MAY WORK BETTER FOR FRACTIONAL BEATS
-var insert = (list, item) => {
-    if (!list.length)
-        return [item];
-
-    var center = Math.floor(list.length/2);
-    
-    if (item === list[center]) {
-        return list;
-    };
-    if (!center) {
-        if (item > list[0])
-            return list.concat([item]);
-        return [item].concat(list);
-    }
-
-    var left = list.slice(0, center);
-    var right = list.slice(center);
-    if (item > list[center])
-        return left.concat(insert(right, item));
-    return insert(left, item).concat(right);
-}; */
-
 var cap_start;
 var cap_end;
 var capturing = false;
@@ -976,7 +953,7 @@ export default function measure(p) {
         }
 
         if (GIF) {
-            Mouse.draw();
+            //Mouse.draw();
             p.push();
             p.translate(20, p.height - 50);
             [mod_stack, key_stack].forEach(stack =>
@@ -993,6 +970,7 @@ export default function measure(p) {
             p.pop();
         }
             
+        Mouse.draw();
         if (GIF && capturing)
             capturer.capture(document.getElementById('defaultCanvas0'));
     }
@@ -2244,12 +2222,14 @@ export default function measure(p) {
         return;
     }
 
-    p.mouseMoved = function(event) {
+    p.mouseMoved = function() {
         if (!(p.mouseX > 0 && p.mouseX < p.width &&
             p.mouseY > 0 && p.mouseY < p.height
         )) {
+            document.body.style.cursor = 'default';
             return false;
         }
+        document.body.style.cursor = 'none';
 
         // loop/marker
         if (Mouse.rolloverLoop()) return;

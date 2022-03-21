@@ -50,6 +50,17 @@ export default (p, Window) => {
                     this.cursors[icon].icon = img;
                     this.cursors[icon].draw = () => 
                         p.image(img, ...icon_dims[icon]);
+                    //ns-resize is ew-resize rotated
+                    if (icon === 'ew-resize') {
+                        this.cursors['ns-resize'] = {
+                            icon: img,
+                            draw: () => {
+                                p.rotate(p.HALF_PI);
+                                p.image(img, ...icon_dims[icon]);
+                            }
+
+                        }
+                    }
                 })
             );
         }
@@ -321,7 +332,7 @@ export default (p, Window) => {
             return false;
         }
 
-        rolloverMarker(markers) {
+        rolloverMarker() {
             if (p.mouseY < c.PLAYBACK_HEIGHT+6) {
                 let mouseX = p.mouseX - c.PANES_WIDTH - Window.viewport;
                 let rollover = {};
@@ -425,6 +436,8 @@ export default (p, Window) => {
             let beats = meas.cache.beats;
             for (let i=0; i<beats.length; i++) {
                 let beat = beats[i];
+                // which beat?
+                rollover.beat = i;
                 if ((frameX > beat - c.ROLLOVER_TOLERANCE) &&
                     (frameX < beat + c.ROLLOVER_TOLERANCE)
                 ) {
@@ -433,7 +446,7 @@ export default (p, Window) => {
                         && Window.editor.meas.id !== meas.id
                     )
                         Window.editor_hover(tempo);
-                    return Object.assign(rollover, { type: 'beat', beat: i, tempo });
+                    return Object.assign(rollover, { type: 'beat', tempo });
                 } else if (i < meas.cache.beats.length-1) { // last beat has no graph
                     let graph_ro = this.rolloverGraph(rollover, frameX, frameY, meas.cache.graph[i]);
                     if (graph_ro)
@@ -641,54 +654,6 @@ export default (p, Window) => {
             this.rollover = meta;
         }
 
-        /* DEPRECATED
-        rolloverCheck(coords, meta, additional) {
-            // a four-number array checks within a box,
-            // a two-number array checks a point within tolerances
-
-            if (typeof(additional) !== 'function') {
-                additional = () => true;
-            }
-            let tolerance = 0;
-            if (coords.length === 2) {
-                coords.push(coords[0]);
-                coords.push(coords[1]);
-                tolerance = 5;
-            }
-
-
-            let add = additional();
-            if (meta.type === 'tempo') {
-                p.push();
-                p.fill(0);
-                //p.rect(coords[0],coords[1],coords[2],coords[3]);
-                //p.rect(this.loc.x+coords[0],this.loc.y+coords[1],coords[2]-coords[0],coords[3]-coords[1]);
-                p.pop();
-            }
-            let xCheck = () =>
-                (coords[0] === null) ? true :
-                    (p.mouseX >= this.loc.x + coords[0] - tolerance &&
-                    p.mouseX < this.loc.x + coords[2] + tolerance);
-
-            let yCheck = () => 
-                (coords[1] === null) ? true :
-                    (p.mouseY >= this.loc.y + coords[1] - tolerance &&
-                    p.mouseY < this.loc.y + coords[3] + tolerance); 
-
-            if (xCheck() && yCheck() && add) {
-                Object.assign(this._rollover, meta);
-                this.cursor = (meta.meas &&
-                    Window.selected.meas &&
-                    meta.meas.id === Window.selected.meas.id
-                ) ?
-                    cursors[meta.type](Window.mods) :
-                    'default';
-                return true;
-            }
-            return false;
-        }
-        */
-
         dragCursorUpdate() {
             if (this.drag.mode === 'measure')
                 this.cursor = 'ew-resize'
@@ -719,8 +684,6 @@ export default (p, Window) => {
             // if rolling over an editor option
             if (this.rollover.type && this.rollover.type.indexOf('marking') > -1)
                 this.cursor = 'text';
-
-            document.body.style.cursor = this.cursor;
         }
 
         buttonCheck(buttons) {
